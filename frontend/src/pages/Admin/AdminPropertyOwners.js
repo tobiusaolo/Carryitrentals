@@ -59,7 +59,9 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
-import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
+import { showSuccess, showError, showConfirm, showLoading, showWarning, closeAlert } from '../../utils/sweetAlert';
+import adminAPI from '../../services/api/adminAPI';
+import { propertyAPI } from '../../services/api/propertyAPI';
 
 const AdminPropertyOwners = () => {
   const dispatch = useDispatch();
@@ -92,78 +94,77 @@ const AdminPropertyOwners = () => {
 
   const loadPropertyOwners = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await dispatch(fetchProperties());
+      // Get all users
+      const usersResponse = await adminAPI.getAllUsers();
+      const allUsers = Array.isArray(usersResponse) ? usersResponse : [];
       
-      // Mock property owners data with high-level information
-      const ownersData = [
-        {
-          id: 1,
-          name: 'Admin User',
-          email: 'admin@example.com',
-          phone: '+256 700 123 456',
-          location: 'Kampala, Uganda',
-          totalProperties: 1,
-          totalUnits: 300,
-          occupiedUnits: 285,
-          availableUnits: 15,
-          totalTenants: 285,
-          monthlyRevenue: 360000,
-          growthRate: 15.2,
-          status: 'active',
-          joinDate: '2024-01-15',
-          lastActivity: '2 hours ago',
-          properties: [
-            {
-              id: 1,
-              name: 'Kiwo Estates',
-              location: 'Kampala, Uganda',
-              units: 300,
-              occupied: 285,
-              revenue: 360000
-            }
-          ]
-        },
-        {
-          id: 2,
-          name: 'Test User',
-          email: 'test@example.com',
-          phone: '+256 700 789 012',
-          location: 'Entebbe, Uganda',
-          totalProperties: 5,
-          totalUnits: 15,
-          occupiedUnits: 12,
-          availableUnits: 3,
-          totalTenants: 12,
-          monthlyRevenue: 27000,
-          growthRate: 8.5,
-          status: 'active',
-          joinDate: '2024-02-20',
-          lastActivity: '1 day ago',
-          properties: [
-            {
-              id: 2,
-              name: 'Sunset Apartments',
-              location: 'Entebbe, Uganda',
-              units: 8,
-              occupied: 6,
-              revenue: 18000
-            },
-            {
-              id: 3,
-              name: 'Garden Villas',
-              location: 'Entebbe, Uganda',
-              units: 7,
-              occupied: 6,
-              revenue: 9000
-            }
-          ]
-        }
-      ];
-
+      // Filter for owners only
+      const owners = allUsers.filter(user => user.role === 'owner');
+      
+      // Get all properties to calculate stats
+      const propertiesResponse = await adminAPI.getAllProperties();
+      const allProperties = Array.isArray(propertiesResponse) ? propertiesResponse : [];
+      
+      // Get all rental units
+      const unitsResponse = await adminAPI.getAllRentalUnits();
+      const allRentalUnits = Array.isArray(unitsResponse) ? unitsResponse : [];
+      
+      // Process each owner to get their stats
+      const ownersData = await Promise.all(owners.map(async (owner) => {
+        // Get properties owned by this user
+        const ownerProperties = allProperties.filter(prop => prop.owner_id === owner.id);
+        
+        // Get rental units for owner's properties
+        const propertyIds = ownerProperties.map(p => p.id);
+        const ownerRentalUnits = allRentalUnits.filter(unit => propertyIds.includes(unit.property_id));
+        
+        // Calculate stats
+        const occupiedUnits = ownerRentalUnits.filter(u => u.status === 'occupied').length;
+        const availableUnits = ownerRentalUnits.filter(u => u.status === 'available').length;
+        const totalUnits = ownerRentalUnits.length;
+        
+        // Calculate monthly revenue (sum of occupied units' rent)
+        const monthlyRevenue = ownerRentalUnits
+          .filter(u => u.status === 'occupied')
+          .reduce((sum, unit) => sum + (parseFloat(unit.monthly_rent) || 0), 0);
+        
+        // Get tenants count (approximate from occupied units)
+        const totalTenants = occupiedUnits;
+        
+        return {
+          id: owner.id,
+          name: `${owner.first_name} ${owner.last_name}`,
+          email: owner.email,
+          phone: owner.phone || 'Not provided',
+          location: ownerProperties.length > 0 ? ownerProperties[0].location : 'Not specified',
+          totalProperties: ownerProperties.length,
+          totalUnits: totalUnits,
+          occupiedUnits: occupiedUnits,
+          availableUnits: availableUnits,
+          totalTenants: totalTenants,
+          monthlyRevenue: monthlyRevenue,
+          growthRate: 0, // Placeholder - would need historical data
+          status: owner.is_active ? 'active' : 'inactive',
+          joinDate: owner.created_at ? new Date(owner.created_at).toISOString().split('T')[0] : 'N/A',
+          lastActivity: owner.updated_at ? new Date(owner.updated_at).toLocaleDateString() : 'N/A',
+          properties: ownerProperties.map(prop => ({
+            id: prop.id,
+            name: prop.name,
+            location: prop.location,
+            units: totalUnits,
+            occupied: occupiedUnits,
+            revenue: monthlyRevenue
+          }))
+        };
+      }));
+      
       setPropertyOwners(ownersData);
     } catch (err) {
-      setError('Failed to load property owners data');
+      console.error('Failed to load property owners:', err);
+      setError('Failed to load property owners data. Please try again.');
+      showError('Load Failed', 'Unable to fetch property owners information.');
     } finally {
       setLoading(false);
     }
@@ -213,20 +214,18 @@ const AdminPropertyOwners = () => {
     const loadingAlert = showLoading('Updating owner...', 'Please wait');
     
     try {
-      // Simulate API call
+      // TODO: Implement real API call to update user when backend endpoint is available
+      // For now, we'll show a message that editing requires backend implementation
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Update the owner in the list
-      const updatedOwners = propertyOwners.map(owner => 
-        owner.id === selectedOwner.id 
-          ? { ...owner, ...editFormData }
-          : owner
-      );
-      setPropertyOwners(updatedOwners);
-      
       closeAlert();
-      showSuccess('Owner Updated!', 'The owner information has been successfully updated.');
+      showWarning(
+        'Feature Coming Soon', 
+        'User editing functionality requires backend implementation. Contact system administrator.'
+      );
       handleCloseEditDialog();
+      // Reload data to ensure we have the latest
+      await loadPropertyOwners();
     } catch (error) {
       closeAlert();
       showError('Update Failed', 'Failed to update owner information.');
@@ -253,14 +252,17 @@ const AdminPropertyOwners = () => {
       const loadingAlert = showLoading('Deleting owner...', 'Please wait');
       
       try {
-        // Simulate API call
+        // TODO: Implement real API call to delete user when backend endpoint is available
+        // For now, we'll show a message that deletion requires backend implementation
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        const updatedOwners = propertyOwners.filter(o => o.id !== owner.id);
-        setPropertyOwners(updatedOwners);
-        
         closeAlert();
-        showSuccess('Owner Deleted!', 'The owner has been successfully removed from the system.');
+        showWarning(
+          'Feature Coming Soon', 
+          'User deletion functionality requires backend implementation and proper safeguards. Contact system administrator.'
+        );
+        // Reload data to ensure we have the latest
+        await loadPropertyOwners();
       } catch (error) {
         closeAlert();
         showError('Delete Failed', 'Failed to delete owner.');
