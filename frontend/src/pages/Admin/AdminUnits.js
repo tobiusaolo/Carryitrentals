@@ -66,6 +66,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { unitAPI } from '../../services/api/unitAPI';
 import { agentAPI } from '../../services/api/agentAPI';
+import { showSuccess, showError, showWarning, showLoading, closeAlert } from '../../utils/sweetAlert';
 
 const AdminUnits = () => {
   const dispatch = useDispatch();
@@ -208,6 +209,10 @@ const AdminUnits = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+    
+    const loadingAlert = showLoading('Saving unit...', 'Please wait');
+    
     try {
       // Validate required fields
       if (!formData.title || !formData.location || !formData.bedrooms || !formData.bathrooms || !formData.monthly_rent) {
@@ -223,36 +228,11 @@ const AdminUnits = () => {
         return;
       }
 
-      // Convert File objects to base64 strings
-      let imageStrings = [];
-      if (selectedImages.length > 0) {
-        console.log('Converting images:', selectedImages.length);
-        for (const file of selectedImages) {
-          if (typeof file === 'string') {
-            // Already a string (existing image)
-            console.log('Existing image string:', file.substring(0, 50) + '...');
-            imageStrings.push(file);
-          } else {
-            // File object - convert to base64
-            console.log('Converting file to base64:', file.name, file.size);
-            const base64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                console.log('Base64 conversion complete, length:', reader.result.length);
-                resolve(reader.result);
-              };
-              reader.onerror = () => {
-                console.error('Base64 conversion failed');
-                reject(reader.error);
-              };
-              reader.readAsDataURL(file);
-            });
-            imageStrings.push(base64);
-          }
-        }
-        console.log('Final image strings count:', imageStrings.length);
-      }
+      // Separate files (new uploads) from strings (existing images)
+      const newImageFiles = selectedImages.filter(img => img instanceof File || img instanceof Blob);
+      const existingImageStrings = selectedImages.filter(img => typeof img === 'string');
 
+      // Create unit data WITHOUT images to avoid timeout
       let unitData = { 
         ...formData,
         bedrooms: parseInt(formData.bedrooms) || 1,
@@ -260,28 +240,54 @@ const AdminUnits = () => {
         monthly_rent: parseFloat(formData.monthly_rent),
         floor: formData.floor ? parseInt(formData.floor) : null,
         agent_id: formData.agent_id ? parseInt(formData.agent_id) : null,
-        images: imageStrings.length > 0 ? imageStrings.join('|||IMAGE_SEPARATOR|||') : null
+        images: null // Don't send images in initial request to avoid timeout
       };
 
       console.log('Sending rental unit data:', unitData);
       
+      let createdUnit;
       if (editingUnit) {
         // Update existing unit
         if (editingUnit.isRentalUnit) {
-          await unitAPI.updateRentalUnit(editingUnit.id, unitData);
+          createdUnit = await unitAPI.updateRentalUnit(editingUnit.id, unitData);
         } else {
-          await unitAPI.updateUnit(editingUnit.id, unitData);
+          createdUnit = await unitAPI.updateUnit(editingUnit.id, unitData);
         }
       } else {
-        // Create new rental unit with base64 images
-        await unitAPI.createRentalUnit(unitData);
+        // Create new rental unit WITHOUT images first
+        const response = await unitAPI.createRentalUnit(unitData);
+        createdUnit = response.data || response;
       }
+      
+      // Upload images separately using proper file upload endpoint
+      if (newImageFiles.length > 0) {
+        try {
+          console.log('Uploading images separately:', newImageFiles.length);
+          const uploadResponse = await unitAPI.uploadRentalUnitImages(
+            createdUnit.id || editingUnit.id, 
+            newImageFiles
+          );
+          console.log('Images uploaded successfully:', uploadResponse);
+        } catch (uploadErr) {
+          console.error('Failed to upload images:', uploadErr);
+          // Don't fail the whole operation if image upload fails
+          setError('Unit created but image upload failed. Please upload images manually.');
+        }
+      }
+      
+      closeAlert();
+      showSuccess(
+        'Unit Saved!', 
+        editingUnit ? 'The unit has been successfully updated.' : 'New unit has been created successfully.'
+      );
       
       handleCloseDialog();
       loadUnits();
     } catch (err) {
       console.error('Failed to save unit:', err);
       console.error('Error response:', err.response?.data);
+      
+      closeAlert();
       
       let errorMessage = 'Failed to save unit';
       if (err.response?.data?.detail) {
@@ -290,8 +296,11 @@ const AdminUnits = () => {
         } else if (Array.isArray(err.response.data.detail)) {
           errorMessage = err.response.data.detail.map(d => d.msg || d).join(', ');
         }
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
+      showError('Save Failed', errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -799,10 +808,17 @@ const AdminUnits = () => {
                   <Button
                     variant="contained"
                     onClick={handleSubmit}
-                    disabled={selectedImages.length < 5 && !editingUnit}
+                    disabled={loading}
                     sx={{ mt: 1, mr: 1 }}
                   >
-                    {editingUnit ? 'Update' : 'Create'} Unit
+                    {loading ? (
+                      <>
+                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                        {editingUnit ? 'Updating...' : 'Creating...'}
+                      </>
+                    ) : (
+                      `${editingUnit ? 'Update' : 'Create'} Unit`
+                    )}
                   </Button>
                   <Button onClick={handleBack}>
                     Back
