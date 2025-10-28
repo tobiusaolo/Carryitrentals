@@ -73,6 +73,7 @@ const AdminUnits = () => {
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [rentalUnits, setRentalUnits] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -112,9 +113,13 @@ const AdminUnits = () => {
       // Load only rental units (admin-added units for rent)
       const rentalUnitsResponse = await unitAPI.getRentalUnits();
       setRentalUnits(rentalUnitsResponse.data || []);
+      setError(null);
     } catch (err) {
       console.error('Failed to load rental units:', err);
-      setError('Failed to load rental units');
+      // Don't show error for 401s during submission - they're handled elsewhere
+      if (err.response?.status !== 401) {
+        setError('Failed to load rental units');
+      }
     } finally {
       setLoading(false);
     }
@@ -208,7 +213,7 @@ const AdminUnits = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError(null);
     
     const loadingAlert = showLoading('Saving unit...', 'Please wait');
@@ -219,7 +224,7 @@ const AdminUnits = () => {
         closeAlert();
         showError('Validation Error', 'Please fill in all required fields');
         setError('Please fill in all required fields');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
 
@@ -228,7 +233,7 @@ const AdminUnits = () => {
         closeAlert();
         showError('Validation Error', 'Monthly rent must be greater than 0');
         setError('Monthly rent must be greater than 0');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
       
@@ -237,7 +242,7 @@ const AdminUnits = () => {
         closeAlert();
         showWarning('Images Required', 'Please add at least 5 images of the rental unit');
         setError('At least 5 images are required');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
 
@@ -289,13 +294,19 @@ const AdminUnits = () => {
       }
       
       closeAlert();
-      showSuccess(
-        'Unit Saved!', 
-        editingUnit ? 'The unit has been successfully updated.' : 'New unit has been created successfully.'
-      );
       
+      // Close dialog first, then show success
       handleCloseDialog();
-      loadUnits();
+      
+      // Wait a bit for dialog to close, then show success and reload
+      setTimeout(() => {
+        showSuccess(
+          'Unit Saved!', 
+          editingUnit ? 'The unit has been successfully updated.' : 'New unit has been created successfully.'
+        );
+        // Reload units after showing success
+        loadUnits();
+      }, 300);
     } catch (err) {
       console.error('Failed to save unit:', err);
       console.error('Error response:', err.response?.data);
@@ -316,7 +327,7 @@ const AdminUnits = () => {
       showError('Save Failed', errorMessage);
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -822,10 +833,10 @@ const AdminUnits = () => {
                   <Button
                     type="submit"
                     variant="contained"
-                    disabled={loading}
+                    disabled={submitting}
                     sx={{ mt: 1, mr: 1 }}
                   >
-                    {loading ? (
+                    {submitting ? (
                       <>
                         <CircularProgress size={20} sx={{ mr: 1 }} />
                         {editingUnit ? 'Updating...' : 'Creating...'}
