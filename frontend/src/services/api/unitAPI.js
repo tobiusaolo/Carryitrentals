@@ -1,7 +1,5 @@
 import authService from '../authService';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com';
-
 export const unitAPI = {
   // Get all units
   getUnits: (params = {}) => {
@@ -12,7 +10,7 @@ export const unitAPI = {
       }
     });
     const queryString = queryParams.toString();
-    return authService.get(`${API_BASE_URL}/api/v1/units/${queryString ? `?${queryString}` : ''}`);
+    return authService.get(`/units/${queryString ? `?${queryString}` : ''}`);
   },
 
   // Alias for getAllUnits (used by Redux)
@@ -24,7 +22,7 @@ export const unitAPI = {
       }
     });
     const queryString = queryParams.toString();
-    return authService.get(`${API_BASE_URL}/api/v1/units/${queryString ? `?${queryString}` : ''}`);
+    return authService.get(`/units/${queryString ? `?${queryString}` : ''}`);
   },
 
   // Get rental units (for rent)
@@ -36,29 +34,29 @@ export const unitAPI = {
       }
     });
     const queryString = queryParams.toString();
-    return authService.get(`${API_BASE_URL}/api/v1/rental-units/${queryString ? `?${queryString}` : ''}`);
+    return authService.get(`/rental-units/${queryString ? `?${queryString}` : ''}`);
   },
 
   // Get a single unit by ID
-  getUnit: (id) => authService.get(`${API_BASE_URL}/api/v1/units/${id}`),
+  getUnit: (id) => authService.get(`/units/${id}`),
 
   // Create a new unit
-  createUnit: (unitData) => authService.post(`${API_BASE_URL}/api/v1/units/`, unitData),
+  createUnit: (unitData) => authService.post(`/units/`, unitData),
 
   // Create a new rental unit
-  createRentalUnit: (unitData) => authService.post(`${API_BASE_URL}/api/v1/rental-units/`, unitData),
+  createRentalUnit: (unitData) => authService.post(`/rental-units/`, unitData),
 
   // Update an existing unit
-  updateUnit: (id, unitData) => authService.put(`${API_BASE_URL}/api/v1/units/${id}`, unitData),
+  updateUnit: (id, unitData) => authService.put(`/units/${id}`, unitData),
 
   // Update rental unit
-  updateRentalUnit: (id, unitData) => authService.put(`${API_BASE_URL}/api/v1/rental-units/${id}`, unitData),
+  updateRentalUnit: (id, unitData) => authService.put(`/rental-units/${id}`, unitData),
 
   // Delete a unit
-  deleteUnit: (id) => authService.delete(`${API_BASE_URL}/api/v1/units/${id}`),
+  deleteUnit: (id) => authService.delete(`/units/${id}`),
 
   // Delete rental unit
-  deleteRentalUnit: (id) => authService.delete(`${API_BASE_URL}/api/v1/rental-units/${id}`),
+  deleteRentalUnit: (id) => authService.delete(`/rental-units/${id}`),
 
   // Upload unit images
   uploadUnitImages: (id, files) => {
@@ -66,7 +64,7 @@ export const unitAPI = {
     files.forEach((file, index) => {
       formData.append('files', file);
     });
-    return authService.post(`${API_BASE_URL}/api/v1/units/${id}/upload-images`, formData, {
+    return authService.post(`/units/${id}/upload-images`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -79,7 +77,7 @@ export const unitAPI = {
     files.forEach((file, index) => {
       formData.append('files', file);
     });
-    return authService.post(`${API_BASE_URL}/api/v1/rental-units/${id}/upload-images`, formData, {
+    return authService.post(`/rental-units/${id}/upload-images`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -95,6 +93,6 @@ export const unitAPI = {
       }
     });
     const queryString = queryParams.toString();
-    return authService.get(`${API_BASE_URL}/api/v1/units/search/${query}${queryString ? `?${queryString}` : ''}`);
+    return authService.get(`/units/search/${query}${queryString ? `?${queryString}` : ''}`);
   }
 };

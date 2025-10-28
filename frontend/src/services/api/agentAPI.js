@@ -1,7 +1,5 @@
 import authService from '../authService';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com';
-
 export const agentAPI = {
   // Get all agents
   getAgents: (skip = 0, limit = 100) => 
