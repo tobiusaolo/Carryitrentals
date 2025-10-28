@@ -1,0 +1,15 @@
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Allow crawling of all pages
+Allow: /rentals
+Allow: /airbnb
+Allow: /guidelines
+
+# Sitemap location
+Sitemap: https://carryit.com/sitemap.xml
+
+# Crawl delay (optional, in seconds)
+Crawl-delay: 1
+
