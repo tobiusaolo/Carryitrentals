@@ -33,7 +33,8 @@ import {
   List,
   ListItem,
   ListItemAvatar,
-  ListItemText
+  ListItemText,
+  LinearProgress
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -58,6 +59,7 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
+import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
 
 const AdminPropertyOwners = () => {
   const dispatch = useDispatch();
@@ -65,6 +67,7 @@ const AdminPropertyOwners = () => {
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [propertyOwners, setPropertyOwners] = useState([]);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -202,25 +205,69 @@ const AdminPropertyOwners = () => {
     });
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
-    // Update the owner in the list
-    const updatedOwners = propertyOwners.map(owner => 
-      owner.id === selectedOwner.id 
-        ? { ...owner, ...editFormData }
-        : owner
-    );
-    setPropertyOwners(updatedOwners);
-    handleCloseEditDialog();
+    setSubmitting(true);
+    setError(null);
+    
+    const loadingAlert = showLoading('Updating owner...', 'Please wait');
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Update the owner in the list
+      const updatedOwners = propertyOwners.map(owner => 
+        owner.id === selectedOwner.id 
+          ? { ...owner, ...editFormData }
+          : owner
+      );
+      setPropertyOwners(updatedOwners);
+      
+      closeAlert();
+      showSuccess('Owner Updated!', 'The owner information has been successfully updated.');
+      handleCloseEditDialog();
+    } catch (error) {
+      closeAlert();
+      showError('Update Failed', 'Failed to update owner information.');
+      setError('Failed to update owner');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  const handleDeleteOwner = (owner) => {
-    setOwnerToDelete(owner);
-    setDeleteDialogOpen(true);
+  const handleDeleteOwner = async (owner) => {
+    const result = await showConfirm(
+      'Delete Owner?',
+      `Are you sure you want to delete ${owner.name}? This action cannot be undone.`,
+      'Yes, Delete',
+      'Cancel'
+    );
+    
+    if (result.isConfirmed) {
+      setSubmitting(true);
+      const loadingAlert = showLoading('Deleting owner...', 'Please wait');
+      
+      try {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const updatedOwners = propertyOwners.filter(o => o.id !== owner.id);
+        setPropertyOwners(updatedOwners);
+        
+        closeAlert();
+        showSuccess('Owner Deleted!', 'The owner has been successfully removed from the system.');
+      } catch (error) {
+        closeAlert();
+        showError('Delete Failed', 'Failed to delete owner.');
+      } finally {
+        setSubmitting(false);
+      }
+    }
   };
 
   const handleCloseDeleteDialog = () => {
@@ -228,11 +275,27 @@ const AdminPropertyOwners = () => {
     setOwnerToDelete(null);
   };
 
-  const handleConfirmDelete = () => {
-    if (ownerToDelete) {
+  const handleConfirmDelete = async () => {
+    if (!ownerToDelete) return;
+    
+    setSubmitting(true);
+    const loadingAlert = showLoading('Deleting owner...', 'Please wait');
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const updatedOwners = propertyOwners.filter(owner => owner.id !== ownerToDelete.id);
       setPropertyOwners(updatedOwners);
+      
+      closeAlert();
+      showSuccess('Owner Deleted!', 'The owner has been successfully removed from the system.');
       handleCloseDeleteDialog();
+    } catch (error) {
+      closeAlert();
+      showError('Delete Failed', 'Failed to delete owner.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -364,6 +427,8 @@ const AdminPropertyOwners = () => {
             Property Owners Overview
           </Typography>
           
+          {loading && <LinearProgress sx={{ mb: 2 }} />}
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -381,7 +446,25 @@ const AdminPropertyOwners = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {propertyOwners.map((owner) => (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
+                        <CircularProgress />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : propertyOwners.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ py: 3 }}>
+                        <Typography variant="body1" color="text.secondary">
+                          No property owners found.
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : propertyOwners.map((owner) => (
                   <TableRow key={owner.id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -672,8 +755,17 @@ const AdminPropertyOwners = () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseEditDialog}>Cancel</Button>
-            <Button type="submit" variant="contained">Update Owner</Button>
+            <Button onClick={handleCloseEditDialog} disabled={submitting}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  Updating...
+                </>
+              ) : (
+                'Update Owner'
+              )}
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
