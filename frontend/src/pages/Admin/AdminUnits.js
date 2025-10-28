@@ -216,6 +216,8 @@ const AdminUnits = () => {
     try {
       // Validate required fields
       if (!formData.title || !formData.location || !formData.bedrooms || !formData.bathrooms || !formData.monthly_rent) {
+        closeAlert();
+        showError('Validation Error', 'Please fill in all required fields');
         setError('Please fill in all required fields');
         setLoading(false);
         return;
@@ -223,7 +225,18 @@ const AdminUnits = () => {
 
       // Validate monthly_rent is a positive number
       if (parseFloat(formData.monthly_rent) <= 0) {
+        closeAlert();
+        showError('Validation Error', 'Monthly rent must be greater than 0');
         setError('Monthly rent must be greater than 0');
+        setLoading(false);
+        return;
+      }
+      
+      // Validate images - require at least 5 images for new units
+      if (!editingUnit && selectedImages.length < 5) {
+        closeAlert();
+        showWarning('Images Required', 'Please add at least 5 images of the rental unit');
+        setError('At least 5 images are required');
         setLoading(false);
         return;
       }
@@ -543,6 +556,7 @@ const AdminUnits = () => {
         <DialogTitle>
           {editingUnit ? 'Edit Unit' : 'Add New Unit for Rent'}
         </DialogTitle>
+        <form onSubmit={handleSubmit}>
         <DialogContent>
           <Stepper activeStep={activeStep} orientation="vertical">
             <Step>
@@ -806,8 +820,8 @@ const AdminUnits = () => {
                 
                 <Box sx={{ mt: 2 }}>
                   <Button
+                    type="submit"
                     variant="contained"
-                    onClick={handleSubmit}
                     disabled={loading}
                     sx={{ mt: 1, mr: 1 }}
                   >
@@ -820,7 +834,7 @@ const AdminUnits = () => {
                       `${editingUnit ? 'Update' : 'Create'} Unit`
                     )}
                   </Button>
-                  <Button onClick={handleBack}>
+                  <Button type="button" onClick={handleBack}>
                     Back
                   </Button>
                 </Box>
@@ -828,6 +842,7 @@ const AdminUnits = () => {
             </Step>
           </Stepper>
         </DialogContent>
+        </form>
       </Dialog>
 
       {/* View Unit Dialog - World Class Design */}
