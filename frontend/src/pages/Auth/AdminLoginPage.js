@@ -178,7 +178,7 @@ const AdminLoginPage = () => {
               <strong>Admin Credentials:</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Email: admin@example.com
+              Email: carryitadmin@gmail.com
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Password: admin123
