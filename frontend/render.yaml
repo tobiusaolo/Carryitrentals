@@ -2,8 +2,9 @@ services:
   - type: web
     name: carryit-frontend
     env: static
+    rootDir: ./frontend
     buildCommand: npm ci && npm run build
-    staticPublishPath: ./build
+    staticPublishPath: ./frontend/build
     envVars:
       - key: NODE_VERSION
         value: 18.17.0
