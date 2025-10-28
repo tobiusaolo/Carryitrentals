@@ -28,7 +28,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar
+  ListItemAvatar,
+  LinearProgress
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -45,12 +46,14 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { agentAPI } from '../../services/api/agentAPI';
+import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
 
 const AdminAgents = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [agents, setAgents] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -145,30 +148,60 @@ const AdminAgents = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    
+    const loadingAlert = showLoading('Saving agent...', 'Please wait');
+    
     try {
       if (editingAgent) {
         // Update agent
         await agentAPI.updateAgent(editingAgent.id, formData);
+        closeAlert();
+        showSuccess('Agent Updated!', 'The agent information has been successfully updated.');
+        handleCloseDialog();
+        loadAgents();
       } else {
         // Create agent
         await agentAPI.createAgent(formData);
+        closeAlert();
+        showSuccess('Agent Created!', 'New agent has been successfully added to the system.');
+        handleCloseDialog();
+        loadAgents();
       }
-      handleCloseDialog();
-      loadAgents();
     } catch (err) {
       console.error('Failed to save agent:', err);
-      setError('Failed to save agent');
+      closeAlert();
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to save agent';
+      showError('Save Failed', errorMsg);
+      setError(errorMsg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (agentId) => {
-    if (window.confirm('Are you sure you want to delete this agent?')) {
+    const result = await showConfirm(
+      'Delete Agent?',
+      'Are you sure you want to delete this agent? This action cannot be undone.',
+      'Yes, Delete',
+      'Cancel'
+    );
+    
+    if (result.isConfirmed) {
+      const loadingAlert = showLoading('Deleting agent...', 'Please wait');
+      
       try {
         await agentAPI.deleteAgent(agentId);
+        closeAlert();
+        showSuccess('Agent Deleted!', 'The agent has been successfully removed from the system.');
         loadAgents();
       } catch (err) {
         console.error('Failed to delete agent:', err);
-        setError('Failed to delete agent');
+        closeAlert();
+        const errorMsg = err.response?.data?.detail || err.message || 'Failed to delete agent';
+        showError('Delete Failed', errorMsg);
+        setError(errorMsg);
       }
     }
   };
@@ -300,6 +333,8 @@ const AdminAgents = () => {
             </Button>
           </Box>
           
+          {loading && <LinearProgress sx={{ mb: 2 }} />}
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -314,7 +349,25 @@ const AdminAgents = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {agents.map((agent) => (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
+                        <CircularProgress />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : agents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ py: 3 }}>
+                        <Typography variant="body1" color="text.secondary">
+                          No agents found. Click "Add Agent" to create one.
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : agents.map((agent) => (
                   <TableRow key={agent.id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -573,9 +626,16 @@ const AdminAgents = () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained">
-              {editingAgent ? 'Update' : 'Create'} Agent
+            <Button onClick={handleCloseDialog} disabled={submitting}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  {editingAgent ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                `${editingAgent ? 'Update' : 'Create'} Agent`
+              )}
             </Button>
           </DialogActions>
         </form>
