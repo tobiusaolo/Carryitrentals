@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Image Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-image { max-width: 300px; border: 2px solid #ccc; margin: 10px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Simple Base64 Image Test</h1>
+    <div id="status">Loading...</div>
+    <div id="images"></div>
+
+    <script>
+        async function testImages() {
+            try {
+                // Get auth token
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                // Get rental units
+                const unitsResponse = await fetch('http://localhost:8000/api/v1/rental-units/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!unitsResponse.ok) {
+                    throw new Error('Failed to fetch units');
+                }
+                
+                const units = await unitsResponse.json();
+                console.log('Units loaded:', units.length);
+                
+                // Find the real image test unit specifically
+                const unitWithImages = units.find(u => u.title === 'Real Image Test Unit' && u.images && u.images.trim());
+                
+                if (!unitWithImages) {
+                    document.getElementById('status').innerHTML = '<div class="error">No units with images found</div>';
+                    return;
+                }
+                
+                console.log('Unit with images:', unitWithImages.title);
+                console.log('Image data length:', unitWithImages.images.length);
+                
+                const separator = '|||IMAGE_SEPARATOR|||';
+                const images = unitWithImages.images.split(separator).filter(img => img.trim());
+                console.log('Number of images:', images.length);
+                
+                document.getElementById('status').innerHTML = `<div class="success">Found unit "${unitWithImages.title}" with ${images.length} images</div>`;
+                
+                // Display first few images
+                const container = document.getElementById('images');
+                images.slice(0, 3).forEach((image, index) => {
+                    console.log(`Image ${index + 1} preview:`, image.substring(0, 100) + '...');
+                    console.log(`Image ${index + 1} starts with data:`, image.startsWith('data:image/'));
+                    
+                    const imgElement = document.createElement('img');
+                    imgElement.src = image;
+                    imgElement.className = 'test-image';
+                    imgElement.alt = `Test image ${index + 1}`;
+                    
+                    imgElement.onload = () => {
+                        console.log(`Image ${index + 1} loaded successfully`);
+                        imgElement.style.border = '2px solid green';
+                    };
+                    
+                    imgElement.onerror = (e) => {
+                        console.error(`Image ${index + 1} failed to load:`, e);
+                        imgElement.style.border = '2px solid red';
+                        imgElement.alt = `Failed to load image ${index + 1}`;
+                    };
+                    
+                    container.appendChild(imgElement);
+                });
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                document.getElementById('status').innerHTML = `<div class="error">Test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', testImages);
+    </script>
+</body>
+</html>
+

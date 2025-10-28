@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Payment - {{ property.name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .property-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .property-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .property-info p {
+            color: #666;
+            margin: 5px 0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .amount-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .amount-group input {
+            flex: 1;
+        }
+        
+        .currency {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .pay-button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .pay-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .pay-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .success {
+            background: #efe;
+            color: #363;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .mobile-money-info {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .mobile-money-info h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .mobile-money-info p {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Property Payment</h1>
+            <p>Pay rent and utilities for your unit</p>
+        </div>
+        
+        <div class="property-info">
+            <h3>{{ property.name }}</h3>
+            <p><strong>Address:</strong> {{ property.address }}</p>
+            <p><strong>City:</strong> {{ property.city }}, {{ property.state }}</p>
+        </div>
+        
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="phone">Your Phone Number</label>
+                <input type="tel" id="phone" name="phone" placeholder="e.g., 256700000000" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="unit">Select Your Unit</label>
+                <select id="unit" name="unit" required>
+                    <option value="">Choose your unit...</option>
+                    {% for unit in units %}
+                    <option value="{{ unit.id }}" data-rent="{{ unit.monthly_rent }}">
+                        Unit {{ unit.unit_number }} - {{ unit.unit_type.title() }} (UGX {{ unit.monthly_rent }}/month)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="amount">Amount to Pay</label>
+                <div class="amount-group">
+                    <input type="number" id="amount" name="amount" placeholder="0" min="0" step="100" required>
+                    <span class="currency">UGX</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="months">Months to Pay</label>
+                <select id="months" name="months">
+                    <option value="1">1 Month</option>
+                    <option value="2">2 Months</option>
+                    <option value="3">3 Months</option>
+                    <option value="6">6 Months</option>
+                    <option value="12">12 Months</option>
+                </select>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="prepayment" name="prepayment">
+                <label for="prepayment">This is a prepayment (paying ahead of time)</label>
+            </div>
+            
+            <div class="mobile-money-info">
+                <h4>💳 Mobile Money Payment</h4>
+                {% if mtn_number %}
+                <p><strong>MTN Mobile Money:</strong> {{ mtn_number }}</p>
+                {% endif %}
+                {% if airtel_number %}
+                <p><strong>Airtel Money:</strong> {{ airtel_number }}</p>
+                {% endif %}
+                <p>Payment will be processed via mobile money</p>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing payment...</p>
+            </div>
+            
+            <div class="error" id="error"></div>
+            <div class="success" id="success"></div>
+            
+            <button type="submit" class="pay-button" id="payButton">
+                💳 Pay Now
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('unit').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const rent = selectedOption.getAttribute('data-rent');
+            if (rent) {
+                document.getElementById('amount').value = rent;
+            }
+        });
+        
+        document.getElementById('paymentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                phone_number: formData.get('phone'),
+                unit_id: parseInt(formData.get('unit')),
+                amount: parseFloat(formData.get('amount')),
+                months_advance: parseInt(formData.get('months')),
+                is_prepayment: formData.get('prepayment') === 'on'
+            };
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('payButton').disabled = true;
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('success').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/v1/mobile-payment/property/{{ property.id }}/initiate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('success').textContent = 'Payment initiated successfully! Check your phone for mobile money prompt.';
+                    document.getElementById('success').style.display = 'block';
+                } else {
+                    throw new Error(result.detail || 'Payment failed');
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('payButton').disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

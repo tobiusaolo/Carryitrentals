@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Image Display</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        .image-test { max-width: 300px; border: 2px solid #ccc; margin: 10px; }
+        .success { color: green; background: #e8f5e8; padding: 10px; }
+        .error { color: red; background: #ffebee; padding: 10px; }
+        .info { color: blue; background: #e3f2fd; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Image Display</h1>
+    
+    <div id="debug-info"></div>
+    <div id="image-tests"></div>
+
+    <script>
+        async function debugImages() {
+            const debugDiv = document.getElementById('debug-info');
+            const imageTestsDiv = document.getElementById('image-tests');
+            
+            try {
+                // Get auth token
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                debugDiv.innerHTML = '<div class="success">✅ Authentication successful</div>';
+                
+                // Get rental units
+                const unitsResponse = await fetch('http://localhost:8000/api/v1/rental-units/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!unitsResponse.ok) {
+                    throw new Error('Failed to fetch units');
+                }
+                
+                const units = await unitsResponse.json();
+                debugDiv.innerHTML += `<div class="info">📊 Found ${units.length} rental units</div>`;
+                
+                let html = '';
+                
+                units.forEach((unit, unitIndex) => {
+                    html += `<div class="debug-section">`;
+                    html += `<h3>Unit ${unit.id}: ${unit.title}</h3>`;
+                    html += `<p><strong>Location:</strong> ${unit.location}</p>`;
+                    html += `<p><strong>Monthly Rent:</strong> $${unit.monthly_rent}</p>`;
+                    
+                    if (unit.images) {
+                        const imageLength = unit.images.length;
+                        const imageCount = unit.images.split(',').length;
+                        
+                        html += `<div class="info">`;
+                        html += `<p><strong>Images:</strong> ${imageCount} images</p>`;
+                        html += `<p><strong>Total data length:</strong> ${imageLength.toLocaleString()} characters</p>`;
+                        html += `<p><strong>Valid format:</strong> ${unit.images.startsWith('data:image/') ? '✅ Yes' : '❌ No'}</p>`;
+                        html += `<p><strong>Contains base64:</strong> ${unit.images.includes('base64,') ? '✅ Yes' : '❌ No'}</p>`;
+                        html += `</div>`;
+                        
+                        // Test each image (use custom separator)
+                        const separator = '|||IMAGE_SEPARATOR|||';
+                        const images = unit.images.split(separator).filter(img => img.trim());
+                        images.forEach((image, imgIndex) => {
+                            html += `<div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd;">`;
+                            html += `<h4>Image ${imgIndex + 1}</h4>`;
+                            html += `<p><strong>Length:</strong> ${image.length} characters</p>`;
+                            html += `<p><strong>Preview:</strong> ${image.substring(0, 100)}...</p>`;
+                            html += `<p><strong>Starts with data:image:</strong> ${image.startsWith('data:image/') ? '✅ Yes' : '❌ No'}</p>`;
+                            
+                            // Create image element
+                            const imgId = `img-${unitIndex}-${imgIndex}`;
+                            html += `<img id="${imgId}" src="${image}" class="image-test" alt="Test image" 
+                                     onload="document.getElementById('${imgId}').style.border='2px solid green'; console.log('Image ${imgIndex + 1} loaded successfully')"
+                                     onerror="document.getElementById('${imgId}').style.border='2px solid red'; console.error('Image ${imgIndex + 1} failed to load')">`;
+                            
+                            html += `</div>`;
+                        });
+                    } else {
+                        html += `<div class="error">❌ No images</div>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                imageTestsDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Debug failed:', error);
+                debugDiv.innerHTML = `<div class="error">❌ Debug failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Run debug when page loads
+        document.addEventListener('DOMContentLoaded', debugImages);
+    </script>
+</body>
+</html>

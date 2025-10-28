@@ -1,0 +1,4 @@
+# Redirects for Single Page Application (SPA)
+# All routes should serve index.html to enable client-side routing
+
+/*    /index.html   200

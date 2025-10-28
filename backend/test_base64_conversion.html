@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64 Conversion Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .error { color: red; }
+        .success { color: green; }
+        .test-image { max-width: 200px; border: 2px solid #ccc; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Base64 Conversion Test</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Create a test image and convert to base64</h3>
+        <input type="file" id="fileInput" accept="image/*" multiple>
+        <div id="test1-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Test with sample images from server</h3>
+        <button onclick="testServerImages()">Test Server Images</button>
+        <div id="test2-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Create a rental unit with proper base64</h3>
+        <button onclick="createTestUnit()">Create Test Unit</button>
+        <div id="test3-result"></div>
+    </div>
+
+    <script>
+        // Test 1: File input conversion
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+            const resultDiv = document.getElementById('test1-result');
+            
+            if (files.length === 0) {
+                resultDiv.innerHTML = '<div class="error">No files selected</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div>Converting files...</div>';
+            
+            try {
+                const base64Strings = [];
+                
+                for (const file of files) {
+                    console.log(`Converting file: ${file.name}, size: ${file.size}`);
+                    
+                    const base64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            console.log('FileReader result length:', reader.result.length);
+                            console.log('FileReader result preview:', reader.result.substring(0, 100));
+                            resolve(reader.result);
+                        };
+                        reader.onerror = () => {
+                            console.error('FileReader error:', reader.error);
+                            reject(reader.error);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                    
+                    base64Strings.push(base64);
+                    console.log(`Converted ${file.name} to base64, length: ${base64.length}`);
+                }
+                
+                let html = `<div class="success">Successfully converted ${base64Strings.length} files</div>`;
+                
+                base64Strings.forEach((base64, index) => {
+                    html += `
+                        <div class="result">
+                            <h4>Image ${index + 1}:</h4>
+                            <p>Length: ${base64.length} characters</p>
+                            <p>Starts with: ${base64.substring(0, 50)}...</p>
+                            <p>Valid data URL: ${base64.startsWith('data:image/')}</p>
+                            <img src="${base64}" class="test-image" alt="Test image ${index + 1}">
+                        </div>
+                    `;
+                });
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Conversion error:', error);
+                resultDiv.innerHTML = `<div class="error">Conversion failed: ${error.message}</div>`;
+            }
+        });
+        
+        // Test 2: Test server images
+        async function testServerImages() {
+            const resultDiv = document.getElementById('test2-result');
+            resultDiv.innerHTML = '<div>Loading server images...</div>';
+            
+            try {
+                // Get auth token
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                // Get rental units
+                const unitsResponse = await fetch('http://localhost:8000/api/v1/rental-units/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!unitsResponse.ok) {
+                    throw new Error('Failed to fetch units');
+                }
+                
+                const units = await unitsResponse.json();
+                const unitWithImages = units.find(u => u.images && u.images.trim());
+                
+                if (!unitWithImages) {
+                    resultDiv.innerHTML = '<div class="error">No units with images found</div>';
+                    return;
+                }
+                
+                const images = unitWithImages.images.split(',').filter(img => img.trim());
+                let html = `<div class="success">Found unit "${unitWithImages.title}" with ${images.length} images</div>`;
+                
+                images.slice(0, 2).forEach((image, index) => {
+                    html += `
+                        <div class="result">
+                            <h4>Server Image ${index + 1}:</h4>
+                            <p>Length: ${image.length} characters</p>
+                            <p>Starts with: ${image.substring(0, 50)}...</p>
+                            <p>Valid data URL: ${image.startsWith('data:image/')}</p>
+                            <p>Contains base64 data: ${image.includes('base64,')}</p>
+                            <img src="${image}" class="test-image" alt="Server image ${index + 1}" 
+                                 onload="console.log('Server image ${index + 1} loaded')"
+                                 onerror="console.error('Server image ${index + 1} failed to load')">
+                        </div>
+                    `;
+                });
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Server test error:', error);
+                resultDiv.innerHTML = `<div class="error">Server test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Test 3: Create a test unit with proper base64
+        async function createTestUnit() {
+            const resultDiv = document.getElementById('test3-result');
+            resultDiv.innerHTML = '<div>Creating test unit...</div>';
+            
+            try {
+                // Create a simple test image (1x1 pixel PNG)
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, 0, 100, 100);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(25, 25, 50, 50);
+                ctx.fillStyle = '#0000ff';
+                ctx.fillRect(40, 40, 20, 20);
+                
+                const testImageBase64 = canvas.toDataURL('image/png');
+                console.log('Generated test image:', testImageBase64.substring(0, 100));
+                
+                // Get auth token
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                // Create rental unit with test image
+                const unitData = {
+                    title: 'Base64 Test Unit',
+                    location: 'Test Location',
+                    unit_type: 'one_bedroom',
+                    bedrooms: 1,
+                    bathrooms: 1,
+                    monthly_rent: 500.00,
+                    status: 'available',
+                    description: 'Test unit with generated base64 image',
+                    images: testImageBase64
+                };
+                
+                const createResponse = await fetch('http://localhost:8000/api/v1/rental-units/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(unitData)
+                });
+                
+                if (!createResponse.ok) {
+                    throw new Error(`Create failed: ${createResponse.status}`);
+                }
+                
+                const createdUnit = await createResponse.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">Successfully created test unit ID: ${createdUnit.id}</div>
+                    <div class="result">
+                        <h4>Generated Test Image:</h4>
+                        <img src="${testImageBase64}" class="test-image" alt="Generated test image">
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Create test error:', error);
+                resultDiv.innerHTML = `<div class="error">Create test failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
+

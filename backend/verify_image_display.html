@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Real Image Display</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .image-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .test-image {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 3px solid #fff;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .loading { background: #e3f2fd; color: #1976d2; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .info { background: #f3e5f5; color: #7b1fa2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ Real Image Display Verification</h1>
+        <p>Testing if the uploaded real image from sample_images displays correctly</p>
+        
+        <div id="status" class="status loading">Loading image...</div>
+        <div id="image-container" class="image-container"></div>
+        <div id="details"></div>
+    </div>
+
+    <script>
+        async function loadAndDisplayImage() {
+            const statusDiv = document.getElementById('status');
+            const imageContainer = document.getElementById('image-container');
+            const detailsDiv = document.getElementById('details');
+            
+            try {
+                // Get auth token
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+                
+                const loginData = await loginResponse.json();
+                const token = loginData.access_token;
+                
+                statusDiv.innerHTML = '✅ Authenticated successfully';
+                statusDiv.className = 'status success';
+                
+                // Get rental units
+                const unitsResponse = await fetch('http://localhost:8000/api/v1/rental-units/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!unitsResponse.ok) {
+                    throw new Error('Failed to fetch units');
+                }
+                
+                const units = await unitsResponse.json();
+                console.log('Loaded units:', units.length);
+                
+                // Find the unit with real image (should be ID 2)
+                const realImageUnit = units.find(u => u.id === 2 && u.title === 'Real Image Test Unit');
+                
+                if (!realImageUnit) {
+                    throw new Error('Real image test unit not found');
+                }
+                
+                console.log('Found real image unit:', realImageUnit.title);
+                
+                if (!realImageUnit.images) {
+                    throw new Error('No images found in the unit');
+                }
+                
+                const imageData = realImageUnit.images;
+                console.log('Image data length:', imageData.length);
+                console.log('Image preview:', imageData.substring(0, 100));
+                
+                // Create image element
+                const img = document.createElement('img');
+                img.src = imageData;
+                img.className = 'test-image';
+                img.alt = 'Real uploaded image';
+                
+                img.onload = () => {
+                    console.log('✅ Image loaded successfully');
+                    statusDiv.innerHTML = '✅ Image loaded and displayed successfully!';
+                    statusDiv.className = 'status success';
+                    
+                    detailsDiv.innerHTML = `
+                        <div class="status info">
+                            <h3>📊 Image Details:</h3>
+                            <p><strong>Unit:</strong> ${realImageUnit.title}</p>
+                            <p><strong>Location:</strong> ${realImageUnit.location}</p>
+                            <p><strong>Monthly Rent:</strong> $${realImageUnit.monthly_rent}</p>
+                            <p><strong>Image Data Length:</strong> ${imageData.length.toLocaleString()} characters</p>
+                            <p><strong>Image Format:</strong> ${imageData.startsWith('data:image/jpeg') ? 'JPEG' : 'Unknown'}</p>
+                            <p><strong>Image Dimensions:</strong> ${img.naturalWidth} x ${img.naturalHeight} pixels</p>
+                        </div>
+                    `;
+                };
+                
+                img.onerror = (e) => {
+                    console.error('❌ Image failed to load:', e);
+                    statusDiv.innerHTML = '❌ Image failed to load';
+                    statusDiv.className = 'status error';
+                    detailsDiv.innerHTML = `
+                        <div class="status error">
+                            <h3>❌ Error Details:</h3>
+                            <p>Image data length: ${imageData.length} characters</p>
+                            <p>Image preview: ${imageData.substring(0, 100)}...</p>
+                            <p>Check browser console for more details</p>
+                        </div>
+                    `;
+                };
+                
+                imageContainer.appendChild(img);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                statusDiv.className = 'status error';
+            }
+        }
+        
+        // Load image when page loads
+        document.addEventListener('DOMContentLoaded', loadAndDisplayImage);
+    </script>
+</body>
+</html>
