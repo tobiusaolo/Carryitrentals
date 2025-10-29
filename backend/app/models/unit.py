@@ -35,4 +35,4 @@ class Unit(Base):
     mobile_payments = relationship("MobilePayment", back_populates="unit")
     utilities = relationship("UnitUtility", back_populates="unit", cascade="all, delete-orphan")
     inspection_bookings = relationship("InspectionBooking", back_populates="unit", cascade="all, delete-orphan")
-    agent = relationship("Agent", back_populates="assigned_units")
+    agent = relationship("Agent", back_populates="units")
