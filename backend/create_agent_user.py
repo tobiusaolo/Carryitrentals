@@ -14,20 +14,34 @@ from app.models.agent import Agent
 from app.models.enums import UserRole
 
 def create_agent_user():
-    """Create a test agent user."""
+    """Create User account for existing agent in database."""
     db = SessionLocal()
     
     try:
-        # Agent credentials
-        agent_email = "testagent@carryit.com"
-        agent_phone = "+256750371313"
-        agent_password = "agent123"
+        # First, check if there are agents in the agents table
+        existing_agents = db.query(Agent).all()
+        
+        if not existing_agents:
+            print(f"\n⚠️  No agents found in database!")
+            print(f"   Please create an agent first via Admin Panel.")
+            return False
+        
+        print(f"\n📋 Found {len(existing_agents)} agent(s) in database:")
+        for agent in existing_agents:
+            print(f"   - {agent.name} ({agent.email}, {agent.phone})")
+        
+        # Use the first agent's details
+        agent = existing_agents[0]
+        agent_email = agent.email
+        agent_phone = agent.phone
+        agent_name = agent.name
+        agent_password = "agent123"  # Default password
         
         # Check if user already exists
         existing_user = db.query(User).filter(User.email == agent_email).first()
         
         if existing_user:
-            print(f"\n⚠️  Agent user already exists!")
+            print(f"\n⚠️  User account already exists for this agent!")
             print(f"   Email: {agent_email}")
             print(f"   Phone: {agent_phone}")
             print(f"   Role: {existing_user.role}")
@@ -35,20 +49,25 @@ def create_agent_user():
             print(f"   Password: {agent_password}")
             return True
         
-        # Create agent user in users table
-        print(f"\n📝 Creating agent user...")
+        # Create User account in users table for the existing agent
+        print(f"\n📝 Creating User account for agent '{agent_name}'...")
         print(f"   Email: {agent_email}")
         print(f"   Phone: {agent_phone}")
         print(f"   Role: agent")
         
         hashed_password = get_password_hash(agent_password)
         
+        # Extract first and last name
+        name_parts = agent_name.split()
+        first_name = name_parts[0] if name_parts else agent_name
+        last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ""
+        
         agent_user = User(
             email=agent_email,
-            username="testagent",
+            username=agent_email.split('@')[0],  # Use email prefix as username
             hashed_password=hashed_password,
-            first_name="Test",
-            last_name="Agent",
+            first_name=first_name,
+            last_name=last_name,
             phone=agent_phone,
             role=UserRole.AGENT,
             is_active=True,
@@ -59,31 +78,17 @@ def create_agent_user():
         db.commit()
         db.refresh(agent_user)
         
-        # Also create an Agent profile (optional but recommended)
-        agent_profile = Agent(
-            name="Test Agent",
-            email=agent_email,
-            phone=agent_phone,
-            age=30,
-            location="Kampala, Uganda",
-            nin_number="CM12345678901234",
-            specialization="Property Inspections",
-            is_active=True,
-            notes="Test agent created automatically"
-        )
-        
-        db.add(agent_profile)
-        db.commit()
-        
-        print("\n✅ Agent user created successfully!")
+        print("\n✅ User account created successfully for agent!")
         print("\n" + "=" * 70)
         print("Agent Login Credentials".center(70))
         print("=" * 70)
-        print(f"\n   Email:    {agent_email}")
+        print(f"\n   Name:     {agent_name}")
+        print(f"   Email:    {agent_email}")
         print(f"   Phone:    {agent_phone}")
         print(f"   Password: {agent_password}")
         print(f"   Role:     agent")
         print(f"\n   👉 Login at: https://carryitrentals.onrender.com/#/agent-login")
+        print(f"   👉 Use either email OR phone as username")
         print("\n" + "=" * 70)
         
         return True
