@@ -96,10 +96,17 @@ async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     return response_data
 
 @router.post("/agent-login")
-async def agent_phone_login(phone: str, db: Session = Depends(get_db)):
+async def agent_phone_login(request: dict, db: Session = Depends(get_db)):
     """Agent login with phone number only (passwordless)."""
     from ..auth import create_access_token, create_refresh_token
     from ..models.agent import Agent
+    
+    phone = request.get("phone")
+    if not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number is required"
+        )
     
     print(f"DEBUG: Agent login attempt - Phone: '{phone}'")
     
