@@ -95,6 +95,92 @@ async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     
     return response_data
 
+@router.post("/agent-login")
+async def agent_phone_login(phone: str, db: Session = Depends(get_db)):
+    """Agent login with phone number only (passwordless)."""
+    from ..auth import create_access_token, create_refresh_token
+    from ..models.agent import Agent
+    
+    print(f"DEBUG: Agent login attempt - Phone: '{phone}'")
+    
+    # Check if agent exists with this phone number
+    agent = db.query(Agent).filter(Agent.phone == phone).first()
+    
+    if not agent:
+        print(f"DEBUG: Agent not found with phone: {phone}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Agent not found with this phone number"
+        )
+    
+    if not agent.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Agent account is inactive"
+        )
+    
+    print(f"DEBUG: Agent found: {agent.name}")
+    
+    # Find or create corresponding User account
+    user = db.query(User).filter(
+        (User.phone == phone) | (User.email == agent.email)
+    ).first()
+    
+    if not user:
+        # Auto-create user if doesn't exist
+        from ..crud.user import user_crud
+        from ..schemas.user import UserCreate
+        from ..models.enums import UserRole
+        import secrets
+        
+        name_parts = agent.name.split()
+        first_name = name_parts[0] if name_parts else agent.name
+        last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ""
+        
+        user_data = UserCreate(
+            email=agent.email,
+            username=phone,
+            password=secrets.token_urlsafe(32),
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            role=UserRole.AGENT
+        )
+        
+        user = user_crud.create_user(db, user_data)
+        print(f"DEBUG: Created new user for agent")
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User account is inactive"
+        )
+    
+    # Create tokens
+    access_token = create_access_token(data={"sub": user.email})
+    refresh_token = create_refresh_token(data={"sub": user.email})
+    
+    role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    
+    response_data = {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": refresh_token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": role_value,
+            "phone": user.phone,
+            "is_active": user.is_active
+        }
+    }
+    
+    print(f"DEBUG: Agent login successful for: {agent.name}")
+    return response_data
+
 @router.post("/refresh", response_model=Token)
 async def refresh_token(refresh_data: dict, db: Session = Depends(get_db)):
     """Refresh access token using refresh token."""

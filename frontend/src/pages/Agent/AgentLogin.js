@@ -16,8 +16,6 @@ import {
 } from '@mui/material';
 import {
   Phone,
-  Visibility,
-  VisibilityOff,
   PersonPin,
   Login
 } from '@mui/icons-material';
@@ -28,11 +26,7 @@ import authService from '../../services/authService';
 const AgentLogin = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [formData, setFormData] = useState({
-    phone: '',
-    password: ''
-  });
-  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -42,11 +36,15 @@ const AgentLogin = () => {
     setError('');
 
     try {
-      // Login with phone number as username
-      const response = await axios.post('https://carryit-backend.onrender.com/api/v1/auth/login', {
-        email: formData.phone, // Backend expects email field, but we send phone
-        password: formData.password
-      });
+      // Passwordless login with phone number only
+      const response = await axios.post('https://carryit-backend.onrender.com/api/v1/auth/agent-login', 
+        { phone },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
       console.log('=== FULL RESPONSE ===');
       console.log('Status:', response.status);
@@ -117,7 +115,7 @@ const AgentLogin = () => {
       }, 100);
     } catch (err) {
       console.error('Login error:', err);
-      let errorMessage = 'Login failed. Please check your phone number and password.';
+      let errorMessage = 'Login failed. Please check your phone number.';
       
       if (err.response?.data?.detail) {
         // Handle array of validation errors
@@ -171,14 +169,20 @@ const AgentLogin = () => {
                 {error}
               </Alert>
             )}
+            
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <Typography variant="body2">
+                <strong>Passwordless Login</strong> - Just enter your registered phone number
+              </Typography>
+            </Alert>
 
             <form onSubmit={handleSubmit}>
               <TextField
                 fullWidth
                 label="Phone Number"
                 placeholder="+256750371313"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 margin="normal"
                 required
                 InputProps={{
@@ -188,33 +192,7 @@ const AgentLogin = () => {
                     </InputAdornment>
                   )
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                type={showPassword ? 'text' : 'password'}
-                label="Password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                margin="normal"
-                required
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
+                helperText="Enter the phone number registered by your admin"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2

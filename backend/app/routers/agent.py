@@ -136,7 +136,41 @@ async def create_agent(
             detail="Agent with this NIN number already exists"
         )
     
-    return agent_crud.create_agent(db, agent)
+    # Create the agent
+    new_agent = agent_crud.create_agent(db, agent)
+    
+    # Auto-create User account for agent login (phone-only login)
+    from ..crud.user import user_crud
+    from ..schemas.user import UserCreate
+    from ..models.enums import UserRole
+    from ..auth import get_password_hash
+    import secrets
+    
+    # Check if user already exists
+    existing_user = db.query(User).filter(
+        (User.email == agent.email) | (User.phone == agent.phone)
+    ).first()
+    
+    if not existing_user:
+        # Create user account with random password (not used for login)
+        random_password = secrets.token_urlsafe(32)
+        name_parts = agent.name.split()
+        first_name = name_parts[0] if name_parts else agent.name
+        last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ""
+        
+        user_data = UserCreate(
+            email=agent.email,
+            username=agent.phone,  # Use phone as username
+            password=random_password,  # Random password (not used)
+            first_name=first_name,
+            last_name=last_name,
+            phone=agent.phone,
+            role=UserRole.AGENT
+        )
+        
+        user_crud.create_user(db, user_data)
+    
+    return new_agent
 
 @router.get("/", response_model=List[AgentResponse])
 async def get_agents(
