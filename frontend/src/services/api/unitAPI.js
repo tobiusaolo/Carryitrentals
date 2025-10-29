@@ -41,10 +41,10 @@ export const unitAPI = {
   getUnit: (id) => authService.get(`/units/${id}`),
 
   // Create a new unit
-  createUnit: (unitData) => authService.post(`/units/`, unitData),
+  createUnit: (unitData) => authService.post(`/units/`, unitData, { timeout: 120000 }),
 
   // Create a new rental unit
-  createRentalUnit: (unitData) => authService.post(`/rental-units/`, unitData),
+  createRentalUnit: (unitData) => authService.post(`/rental-units/`, unitData, { timeout: 120000 }),
 
   // Update an existing unit
   updateUnit: (id, unitData) => authService.put(`/units/${id}`, unitData),
@@ -68,6 +68,7 @@ export const unitAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 180000, // 3 minutes for large image uploads
     });
   },
 
@@ -81,6 +82,7 @@ export const unitAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 180000, // 3 minutes for large image uploads
     });
   },
 

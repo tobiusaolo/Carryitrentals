@@ -15,11 +15,11 @@ export const agentAPI = {
   
   // Create new agent
   createAgent: (agentData) => 
-    authService.post('/agents/', agentData),
+    authService.post('/agents/', agentData, { timeout: 120000 }), // 2 minutes for image uploads
   
   // Update agent
   updateAgent: (agentId, agentData) => 
-    authService.put(`/agents/${agentId}`, agentData),
+    authService.put(`/agents/${agentId}`, agentData, { timeout: 120000 }), // 2 minutes for image uploads
   
   // Delete agent
   deleteAgent: (agentId) => 

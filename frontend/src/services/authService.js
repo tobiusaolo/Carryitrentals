@@ -21,7 +21,7 @@ class AuthService {
   createAxiosInstance() {
     const instance = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000, // Increased timeout for PDF generation
+      timeout: 120000, // 2 minutes - increased for image uploads, PDF generation, and slow operations
     });
 
     // Request interceptor

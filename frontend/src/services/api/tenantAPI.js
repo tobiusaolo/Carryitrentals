@@ -15,7 +15,7 @@ export const tenantAPI = {
     api.get(`/tenants/${tenantId}`),
   
   createTenant: (tenantData) => 
-    api.post('/tenants', tenantData),
+    api.post('/tenants', tenantData, { timeout: 120000 }), // 2 minutes for complex operations
   
   updateTenant: (tenantId, tenantData) => 
     api.put(`/tenants/${tenantId}`, tenantData),
@@ -54,6 +54,7 @@ export const tenantAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 180000, // 3 minutes for image uploads
     });
   },
   

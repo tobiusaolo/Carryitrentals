@@ -8,10 +8,10 @@ export const propertyAPI = {
     authService.get(`/properties/${propertyId}/`),
   
   createProperty: (propertyData) => 
-    authService.post('/properties/', propertyData),
+    authService.post('/properties/', propertyData, { timeout: 120000 }), // 2 minutes for complex operations
   
   updateProperty: (propertyId, propertyData) => 
-    authService.put(`/properties/${propertyId}/`, propertyData),
+    authService.put(`/properties/${propertyId}/`, propertyData, { timeout: 120000 }), // 2 minutes for complex operations
   
   deleteProperty: (propertyId) => 
     authService.delete(`/properties/${propertyId}/`),
