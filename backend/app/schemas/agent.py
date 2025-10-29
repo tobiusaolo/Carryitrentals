@@ -35,6 +35,7 @@ class AgentUpdate(BaseModel):
 
 class AgentResponse(AgentBase):
     id: int
+    assigned_units: int = 0
     completed_inspections: int = 0
     created_at: datetime
     updated_at: datetime
