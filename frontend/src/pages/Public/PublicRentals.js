@@ -1329,7 +1329,7 @@ const PublicRentals = () => {
                       label={
                         <Box>
                           <Typography variant="body2" fontWeight={600}>
-                            {service.name} - UGX {parseInt(service.price).toLocaleString()}
+                            {service.name}
                           </Typography>
                           {service.description && (
                             <Typography variant="caption" color="text.secondary">

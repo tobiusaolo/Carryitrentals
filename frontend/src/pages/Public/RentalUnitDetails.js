@@ -384,7 +384,7 @@ const RentalUnitDetails = () => {
             <Paper sx={{ p: 3, borderRadius: 3, position: 'sticky', top: 80 }}>
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 3 }}>
                 <Typography variant="h4" fontWeight={700} color="primary">
-                  UGX {parseInt(unit.rental_price).toLocaleString()}
+                  {unit.currency || 'UGX'} {parseInt(unit.monthly_rent || unit.rental_price || 0).toLocaleString()}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   /month
@@ -653,7 +653,7 @@ const RentalUnitDetails = () => {
                       label={
                         <Box>
                           <Typography variant="body2" fontWeight={600}>
-                            {service.name} - UGX {parseInt(service.price).toLocaleString()}
+                            {service.name}
                           </Typography>
                           {service.description && (
                             <Typography variant="caption" color="text.secondary">
