@@ -25,7 +25,10 @@ import {
   ImageList,
   ImageListItem,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Checkbox,
+  FormGroup,
+  FormControlLabel
 } from '@mui/material';
 import {
   ArrowBack,
@@ -42,6 +45,7 @@ import {
   Close
 } from '@mui/icons-material';
 import axios from 'axios';
+import additionalServicesAPI from '../../services/api/additionalServicesAPI';
 
 const RentalUnitDetails = () => {
   const { id } = useParams();
@@ -60,13 +64,16 @@ const RentalUnitDetails = () => {
     email: '',
     preferred_date: '',
     preferred_time: 'morning',
-    message: ''
+    message: '',
+    additional_service_ids: []
   });
   const [submitting, setSubmitting] = useState(false);
   const [alert, setAlert] = useState({ show: false, type: 'success', message: '' });
+  const [additionalServices, setAdditionalServices] = useState([]);
 
   useEffect(() => {
     loadUnit();
+    loadAdditionalServices();
   }, [id]);
 
   const loadUnit = async () => {
@@ -95,6 +102,15 @@ const RentalUnitDetails = () => {
     }
   };
 
+  const loadAdditionalServices = async () => {
+    try {
+      const response = await additionalServicesAPI.getActiveServices();
+      setAdditionalServices(response.data);
+    } catch (err) {
+      console.error('Error loading additional services:', err);
+    }
+  };
+
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? (unit?.images?.length || 1) - 1 : prev - 1));
   };
@@ -118,7 +134,8 @@ const RentalUnitDetails = () => {
         contact_email: bookingData.email || null,
         booking_date: new Date(bookingData.preferred_date).toISOString(),
         preferred_time_slot: bookingData.preferred_time,
-        message: bookingData.message || null
+        message: bookingData.message || null,
+        additional_service_ids: bookingData.additional_service_ids
       });
 
       showAlert('success', 'Inspection booking submitted successfully! We will contact you soon.');
@@ -129,7 +146,8 @@ const RentalUnitDetails = () => {
         email: '',
         preferred_date: '',
         preferred_time: 'morning',
-        message: ''
+        message: '',
+        additional_service_ids: []
       });
     } catch (error) {
       showAlert('error', error.response?.data?.detail || 'Failed to submit booking');
@@ -392,8 +410,17 @@ const RentalUnitDetails = () => {
                 Inspection Fee
               </Typography>
               <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  <strong>UGX 30,000</strong> per house
+                <Typography variant="body2" fontWeight={600}>
+                  <strong>{unit.currency || 'UGX'} {unit.inspection_fee ? parseFloat(unit.inspection_fee).toLocaleString() : '30,000'}</strong> per property
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5 }}>
+                  This fee covers:
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', pl: 1 }}>
+                  • Physical inspection of the property
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', pl: 1, mb: 0.5 }}>
+                  • Video view for the property
                 </Typography>
                 <Typography variant="caption">
                   Fees for multiple houses are negotiable
@@ -515,8 +542,11 @@ const RentalUnitDetails = () => {
         </DialogTitle>
         <DialogContent dividers>
           <Alert severity="info" sx={{ mb: 3 }}>
-            <Typography variant="body2">
-              <strong>Inspection Fee: UGX 30,000</strong>
+            <Typography variant="body2" fontWeight={600}>
+              <strong>Inspection Fee: {unit.currency || 'UGX'} {unit.inspection_fee ? parseFloat(unit.inspection_fee).toLocaleString() : '30,000'}</strong>
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5 }}>
+              This fee covers: Physical inspection & Video view for the property
             </Typography>
             <Typography variant="caption">
               Fees for multiple houses are negotiable
@@ -586,6 +616,57 @@ const RentalUnitDetails = () => {
                 placeholder="Any special requirements..."
               />
             </Grid>
+
+            {/* Additional Services */}
+            {additionalServices.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Additional Services (Optional)
+                </Typography>
+                <FormGroup>
+                  {additionalServices.map((service) => (
+                    <FormControlLabel
+                      key={service.id}
+                      control={
+                        <Checkbox
+                          checked={bookingData.additional_service_ids.includes(service.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setBookingData({
+                                ...bookingData,
+                                additional_service_ids: [
+                                  ...bookingData.additional_service_ids,
+                                  service.id
+                                ]
+                              });
+                            } else {
+                              setBookingData({
+                                ...bookingData,
+                                additional_service_ids: bookingData.additional_service_ids.filter(
+                                  id => id !== service.id
+                                )
+                              });
+                            }
+                          }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {service.name} - UGX {parseInt(service.price).toLocaleString()}
+                          </Typography>
+                          {service.description && (
+                            <Typography variant="caption" color="text.secondary">
+                              {service.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
+                  ))}
+                </FormGroup>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

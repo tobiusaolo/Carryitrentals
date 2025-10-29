@@ -29,6 +29,11 @@ class InspectionBooking(Base):
     tenant = relationship("User", foreign_keys=[tenant_id], back_populates="tenant_inspections")
     owner = relationship("User", foreign_keys=[owner_id], back_populates="owner_inspections")
     payment = relationship("InspectionPayment", back_populates="inspection_booking", uselist=False)
+    additional_services = relationship(
+        "AdditionalService",
+        secondary="inspection_booking_services",
+        back_populates="inspection_bookings"
+    )
 
 
 

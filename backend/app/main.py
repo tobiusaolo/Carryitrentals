@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from .database import engine, Base
-from .routers import auth, property, unit, payment, maintenance, utility, analytics, unit_utility, rental_units, rental_stats, tenant, payment_monitoring, inspections, qr_payment, mobile_payment, property_qr, property_mobile_payment, agent, admin, payment_methods, inspection_payments, webhooks, communications, accounting, reports, airbnb, inspection_bookings
+from .routers import auth, property, unit, payment, maintenance, utility, analytics, unit_utility, rental_units, rental_stats, tenant, payment_monitoring, inspections, qr_payment, mobile_payment, property_qr, property_mobile_payment, agent, admin, payment_methods, inspection_payments, webhooks, communications, accounting, reports, airbnb, inspection_bookings, additional_services
 
 # Import all models to register them with SQLAlchemy
 from .models import *
@@ -98,6 +98,7 @@ app.include_router(accounting.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(airbnb.router, prefix="/api/v1")
 app.include_router(inspection_bookings.router, prefix="/api/v1")
+app.include_router(additional_services.router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

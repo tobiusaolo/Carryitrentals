@@ -5,6 +5,7 @@ from datetime import datetime
 
 from ..database import get_db
 from ..models.inspection_booking import InspectionBooking
+from ..models.additional_service import AdditionalService
 from ..schemas.inspection_booking import PublicInspectionBookingCreate, PublicInspectionBookingResponse
 from ..models.enums import InspectionStatus
 
@@ -18,6 +19,7 @@ async def create_public_inspection_booking(
     """
     Create a public inspection booking (no login required).
     Used for potential tenants to book inspections for rental units.
+    Supports selection of additional services (moving, packaging, cleaning).
     """
     try:
         # Create the inspection booking
@@ -36,6 +38,17 @@ async def create_public_inspection_booking(
         )
         
         db.add(db_booking)
+        db.flush()  # Flush to get the booking ID
+        
+        # Add selected additional services
+        if booking.additional_service_ids:
+            services = db.query(AdditionalService).filter(
+                AdditionalService.id.in_(booking.additional_service_ids),
+                AdditionalService.is_active == True
+            ).all()
+            
+            db_booking.additional_services = services
+        
         db.commit()
         db.refresh(db_booking)
         

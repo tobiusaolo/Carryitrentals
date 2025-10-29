@@ -31,7 +31,8 @@ import {
   Payment as PaymentIcon,
   Message as MessageIcon,
   Description as DescriptionIcon,
-  Bed as AirbnbIcon
+  Bed as AirbnbIcon,
+  MiscellaneousServices as ServicesIcon
 } from '@mui/icons-material';
 
 const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
@@ -68,6 +69,12 @@ const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
       icon: <AssignmentIcon />, 
       path: '/admin/inspections',
       description: 'Manage property inspections'
+    },
+    { 
+      text: 'Additional Services', 
+      icon: <ServicesIcon />, 
+      path: '/admin/additional-services',
+      description: 'Manage inspection services (Moving, Packaging, Cleaning)'
     },
     { 
       text: 'Payment Methods', 

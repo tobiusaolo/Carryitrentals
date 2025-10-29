@@ -59,9 +59,11 @@ async def book_public_inspection(
     
     Inspection fees: UGX 30,000 per property.
     Note: If multiple properties are chosen for inspection, fees will be negotiated at the inspection day.
+    Supports selection of additional services (moving, packaging, cleaning).
     """
     from ..models.inspection_booking import InspectionBooking
     from ..models.rental_unit import RentalUnit
+    from ..models.additional_service import AdditionalService
     
     # Verify rental unit exists
     rental_unit = db.query(RentalUnit).filter(RentalUnit.id == booking.rental_unit_id).first()
@@ -86,6 +88,17 @@ async def book_public_inspection(
     )
     
     db.add(new_booking)
+    db.flush()  # Flush to get the booking ID
+    
+    # Add selected additional services
+    if booking.additional_service_ids:
+        services = db.query(AdditionalService).filter(
+            AdditionalService.id.in_(booking.additional_service_ids),
+            AdditionalService.is_active == True
+        ).all()
+        
+        new_booking.additional_services = services
+    
     db.commit()
     db.refresh(new_booking)
     

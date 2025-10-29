@@ -1,6 +1,7 @@
 from pydantic import BaseModel, validator
 from typing import Optional, List, Any
 from datetime import datetime, date
+from decimal import Decimal
 from ..models import InspectionStatus
 
 # Inspection Booking Schemas
@@ -52,6 +53,7 @@ class PublicInspectionBookingCreate(BaseModel):
     booking_date: datetime
     preferred_time_slot: Optional[str] = None  # morning, afternoon, evening
     message: Optional[str] = None
+    additional_service_ids: Optional[List[int]] = []  # IDs of selected additional services
     
     @validator('contact_phone')
     def validate_phone(cls, v):
@@ -65,6 +67,17 @@ class PublicInspectionBookingCreate(BaseModel):
             raise ValueError('Valid name is required')
         return v
 
+# Additional Service Response Schema (embedded)
+class AdditionalServiceInfo(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: Decimal
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
+
 class PublicInspectionBookingResponse(BaseModel):
     id: int
     rental_unit_id: int
@@ -76,6 +89,7 @@ class PublicInspectionBookingResponse(BaseModel):
     message: Optional[str] = None
     status: InspectionStatus
     created_at: datetime
+    additional_services: List[AdditionalServiceInfo] = []  # List of selected additional services
     
     class Config:
         from_attributes = True

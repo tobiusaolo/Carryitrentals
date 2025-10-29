@@ -33,6 +33,7 @@ import AdminNotifications from './pages/Admin/AdminNotifications';
 import AdminAnalytics from './pages/Admin/AdminAnalytics';
 import AdminPaymentMethods from './pages/Admin/AdminPaymentMethods';
 import AdminSettings from './pages/Admin/AdminSettings';
+import AdditionalServices from './pages/Admin/AdditionalServices';
 import InspectionPayment from './pages/InspectionPayment/InspectionPayment';
 import TestLogin from './pages/TestLogin';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -110,6 +111,7 @@ function App() {
         <Route path="properties" element={<AdminPropertiesOverview />} />
         <Route path="units" element={<AdminUnits />} />
         <Route path="inspections" element={<AdminInspections />} />
+        <Route path="additional-services" element={<AdditionalServices />} />
         <Route path="payment-methods" element={<AdminPaymentMethods />} />
         <Route path="agents" element={<AdminAgents />} />
         <Route path="airbnb" element={<AdminAirbnb />} />

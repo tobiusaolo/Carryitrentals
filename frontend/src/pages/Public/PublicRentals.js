@@ -38,7 +38,10 @@ import {
   ImageListItem,
   Slide,
   Alert,
-  Snackbar
+  Snackbar,
+  Checkbox,
+  FormGroup,
+  FormControlLabel
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -61,6 +64,7 @@ import {
   Star
 } from '@mui/icons-material';
 import axios from 'axios';
+import additionalServicesAPI from '../../services/api/additionalServicesAPI';
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -84,11 +88,13 @@ const PublicRentals = () => {
     contact_email: '',
     booking_date: '',
     preferred_time_slot: 'morning',
-    message: ''
+    message: '',
+    additional_service_ids: []
   });
   const [bookingErrors, setBookingErrors] = useState({});
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [additionalServices, setAdditionalServices] = useState([]);
   
   const [filters, setFilters] = useState({
     search: '',
@@ -100,6 +106,7 @@ const PublicRentals = () => {
 
   useEffect(() => {
     loadRentalUnits();
+    loadAdditionalServices();
   }, []);
 
   useEffect(() => {
@@ -131,6 +138,15 @@ const PublicRentals = () => {
       console.error('Error loading rental units:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAdditionalServices = async () => {
+    try {
+      const response = await additionalServicesAPI.getActiveServices();
+      setAdditionalServices(response.data);
+    } catch (err) {
+      console.error('Error loading additional services:', err);
     }
   };
 
@@ -216,7 +232,8 @@ const PublicRentals = () => {
         contact_email: bookingForm.contact_email || undefined,
         booking_date: new Date(bookingForm.booking_date).toISOString(),
         preferred_time_slot: bookingForm.preferred_time_slot,
-        message: bookingForm.message || undefined
+        message: bookingForm.message || undefined,
+        additional_service_ids: bookingForm.additional_service_ids
       };
       
       // Call public inspection booking API
@@ -238,7 +255,8 @@ const PublicRentals = () => {
         contact_email: '',
         booking_date: '',
         preferred_time_slot: 'morning',
-        message: ''
+        message: '',
+        additional_service_ids: []
       });
       setBookingErrors({});
       
@@ -1010,6 +1028,30 @@ const PublicRentals = () => {
                   </Box>
                 )}
 
+                {/* Inspection Fee Information */}
+                <Box sx={{ mb: 3, p: 2, bgcolor: '#f0f9ff', borderRadius: 2, border: '1px solid #bae6fd' }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: '#0284c7' }}>
+                    Inspection Fee
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} gutterBottom sx={{ color: '#0284c7' }}>
+                    {selectedUnit.currency || 'UGX'} {selectedUnit.inspection_fee ? parseFloat(selectedUnit.inspection_fee).toLocaleString() : '30,000'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    This fee includes:
+                  </Typography>
+                  <Box sx={{ pl: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      • Physical inspection of the property
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      • Video view for the property
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                    Note: Fees for multiple properties are negotiable at the inspection day
+                  </Typography>
+                </Box>
+
                 {/* Amenities */}
                 {selectedUnit.amenities && (
                   <Box sx={{ mb: 3 }}>
@@ -1163,7 +1205,10 @@ const PublicRentals = () => {
           {/* Pricing Information */}
           <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             <Typography variant="body2" fontWeight={600} gutterBottom>
-              Inspection Fee: UGX 30,000 per property
+              Inspection Fee: {selectedUnit?.currency || 'UGX'} {selectedUnit?.inspection_fee ? parseFloat(selectedUnit.inspection_fee).toLocaleString() : '30,000'} per property
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              This fee covers: Physical inspection & Video view for the property
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Note: If you have multiple properties chosen for inspection, fees will be further negotiated at the day of inspection.
@@ -1252,6 +1297,52 @@ const PublicRentals = () => {
               variant="outlined"
               sx={{ borderRadius: 2 }}
             />
+
+            {/* Additional Services */}
+            {additionalServices.length > 0 && (
+              <Box>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Additional Services (Optional)
+                </Typography>
+                <FormGroup>
+                  {additionalServices.map((service) => (
+                    <FormControlLabel
+                      key={service.id}
+                      control={
+                        <Checkbox
+                          checked={bookingForm.additional_service_ids.includes(service.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleBookingFormChange('additional_service_ids', [
+                                ...bookingForm.additional_service_ids,
+                                service.id
+                              ]);
+                            } else {
+                              handleBookingFormChange(
+                                'additional_service_ids',
+                                bookingForm.additional_service_ids.filter(id => id !== service.id)
+                              );
+                            }
+                          }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {service.name} - UGX {parseInt(service.price).toLocaleString()}
+                          </Typography>
+                          {service.description && (
+                            <Typography variant="caption" color="text.secondary">
+                              {service.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            )}
           </Box>
         </DialogContent>
 

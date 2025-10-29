@@ -23,6 +23,9 @@ from .payment_method import PaymentMethod, PaymentMethodType
 from .inspection_payment import InspectionPayment, PaymentStatus as InspectionPaymentStatus
 from .message_template import MessageTemplate
 from .communication_log import CommunicationLog
+from .airbnb import Airbnb
+from .airbnb_booking import AirbnbBooking
+from .additional_service import AdditionalService, inspection_booking_services
 
 # Export all models and enums
 __all__ = [
@@ -59,5 +62,9 @@ __all__ = [
     "PaymentMethod",
     "InspectionPayment",
     "MessageTemplate",
-    "CommunicationLog"
+    "CommunicationLog",
+    "Airbnb",
+    "AirbnbBooking",
+    "AdditionalService",
+    "inspection_booking_services"
 ]

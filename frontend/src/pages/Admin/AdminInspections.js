@@ -600,6 +600,7 @@ const AdminInspections = () => {
                   <TableCell>Date & Time</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Type</TableCell>
+                  <TableCell>Additional Services</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -685,6 +686,27 @@ const AdminInspections = () => {
                         variant="outlined"
                         size="small" 
                       />
+                    </TableCell>
+                    
+                    {/* Additional Services */}
+                    <TableCell>
+                      {inspection.additional_services && inspection.additional_services.length > 0 ? (
+                        <Box>
+                          {inspection.additional_services.map((service, idx) => (
+                            <Chip 
+                              key={idx}
+                              label={service.name}
+                              size="small" 
+                              color="secondary"
+                              sx={{ mb: 0.5, mr: 0.5 }}
+                            />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          None
+                        </Typography>
+                      )}
                     </TableCell>
                     
                     {/* Actions */}
