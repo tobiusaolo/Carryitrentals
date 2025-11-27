@@ -86,6 +86,7 @@ const AdminUnits = () => {
   const [formData, setFormData] = useState({
     title: '',
     location: '',
+    country: 'Uganda',
     unit_type: 'one_bedroom',
     floor: null,
     bedrooms: 1,
@@ -112,7 +113,16 @@ const AdminUnits = () => {
     try {
       // Load only rental units (admin-added units for rent)
       const rentalUnitsResponse = await unitAPI.getRentalUnits();
-      setRentalUnits(rentalUnitsResponse.data || []);
+      const units = rentalUnitsResponse.data || [];
+      console.log('📥 Loaded rental units:', units.length);
+      console.log('📥 Sample unit data:', units[0] ? {
+        id: units[0].id,
+        title: units[0].title,
+        agent_id: units[0].agent_id,
+        agent_name: units[0].agent_name,
+        full_unit: units[0]
+      } : 'No units');
+      setRentalUnits(units);
       setError(null);
     } catch (err) {
       console.error('Failed to load rental units:', err);
@@ -141,6 +151,7 @@ const AdminUnits = () => {
       setFormData({
         title: unit.title,
         location: unit.location,
+        country: unit.country || 'Uganda',
         unit_type: unit.unit_type || 'apartment',
         floor: unit.floor || '',
         bedrooms: unit.bedrooms,
@@ -161,6 +172,7 @@ const AdminUnits = () => {
       setFormData({
         title: '',
         location: '',
+        country: 'Uganda',
         unit_type: 'one_bedroom',
         floor: null,
         bedrooms: 1,
@@ -209,6 +221,25 @@ const AdminUnits = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingUnit(null);
+    setActiveStep(0);
+    setSelectedImages([]);
+    // Reset form data
+    setFormData({
+      title: '',
+      location: '',
+      unit_type: 'one_bedroom',
+      floor: null,
+      bedrooms: 1,
+      bathrooms: 1,
+      monthly_rent: 0,
+      currency: 'USD',
+      inspection_fee: 0,
+      status: 'available',
+      description: '',
+      amenities: '',
+      images: '',
+      agent_id: null
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -246,22 +277,62 @@ const AdminUnits = () => {
         return;
       }
 
+      // Convert File images to base64 strings for Firestore storage
+      const convertFileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      };
+
       // Separate files (new uploads) from strings (existing images)
       const newImageFiles = selectedImages.filter(img => img instanceof File || img instanceof Blob);
       const existingImageStrings = selectedImages.filter(img => typeof img === 'string');
 
-      // Create unit data WITHOUT images to avoid timeout
+      // Convert new image files to base64
+      let base64Images = [...existingImageStrings]; // Start with existing base64 strings
+      if (newImageFiles.length > 0) {
+        try {
+          console.log('Converting images to base64:', newImageFiles.length);
+          const base64Promises = newImageFiles.map(file => convertFileToBase64(file));
+          const convertedImages = await Promise.all(base64Promises);
+          base64Images = [...base64Images, ...convertedImages];
+          console.log('Converted images to base64 successfully');
+        } catch (convertErr) {
+          console.error('Failed to convert images to base64:', convertErr);
+          showError('Image Conversion Failed', 'Failed to process images. Please try again.');
+          setSubmitting(false);
+          closeAlert();
+          return;
+        }
+      }
+
+      // Join base64 images with separator
+      const imagesString = base64Images.length > 0 
+        ? base64Images.join('|||IMAGE_SEPARATOR|||')
+        : null;
+
+      // Create unit data WITH base64 images
       let unitData = { 
         ...formData,
         bedrooms: parseInt(formData.bedrooms) || 1,
         bathrooms: parseInt(formData.bathrooms) || 1,
         monthly_rent: parseFloat(formData.monthly_rent),
         floor: formData.floor ? parseInt(formData.floor) : null,
-        agent_id: formData.agent_id ? parseInt(formData.agent_id) : null,
-        images: null // Don't send images in initial request to avoid timeout
+        agent_id: formData.agent_id ? String(formData.agent_id) : null,  // Keep as string (Firestore IDs are strings)
+        images: imagesString // Send base64 images directly
       };
 
-      console.log('Sending rental unit data:', unitData);
+      console.log('📤 Sending rental unit data:', {
+        title: unitData.title,
+        location: unitData.location,
+        agent_id: unitData.agent_id,
+        agent_id_type: typeof unitData.agent_id,
+        formData_agent_id: formData.agent_id,
+        images: imagesString ? `${imagesString.length} chars (${base64Images.length} images)` : 'null'
+      });
       
       let createdUnit;
       if (editingUnit) {
@@ -272,26 +343,27 @@ const AdminUnits = () => {
           createdUnit = await unitAPI.updateUnit(editingUnit.id, unitData);
         }
       } else {
-        // Create new rental unit WITHOUT images first
+        // Create new rental unit WITH base64 images
         const response = await unitAPI.createRentalUnit(unitData);
         createdUnit = response.data || response;
-      }
-      
-      // Upload images separately using proper file upload endpoint
-      if (newImageFiles.length > 0) {
-        try {
-          console.log('Uploading images separately:', newImageFiles.length);
-          const uploadResponse = await unitAPI.uploadRentalUnitImages(
-            createdUnit.id || editingUnit.id, 
-            newImageFiles
-          );
-          console.log('Images uploaded successfully:', uploadResponse);
-        } catch (uploadErr) {
-          console.error('Failed to upload images:', uploadErr);
-          // Don't fail the whole operation if image upload fails
-          setError('Unit created but image upload failed. Please upload images manually.');
+        
+        // Log the actual response structure
+        console.log('📦 Full API response object:', response);
+        console.log('📦 Response.data:', response.data);
+        if (response && response.data) {
+          console.log('📦 Response.data.agent_id:', response.data.agent_id, '(type:', typeof response.data.agent_id, ')');
+          console.log('📦 Response.data.agent_name:', response.data.agent_name);
+          console.log('📦 Response.data keys:', Object.keys(response.data));
         }
       }
+      
+      console.log('✅ Unit created/updated successfully:', {
+        id: createdUnit?.id || createdUnit?.data?.id,
+        title: createdUnit?.title || createdUnit?.data?.title,
+        agent_id: createdUnit?.agent_id || createdUnit?.data?.agent_id,
+        agent_name: createdUnit?.agent_name || createdUnit?.data?.agent_name,
+        full_response: createdUnit
+      });
       
       closeAlert();
       
@@ -299,13 +371,13 @@ const AdminUnits = () => {
       handleCloseDialog();
       
       // Wait a bit for dialog to close, then show success and reload
-      setTimeout(() => {
+      setTimeout(async () => {
         showSuccess(
           'Unit Saved!', 
           editingUnit ? 'The unit has been successfully updated.' : 'New unit has been created successfully.'
         );
-        // Reload units after showing success
-        loadUnits();
+        // Reload units after showing success to ensure fresh data
+        await loadUnits();
       }, 300);
     } catch (err) {
       console.error('Failed to save unit:', err);
@@ -331,10 +403,22 @@ const AdminUnits = () => {
     }
   };
 
-  const handleView = (unit) => {
+  const handleView = async (unit) => {
     console.log('Viewing unit:', unit);
     console.log('Unit images:', unit.images);
-    setViewingUnit(unit);
+    
+    // Fetch full unit details to ensure we have complete image data
+    try {
+      const fullUnitResponse = await unitAPI.getRentalUnit(unit.id);
+      const fullUnit = fullUnitResponse.data || fullUnitResponse;
+      console.log('Full unit data:', fullUnit);
+      console.log('Full unit images:', fullUnit.images);
+      setViewingUnit(fullUnit);
+    } catch (err) {
+      console.error('Failed to fetch full unit details:', err);
+      // Fallback to using the unit from the list
+      setViewingUnit(unit);
+    }
   };
 
   const handleDelete = async (unitId, isRentalUnit = false) => {
@@ -345,10 +429,15 @@ const AdminUnits = () => {
         } else {
           await unitAPI.deleteUnit(unitId);
         }
-        loadUnits();
+        // Success - refresh data immediately
+        await loadUnits();
+        setError(null); // Clear any previous errors
+        showSuccess('Unit Deleted!', 'The unit has been successfully deleted.');
       } catch (err) {
         console.error('Failed to delete unit:', err);
-        setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Failed to delete unit');
+        const errorMsg = typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Failed to delete unit';
+        setError(errorMsg);
+        showError('Delete Failed', errorMsg);
       }
     }
   };
@@ -502,7 +591,7 @@ const AdminUnits = () => {
                           {unit.title}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Location: {unit.location}
+                          {unit.location}{unit.country ? `, ${unit.country}` : ''}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -595,6 +684,30 @@ const AdminUnits = () => {
                       required
                       placeholder="e.g., Kampala, Nakawa"
                     />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth required>
+                      <InputLabel>Country</InputLabel>
+                      <Select
+                        name="country"
+                        value={formData.country}
+                        label="Country"
+                        onChange={(e) => setFormData({...formData, country: e.target.value})}
+                      >
+                        <MenuItem value="Uganda">Uganda</MenuItem>
+                        <MenuItem value="Kenya">Kenya</MenuItem>
+                        <MenuItem value="Tanzania">Tanzania</MenuItem>
+                        <MenuItem value="Rwanda">Rwanda</MenuItem>
+                        <MenuItem value="Burundi">Burundi</MenuItem>
+                        <MenuItem value="South Sudan">South Sudan</MenuItem>
+                        <MenuItem value="Ethiopia">Ethiopia</MenuItem>
+                        <MenuItem value="Somalia">Somalia</MenuItem>
+                        <MenuItem value="Djibouti">Djibouti</MenuItem>
+                        <MenuItem value="Eritrea">Eritrea</MenuItem>
+                        <MenuItem value="Sudan">Sudan</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
@@ -718,8 +831,12 @@ const AdminUnits = () => {
                       <InputLabel>Assigned Agent</InputLabel>
                       <Select
                         name="agent_id"
-                        value={formData.agent_id}
-                        onChange={(e) => setFormData({...formData, agent_id: e.target.value})}
+                        value={formData.agent_id || ''}
+                        onChange={(e) => {
+                          const selectedAgentId = e.target.value === '' ? null : e.target.value;
+                          console.log('Agent selected:', selectedAgentId, 'from value:', e.target.value);
+                          setFormData({...formData, agent_id: selectedAgentId});
+                        }}
                       >
                         <MenuItem value="">No Agent Assigned</MenuItem>
                         {agents.map((agent) => (
@@ -794,6 +911,11 @@ const AdminUnits = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Please select 5-10 images of the unit. Images should show different angles and rooms.
                   </Typography>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Image Format Tip:</strong> Accepted formats are JPEG, JPG, PNG, or GIF. Maximum file size is 10MB per image.
+                    </Typography>
+                  </Alert>
                   
                   {selectedImages.length > 0 && (
                     <ImageList sx={{ width: '100%', height: 300 }} cols={3} rowHeight={150}>
@@ -989,7 +1111,7 @@ const AdminUnits = () => {
                         </Box>
                       </Box>
                       <Chip 
-                        label={`${viewingUnit.images.split('|||IMAGE_SEPARATOR|||').length} Images`}
+                        label={`${viewingUnit.images && typeof viewingUnit.images === 'string' ? viewingUnit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim()).length : 0} Images`}
                         sx={{ 
                           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                           color: 'white',
@@ -1023,8 +1145,26 @@ const AdminUnits = () => {
                     cols={{ xs: 1, sm: 2, md: 3, lg: 4 }}
                     rowHeight={250}
                   >
-                      {viewingUnit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim()).map((image, index) => {
+                      {viewingUnit.images && typeof viewingUnit.images === 'string' 
+                        ? viewingUnit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim()).map((image, index) => {
                         console.log(`Image ${index + 1}:`, image.substring(0, 100) + '...');
+                        // Images are stored as base64 strings in Firestore, use directly
+                        // If it's not base64 (legacy file path), convert to URL
+                        const getImageUrl = (img) => {
+                          // If it's already base64 or full URL, return as-is
+                          if (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://')) {
+                            return img;
+                          }
+                          // Legacy file path - convert to URL
+                          if (img.startsWith('/')) {
+                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                            return `${apiBaseUrl.replace('/api/v1', '')}${img}`;
+                          }
+                          // Relative path
+                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                          return `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${img}`;
+                        };
+                        const imageUrl = getImageUrl(image);
                         return (
                           <ImageListItem 
                             key={index}
@@ -1041,7 +1181,7 @@ const AdminUnits = () => {
                             }}
                           >
                             <img
-                              src={image}
+                              src={imageUrl}
                               alt={`Unit image ${index + 1}`}
                               loading="lazy"
                               style={{ 
@@ -1051,7 +1191,7 @@ const AdminUnits = () => {
                               }}
                               onLoad={() => console.log(`Image ${index + 1} loaded successfully`)}
                               onError={(e) => {
-                                console.error('Image failed to load:', image.substring(0, 100) + '...');
+                                console.error('Image failed to load:', imageUrl);
                                 e.target.style.display = 'none';
                               }}
                             />
@@ -1079,6 +1219,13 @@ const AdminUnits = () => {
                                   }}
                                   onClick={() => {
                                     // Create a beautiful full-screen image viewer
+                                    // Images are stored as base64, use directly or convert legacy paths
+                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                                    const fullImageUrl = image.startsWith('data:image/') || image.startsWith('http://') || image.startsWith('https://')
+                                      ? image 
+                                      : image.startsWith('/') 
+                                        ? `${apiBaseUrl.replace('/api/v1', '')}${image}`
+                                        : `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${image}`;
                                     const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
                                     newWindow.document.write(`
                                       <html>
@@ -1142,7 +1289,7 @@ const AdminUnits = () => {
                                         <body>
                                           <div class="container">
                                             <div class="title">${viewingUnit.title} - Image ${index + 1}</div>
-                                            <img src="${image}" />
+                                            <img src="${fullImageUrl}" />
                                             <button class="close-btn" onclick="window.close()">Close</button>
                                           </div>
                                         </body>
@@ -1156,7 +1303,9 @@ const AdminUnits = () => {
                             />
                           </ImageListItem>
                         );
-                      })}
+                      }).filter(Boolean)
+                        : []
+                      }
                     </ImageList>
                   </Box>
                 </Box>

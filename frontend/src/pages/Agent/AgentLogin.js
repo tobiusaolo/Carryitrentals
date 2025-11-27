@@ -14,8 +14,10 @@ import {
   Paper,
   CircularProgress,
   Chip,
-  Divider
+  Divider,
+  Avatar
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Phone,
   PersonPin,
@@ -26,6 +28,8 @@ import {
 import axios from 'axios';
 import { setCredentials } from '../../store/slices/authSlice';
 import authService from '../../services/authService';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
 
 const AgentLogin = () => {
   const navigate = useNavigate();
@@ -41,7 +45,7 @@ const AgentLogin = () => {
 
     try {
       // Passwordless login with phone number only
-      const response = await axios.post('https://carryit-backend.onrender.com/api/v1/auth/agent-login', 
+      const response = await axios.post(`${API_BASE_URL}/auth/agent-login`, 
         { phone },
         {
           headers: {
@@ -177,8 +181,22 @@ const AgentLogin = () => {
           >
             Agent Portal
           </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
+            <Avatar
+              src={logoImage}
+              alt="Easy Rentals Logo"
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                border: '2px solid rgba(255,255,255,0.3)'
+              }}
+              variant="rounded"
+            />
+          </Box>
           <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-            CarryIT Property Management System
+            Easy Rentals Property Management System
           </Typography>
         </Box>
 
@@ -340,7 +358,7 @@ const AgentLogin = () => {
         {/* Footer */}
         <Box sx={{ textAlign: 'center', mt: 3 }}>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-            © 2025 CarryIT Property Management. All rights reserved.
+            © 2025 Easy Rentals. All rights reserved.
           </Typography>
         </Box>
       </Container>

@@ -45,6 +45,7 @@ import AgentMyUnits from './pages/Agent/AgentMyUnits';
 import AgentAddUnit from './pages/Agent/AgentAddUnit';
 import AgentInspections from './pages/Agent/AgentInspections';
 import AgentProfile from './pages/Agent/AgentProfile';
+import AgentUnitDetails from './pages/Agent/AgentUnitDetails';
 import AgentProtectedRoute from './components/Auth/AgentProtectedRoute';
 import LandingPage from './pages/Landing/LandingPage';
 import PublicRentals from './pages/Public/PublicRentals';
@@ -133,6 +134,7 @@ function App() {
       }>
         <Route index element={<AgentDashboard />} />
         <Route path="my-units" element={<AgentMyUnits />} />
+        <Route path="unit/:id" element={<AgentUnitDetails />} />
         <Route path="add-unit" element={<AgentAddUnit />} />
         <Route path="inspections" element={<AgentInspections />} />
         <Route path="profile" element={<AgentProfile />} />

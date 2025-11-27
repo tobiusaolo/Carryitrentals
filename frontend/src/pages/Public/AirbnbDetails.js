@@ -62,6 +62,28 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+
+// Country to flag emoji mapping
+const getCountryFlag = (country) => {
+  if (!country) return '';
+  const flagMap = {
+    'Uganda': '🇺🇬',
+    'Kenya': '🇰🇪',
+    'Tanzania': '🇹🇿',
+    'Rwanda': '🇷🇼',
+    'Burundi': '🇧🇮',
+    'South Sudan': '🇸🇸',
+    'Ethiopia': '🇪🇹',
+    'Somalia': '🇸🇴',
+    'Djibouti': '🇩🇯',
+    'Eritrea': '🇪🇷',
+    'Sudan': '🇸🇩',
+    'Other': '🌍'
+  };
+  return flagMap[country] || '🌍';
+};
+
 const AirbnbDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,6 +102,7 @@ const AirbnbDetails = () => {
     guest_phone: '',
     guest_username: '',
     guest_date_of_birth: '',
+    guest_country: 'Uganda',
     check_in: '',
     check_out: '',
     number_of_guests: 1,
@@ -97,8 +120,9 @@ const AirbnbDetails = () => {
   const loadAirbnb = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`https://carryit-backend.onrender.com/api/v1/airbnb/public`);
-      const foundAirbnb = response.data.find(a => a.id === parseInt(id));
+      const response = await axios.get(`${API_BASE_URL}/airbnb/public`);
+      // Firestore uses string IDs, so compare as strings
+      const foundAirbnb = response.data.find(a => String(a.id) === String(id));
       
       if (foundAirbnb) {
         // Parse images
@@ -202,24 +226,25 @@ const AirbnbDetails = () => {
       setSubmitting(true);
       
       // Create booking
-      const response = await axios.post('https://carryit-backend.onrender.com/api/v1/airbnb/bookings', {
-        airbnb_id: airbnb.id,
-        guest_name: bookingData.guest_name,
-        guest_email: bookingData.guest_email,
-        guest_phone: bookingData.guest_phone,
-        guest_username: bookingData.guest_username || null,
+      const response = await axios.post(`${API_BASE_URL}/airbnb/bookings`, {
+        airbnb_id: String(airbnb.id), // Ensure it's a string for Firestore
+        guest_name: bookingData.guest_name.trim(),
+        guest_email: bookingData.guest_email.trim(),
+        guest_phone: bookingData.guest_phone.trim(),
+        guest_username: bookingData.guest_username?.trim() || null,
         guest_date_of_birth: bookingData.guest_date_of_birth || null,
+        guest_country: bookingData.guest_country || 'Uganda',
         check_in: bookingData.check_in,
         check_out: bookingData.check_out,
         number_of_guests: parseInt(bookingData.number_of_guests),
-        special_requests: bookingData.special_requests || null,
+        special_requests: bookingData.special_requests?.trim() || null,
         payment_timing: 'pay_later',
         payment_method: 'pending',
         payment_method_type: 'pending'
       });
       
       setCreatedBookingId(response.data.id);
-      showAlert('success', `Booking request submitted! Booking ID: ${response.data.id}. CarryIT will contact you shortly.`);
+      showAlert('success', `Booking request submitted! Booking ID: ${response.data.id}. Easy Rentals will contact you shortly.`);
       
       // Reset form
       setBookingDialog(false);
@@ -230,6 +255,7 @@ const AirbnbDetails = () => {
         guest_phone: '',
         guest_username: '',
         guest_date_of_birth: '',
+        guest_country: 'Uganda',
         check_in: '',
         check_out: '',
         number_of_guests: 1,
@@ -429,84 +455,185 @@ const AirbnbDetails = () => {
               </Typography>
             </Paper>
 
-            {/* Features & Amenities */}
-            <Paper sx={{ p: 3, mt: 3, borderRadius: 3 }}>
-              <Typography variant="h6" fontWeight={600} gutterBottom>
-                Property Features
+            {/* Features & Amenities - World Class Design */}
+            <Paper sx={{ p: 4, mt: 3, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+              <Typography variant="h5" fontWeight={700} gutterBottom sx={{ mb: 3, color: '#1a202c' }}>
+                Property Features & Amenities
               </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Grid container spacing={3}>
+              <Divider sx={{ mb: 3 }} />
+              
+              {/* Basic Features */}
+              <Grid container spacing={3} sx={{ mb: 4 }}>
                 <Grid item xs={6} sm={4}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Bed sx={{ color: '#667eea' }} />
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Bedrooms
-                      </Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {airbnb.bedrooms}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    p: 2.5,
+                    borderRadius: 3,
+                    bgcolor: '#f7fafc',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      bgcolor: '#edf2f7',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 16px rgba(102, 126, 234, 0.15)'
+                    }
+                  }}>
+                    <Bed sx={{ fontSize: 32, color: '#667eea', mb: 1 }} />
+                    <Typography variant="h4" fontWeight={700} color="#667eea">
+                      {airbnb.bedrooms}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Bedrooms
+                    </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6} sm={4}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Bathtub sx={{ color: '#667eea' }} />
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Bathrooms
-                      </Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {airbnb.bathrooms}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    p: 2.5,
+                    borderRadius: 3,
+                    bgcolor: '#f7fafc',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      bgcolor: '#edf2f7',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 16px rgba(102, 126, 234, 0.15)'
+                    }
+                  }}>
+                    <Bathtub sx={{ fontSize: 32, color: '#667eea', mb: 1 }} />
+                    <Typography variant="h4" fontWeight={700} color="#667eea">
+                      {airbnb.bathrooms}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Bathrooms
+                    </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6} sm={4}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <GuestsIcon sx={{ color: '#667eea' }} />
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Max Guests
-                      </Typography>
-                      <Typography variant="body1" fontWeight={600}>
-                        {airbnb.max_guests}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    p: 2.5,
+                    borderRadius: 3,
+                    bgcolor: '#f7fafc',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      bgcolor: '#edf2f7',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 16px rgba(102, 126, 234, 0.15)'
+                    }
+                  }}>
+                    <GuestsIcon sx={{ fontSize: 32, color: '#667eea', mb: 1 }} />
+                    <Typography variant="h4" fontWeight={700} color="#667eea">
+                      {airbnb.max_guests}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      Max Guests
+                    </Typography>
                   </Box>
                 </Grid>
               </Grid>
 
+              {/* Amenities Section - Premium Display */}
               {airbnb.amenities && (
                 <>
                   <Divider sx={{ my: 3 }} />
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                  <Typography variant="h6" fontWeight={700} gutterBottom sx={{ mb: 2, color: '#1a202c' }}>
                     Amenities
                   </Typography>
-                  <List>
+                  <Box sx={{ 
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
+                    gap: 2
+                  }}>
                     {airbnb.amenities.split(',').map((amenity, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon sx={{ color: '#667eea' }}>
+                      <Box
+                        key={index}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: '#f7fafc',
+                          border: '1px solid rgba(102, 126, 234, 0.1)',
+                          transition: 'all 0.3s',
+                          '&:hover': {
+                            bgcolor: '#eff6ff',
+                            borderColor: '#667eea',
+                            transform: 'translateX(4px)',
+                            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.15)'
+                          }
+                        }}
+                      >
+                        <Box sx={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: '10px',
+                          bgcolor: '#eff6ff',
+                          color: '#667eea'
+                        }}>
                           {getAmenityIcon(amenity)}
-                        </ListItemIcon>
-                        <ListItemText primary={amenity.trim()} />
-                      </ListItem>
+                        </Box>
+                        <Typography variant="body2" fontWeight={600} color="#4a5568">
+                          {amenity.trim()}
+                        </Typography>
+                      </Box>
                     ))}
-                  </List>
+                  </Box>
                 </>
               )}
             </Paper>
 
-            {/* House Rules */}
+            {/* House Rules - Premium Design */}
             {airbnb.house_rules && (
-              <Paper sx={{ p: 3, mt: 3, borderRadius: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  House Rules
-                </Typography>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                  {airbnb.house_rules}
-                </Typography>
+              <Paper sx={{ 
+                p: 4, 
+                mt: 3, 
+                borderRadius: 4, 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                bgcolor: '#fffbf0',
+                border: '1px solid rgba(255, 193, 7, 0.2)'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <Box sx={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 48,
+                    height: 48,
+                    borderRadius: '12px',
+                    bgcolor: '#fff3cd',
+                    color: '#ff9800'
+                  }}>
+                    <CalendarToday sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Typography variant="h5" fontWeight={700} sx={{ color: '#1a202c' }}>
+                    House Rules
+                  </Typography>
+                </Box>
+                <Divider sx={{ mb: 3 }} />
+                <Box sx={{ 
+                  bgcolor: 'white',
+                  p: 3,
+                  borderRadius: 2,
+                  border: '1px solid rgba(0,0,0,0.05)'
+                }}>
+                  <Typography variant="body1" color="text.secondary" sx={{ 
+                    whiteSpace: 'pre-line',
+                    lineHeight: 1.8,
+                    fontSize: '0.95rem'
+                  }}>
+                    {airbnb.house_rules}
+                  </Typography>
+                </Box>
               </Paper>
             )}
           </Grid>
@@ -546,7 +673,7 @@ const AirbnbDetails = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <LocationOn sx={{ color: '#667eea' }} />
                 <Typography variant="body2" color="text.secondary">
-                  {airbnb.location}
+                  {airbnb.location}{airbnb.country ? ` ${getCountryFlag(airbnb.country)} ${airbnb.country}` : ''}
                 </Typography>
               </Box>
 
@@ -736,6 +863,30 @@ const AirbnbDetails = () => {
                 </Grid>
                 
                 <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Country *</InputLabel>
+                    <Select
+                      value={bookingData.guest_country}
+                      onChange={(e) => setBookingData({...bookingData, guest_country: e.target.value})}
+                      label="Country *"
+                    >
+                      <MenuItem value="Uganda">🇺🇬 Uganda</MenuItem>
+                      <MenuItem value="Kenya">🇰🇪 Kenya</MenuItem>
+                      <MenuItem value="Tanzania">🇹🇿 Tanzania</MenuItem>
+                      <MenuItem value="Rwanda">🇷🇼 Rwanda</MenuItem>
+                      <MenuItem value="Burundi">🇧🇮 Burundi</MenuItem>
+                      <MenuItem value="South Sudan">🇸🇸 South Sudan</MenuItem>
+                      <MenuItem value="Ethiopia">🇪🇹 Ethiopia</MenuItem>
+                      <MenuItem value="Somalia">🇸🇴 Somalia</MenuItem>
+                      <MenuItem value="Djibouti">🇩🇯 Djibouti</MenuItem>
+                      <MenuItem value="Eritrea">🇪🇷 Eritrea</MenuItem>
+                      <MenuItem value="Sudan">🇸🇩 Sudan</MenuItem>
+                      <MenuItem value="Other">🌍 Other</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
                     label="Phone Number *"
@@ -860,7 +1011,7 @@ const AirbnbDetails = () => {
                   Review your booking details and submit your request
                 </Typography>
                 <Typography variant="caption">
-                  CarryIT will contact you via email to complete the payment process (50% prepayment required)
+                  Easy Rentals will contact you via email to complete the payment process (50% prepayment required)
                 </Typography>
               </Alert>
 
@@ -885,6 +1036,12 @@ const AirbnbDetails = () => {
                       <Typography variant="body2" fontWeight={600}>{bookingData.guest_date_of_birth}</Typography>
                     </Grid>
                   )}
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Country:</Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {getCountryFlag(bookingData.guest_country)} {bookingData.guest_country}
+                    </Typography>
+                  </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="text.secondary">Phone:</Typography>
                     <Typography variant="body2" fontWeight={600}>{bookingData.guest_phone}</Typography>
@@ -936,10 +1093,10 @@ const AirbnbDetails = () => {
                   Payment Information
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  CarryIT will contact you to arrange payment of 50% prepayment to confirm your booking.
+                  Easy Rentals will contact you to arrange payment of 50% prepayment to confirm your booking.
                 </Typography>
                 <Typography variant="body2" fontWeight={600}>
-                  Contact: stuartkevinz852@gmail.com | carryit@gmail.com | +256754577922
+                  Contact: stuartkevinz852@gmail.com | info@easyrentals.com | +256754577922
                 </Typography>
               </Paper>
 

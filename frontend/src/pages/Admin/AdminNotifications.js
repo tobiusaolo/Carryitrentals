@@ -60,6 +60,8 @@ import {
   DeleteSweep as DeleteSweepIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
+import notificationAPI from '../../services/api/notificationAPI';
+import authService from '../../services/authService';
 
 const AdminNotifications = () => {
   const dispatch = useDispatch();
@@ -73,17 +75,14 @@ const AdminNotifications = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [openDialog, setOpenDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+  const [viewingNotification, setViewingNotification] = useState(null);
   const [editingNotification, setEditingNotification] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     message: '',
-    type: 'info',
-    priority: 'medium',
-    target_audience: 'all',
-    send_email: false,
-    send_sms: false,
-    scheduled_time: '',
-    is_active: true
+    notification_type: 'info',
+    user_id: ''
   });
 
   useEffect(() => {
@@ -98,115 +97,14 @@ const AdminNotifications = () => {
 
   const loadNotifications = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Mock data for now - replace with actual API call
-      const mockNotifications = [
-        {
-          id: 1,
-          title: 'System Maintenance Scheduled',
-          message: 'Scheduled maintenance will occur on Sunday from 2:00 AM to 4:00 AM. The system will be temporarily unavailable.',
-          type: 'warning',
-          priority: 'high',
-          target_audience: 'all',
-          send_email: true,
-          send_sms: false,
-          scheduled_time: '2024-10-27T02:00:00Z',
-          is_active: true,
-          status: 'scheduled',
-          created_at: '2024-10-21T10:00:00Z',
-          sent_at: null,
-          read_count: 0,
-          total_recipients: 25
-        },
-        {
-          id: 2,
-          title: 'Payment Overdue Alert',
-          message: 'Tenant John Doe (Unit 101) has an overdue payment of $1,200. Please follow up.',
-          type: 'error',
-          priority: 'high',
-          target_audience: 'property_owners',
-          send_email: true,
-          send_sms: true,
-          scheduled_time: '2024-10-21T12:00:00Z',
-          is_active: true,
-          status: 'sent',
-          created_at: '2024-10-21T11:30:00Z',
-          sent_at: '2024-10-21T12:00:00Z',
-          read_count: 3,
-          total_recipients: 5
-        },
-        {
-          id: 3,
-          title: 'New Property Registration',
-          message: 'A new property "Garden Villas" has been registered by owner@example.com. Please review and approve.',
-          type: 'info',
-          priority: 'medium',
-          target_audience: 'admins',
-          send_email: true,
-          send_sms: false,
-          scheduled_time: '2024-10-21T14:00:00Z',
-          is_active: true,
-          status: 'sent',
-          created_at: '2024-10-21T13:45:00Z',
-          sent_at: '2024-10-21T14:00:00Z',
-          read_count: 1,
-          total_recipients: 2
-        },
-        {
-          id: 4,
-          title: 'Inspection Completed',
-          message: 'Property inspection for Unit 102 has been completed by Agent Smith. Report is available for review.',
-          type: 'success',
-          priority: 'low',
-          target_audience: 'property_owners',
-          send_email: true,
-          send_sms: false,
-          scheduled_time: '2024-10-21T16:30:00Z',
-          is_active: true,
-          status: 'sent',
-          created_at: '2024-10-21T16:15:00Z',
-          sent_at: '2024-10-21T16:30:00Z',
-          read_count: 2,
-          total_recipients: 3
-        },
-        {
-          id: 5,
-          title: 'System Security Alert',
-          message: 'Multiple failed login attempts detected from IP 192.168.1.200. Security measures have been activated.',
-          type: 'error',
-          priority: 'high',
-          target_audience: 'admins',
-          send_email: true,
-          send_sms: true,
-          scheduled_time: '2024-10-21T18:00:00Z',
-          is_active: true,
-          status: 'sent',
-          created_at: '2024-10-21T17:45:00Z',
-          sent_at: '2024-10-21T18:00:00Z',
-          read_count: 1,
-          total_recipients: 2
-        },
-        {
-          id: 6,
-          title: 'Monthly Report Ready',
-          message: 'Monthly financial report for October 2024 is ready for review. Revenue: $45,000, Expenses: $12,000.',
-          type: 'info',
-          priority: 'medium',
-          target_audience: 'admins',
-          send_email: true,
-          send_sms: false,
-          scheduled_time: '2024-10-22T09:00:00Z',
-          is_active: true,
-          status: 'scheduled',
-          created_at: '2024-10-21T20:00:00Z',
-          sent_at: null,
-          read_count: 0,
-          total_recipients: 2
-        }
-      ];
-      setNotifications(mockNotifications);
+      const api = authService.createAxiosInstance();
+      const response = await api.get('/notifications/all');
+      setNotifications(response.data || []);
     } catch (err) {
-      setError('Failed to load notifications');
+      console.error('Error loading notifications:', err);
+      setError(err.response?.data?.detail || 'Failed to load notifications');
     } finally {
       setLoading(false);
     }
@@ -225,15 +123,55 @@ const AdminNotifications = () => {
 
     // Type filter
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(notification => notification.type === typeFilter);
+      filtered = filtered.filter(notification => notification.notification_type === typeFilter);
     }
 
-    // Status filter
+    // Status filter (is_read)
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(notification => notification.status === statusFilter);
+      if (statusFilter === 'read') {
+        filtered = filtered.filter(notification => notification.is_read === true);
+      } else if (statusFilter === 'unread') {
+        filtered = filtered.filter(notification => notification.is_read === false);
+      }
     }
 
     setFilteredNotifications(filtered);
+  };
+
+  const handleView = async (notification) => {
+    try {
+      const api = authService.createAxiosInstance();
+      const response = await api.get(`/notifications/${notification.id}`);
+      const notificationData = response.data;
+      setViewingNotification(notificationData);
+      setOpenViewDialog(true);
+      
+      // Automatically mark as read when viewing (if not already read)
+      if (!notificationData.is_read) {
+        try {
+          await api.post(`/notifications/${notificationData.id}/mark-read`);
+          // Update the notification in the list immediately
+          setNotifications(prevNotifications =>
+            prevNotifications.map(n =>
+              n.id === notificationData.id ? { ...n, is_read: true } : n
+            )
+          );
+          // Update the viewing notification state
+          setViewingNotification(prev => prev ? { ...prev, is_read: true } : null);
+          
+          // Refresh unread count in navbar if available
+          if (typeof window !== 'undefined' && window.refreshNotificationCount) {
+            window.refreshNotificationCount();
+          }
+        } catch (markReadErr) {
+          console.error('Error marking notification as read:', markReadErr);
+          // Don't show error to user, just log it
+        }
+      }
+    } catch (err) {
+      console.error('Error loading notification:', err);
+      setError(err.response?.data?.detail || 'Failed to load notification details');
+    }
   };
 
   const handleOpenDialog = (notification = null) => {
@@ -242,26 +180,18 @@ const AdminNotifications = () => {
       setFormData({
         title: notification.title,
         message: notification.message,
-        type: notification.type,
-        priority: notification.priority,
-        target_audience: notification.target_audience,
-        send_email: notification.send_email,
-        send_sms: notification.send_sms,
-        scheduled_time: notification.scheduled_time,
-        is_active: notification.is_active
+        notification_type: notification.notification_type,
+        user_id: notification.user_id,
+        is_read: notification.is_read
       });
     } else {
       setEditingNotification(null);
       setFormData({
         title: '',
         message: '',
-        type: 'info',
-        priority: 'medium',
-        target_audience: 'all',
-        send_email: false,
-        send_sms: false,
-        scheduled_time: '',
-        is_active: true
+        notification_type: 'info',
+        user_id: user?.id || '',
+        is_read: false
       });
     }
     setOpenDialog(true);
@@ -274,42 +204,64 @@ const AdminNotifications = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
     try {
+      const api = authService.createAxiosInstance();
       if (editingNotification) {
         // Update notification
-        console.log('Updating notification:', formData);
-        // TODO: Implement update API call
+        await api.put(`/notifications/${editingNotification.id}`, {
+          is_read: formData.is_read !== undefined ? formData.is_read : editingNotification.is_read
+        });
       } else {
         // Create notification
-        console.log('Creating notification:', formData);
-        // TODO: Implement create API call
+        await api.post('/notifications/', {
+          title: formData.title,
+          message: formData.message,
+          notification_type: formData.notification_type,
+          user_id: formData.user_id,
+          is_read: false
+        });
       }
       handleCloseDialog();
-      loadNotifications();
+      setTimeout(() => loadNotifications(), 300);
     } catch (err) {
-      setError('Failed to save notification');
+      console.error('Error saving notification:', err);
+      setError(err.response?.data?.detail || 'Failed to save notification');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (notificationId) => {
     if (window.confirm('Are you sure you want to delete this notification?')) {
+      setLoading(true);
+      setError(null);
       try {
-        console.log('Deleting notification:', notificationId);
-        // TODO: Implement delete API call
-        loadNotifications();
+        const api = authService.createAxiosInstance();
+        await api.delete(`/notifications/${notificationId}`);
+        setTimeout(() => loadNotifications(), 300);
       } catch (err) {
-        setError('Failed to delete notification');
+        console.error('Error deleting notification:', err);
+        setError(err.response?.data?.detail || 'Failed to delete notification');
+      } finally {
+        setLoading(false);
       }
     }
   };
 
   const markAsRead = async (notificationId) => {
+    setLoading(true);
+    setError(null);
     try {
-      console.log('Marking notification as read:', notificationId);
-      // TODO: Implement mark as read API call
-      loadNotifications();
+      const api = authService.createAxiosInstance();
+      await api.post(`/notifications/${notificationId}/mark-read`);
+      setTimeout(() => loadNotifications(), 300);
     } catch (err) {
-      setError('Failed to mark notification as read');
+      console.error('Error marking notification as read:', err);
+      setError(err.response?.data?.detail || 'Failed to mark notification as read');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -406,9 +358,9 @@ const AdminNotifications = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {notifications.filter(n => n.status === 'sent').length}
+                    {notifications.filter(n => n.is_read === true).length}
                   </Typography>
-                  <Typography color="text.secondary">Sent</Typography>
+                  <Typography color="text.secondary">Read</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -423,9 +375,9 @@ const AdminNotifications = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {notifications.filter(n => n.status === 'scheduled').length}
+                    {notifications.filter(n => n.is_read === false).length}
                   </Typography>
-                  <Typography color="text.secondary">Scheduled</Typography>
+                  <Typography color="text.secondary">Unread</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -440,9 +392,9 @@ const AdminNotifications = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {notifications.filter(n => n.priority === 'high').length}
+                    {notifications.filter(n => n.notification_type === 'error' || n.notification_type === 'warning').length}
                   </Typography>
-                  <Typography color="text.secondary">High Priority</Typography>
+                  <Typography color="text.secondary">Alerts</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -474,6 +426,9 @@ const AdminNotifications = () => {
                   <MenuItem value="success">Success</MenuItem>
                   <MenuItem value="warning">Warning</MenuItem>
                   <MenuItem value="error">Error</MenuItem>
+                  <MenuItem value="payment_due">Payment Due</MenuItem>
+                  <MenuItem value="maintenance">Maintenance</MenuItem>
+                  <MenuItem value="lease_expiry">Lease Expiry</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -485,10 +440,8 @@ const AdminNotifications = () => {
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <MenuItem value="all">All Status</MenuItem>
-                  <MenuItem value="sent">Sent</MenuItem>
-                  <MenuItem value="scheduled">Scheduled</MenuItem>
-                  <MenuItem value="failed">Failed</MenuItem>
-                  <MenuItem value="draft">Draft</MenuItem>
+                  <MenuItem value="read">Read</MenuItem>
+                  <MenuItem value="unread">Unread</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -514,119 +467,104 @@ const AdminNotifications = () => {
             Notifications ({filteredNotifications.length} results)
           </Typography>
           
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Notification</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Target</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Delivery</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredNotifications.map((notification) => (
-                  <TableRow key={notification.id}>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {notification.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          {notification.message.length > 100 
-                            ? notification.message.substring(0, 100) + '...' 
-                            : notification.message}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                          Created: {new Date(notification.created_at).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        icon={getTypeIcon(notification.type)}
-                        label={notification.type} 
-                        color={getTypeColor(notification.type)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={notification.priority} 
-                        color={getPriorityColor(notification.priority)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {notification.target_audience}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {notification.total_recipients} recipients
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={notification.status} 
-                        color={getStatusColor(notification.status)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {notification.send_email && (
-                          <Chip 
-                            icon={<EmailIcon />}
-                            label="Email" 
-                            size="small" 
-                            color="primary"
-                          />
-                        )}
-                        {notification.send_sms && (
-                          <Chip 
-                            icon={<SmsIcon />}
-                            label="SMS" 
-                            size="small" 
-                            color="secondary"
-                          />
-                        )}
-                      </Box>
-                      {notification.sent_at && (
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                          Sent: {new Date(notification.sent_at).toLocaleString()}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton size="small">
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Notification">
-                        <IconButton size="small" onClick={() => handleOpenDialog(notification)}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Mark as Read">
-                        <IconButton size="small" onClick={() => markAsRead(notification.id)}>
-                          <MarkAsReadIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Notification">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(notification.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredNotifications.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">
+                No notifications found
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Notification</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Read Status</TableCell>
+                    <TableCell>User ID</TableCell>
+                    <TableCell>Created</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {filteredNotifications.map((notification) => (
+                    <TableRow key={notification.id}>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {notification.title || 'No Title'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {notification.message && notification.message.length > 100 
+                              ? notification.message.substring(0, 100) + '...' 
+                              : notification.message || 'No message'}
+                          </Typography>
+                          {notification.created_at && (
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                              Created: {new Date(notification.created_at).toLocaleString()}
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          icon={getTypeIcon(notification.notification_type)}
+                          label={notification.notification_type || 'info'} 
+                          color={getTypeColor(notification.notification_type)}
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={notification.is_read ? 'Read' : 'Unread'} 
+                          color={notification.is_read ? 'success' : 'warning'}
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {notification.user_id || 'N/A'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {notification.created_at ? new Date(notification.created_at).toLocaleString() : 'N/A'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="View Details">
+                          <IconButton size="small" onClick={() => handleView(notification)}>
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Notification">
+                          <IconButton size="small" onClick={() => handleOpenDialog(notification)}>
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        {!notification.is_read && (
+                          <Tooltip title="Mark as Read">
+                            <IconButton size="small" onClick={() => markAsRead(notification.id)}>
+                              <MarkAsReadIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Delete Notification">
+                          <IconButton size="small" color="error" onClick={() => handleDelete(notification.id)}>
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </CardContent>
       </Card>
 
@@ -664,89 +602,44 @@ const AdminNotifications = () => {
                 <FormControl fullWidth required>
                   <InputLabel>Type</InputLabel>
                   <Select
-                    name="type"
-                    value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    name="notification_type"
+                    value={formData.notification_type}
+                    onChange={(e) => setFormData({...formData, notification_type: e.target.value})}
                   >
                     <MenuItem value="info">Info</MenuItem>
                     <MenuItem value="success">Success</MenuItem>
                     <MenuItem value="warning">Warning</MenuItem>
                     <MenuItem value="error">Error</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
-                    name="priority"
-                    value={formData.priority}
-                    onChange={(e) => setFormData({...formData, priority: e.target.value})}
-                  >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Target Audience</InputLabel>
-                  <Select
-                    name="target_audience"
-                    value={formData.target_audience}
-                    onChange={(e) => setFormData({...formData, target_audience: e.target.value})}
-                  >
-                    <MenuItem value="all">All Users</MenuItem>
-                    <MenuItem value="admins">Admins Only</MenuItem>
-                    <MenuItem value="property_owners">Property Owners</MenuItem>
-                    <MenuItem value="tenants">Tenants Only</MenuItem>
-                    <MenuItem value="agents">Agents Only</MenuItem>
+                    <MenuItem value="payment_due">Payment Due</MenuItem>
+                    <MenuItem value="maintenance">Maintenance</MenuItem>
+                    <MenuItem value="lease_expiry">Lease Expiry</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Scheduled Time"
-                  name="scheduled_time"
-                  type="datetime-local"
-                  value={formData.scheduled_time}
-                  onChange={(e) => setFormData({...formData, scheduled_time: e.target.value})}
-                  InputLabelProps={{ shrink: true }}
+                  label="User ID"
+                  name="user_id"
+                  value={formData.user_id}
+                  onChange={(e) => setFormData({...formData, user_id: e.target.value})}
+                  required
+                  helperText="Enter the user ID to send notification to"
                 />
               </Grid>
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+              {editingNotification && (
+                <Grid item xs={12}>
                   <FormControlLabel
                     control={
                       <Switch
-                        checked={formData.send_email}
-                        onChange={(e) => setFormData({...formData, send_email: e.target.checked})}
+                        checked={formData.is_read || false}
+                        onChange={(e) => setFormData({...formData, is_read: e.target.checked})}
                       />
                     }
-                    label="Send Email"
+                    label="Mark as Read"
                   />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={formData.send_sms}
-                        onChange={(e) => setFormData({...formData, send_sms: e.target.checked})}
-                      />
-                    }
-                    label="Send SMS"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={formData.is_active}
-                        onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                      />
-                    }
-                    label="Active"
-                  />
-                </Box>
-              </Grid>
+                </Grid>
+              )}
             </Grid>
           </DialogContent>
           <DialogActions>
@@ -756,6 +649,82 @@ const AdminNotifications = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* View Notification Dialog */}
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {viewingNotification && getTypeIcon(viewingNotification.notification_type)}
+            <Typography variant="h6">Notification Details</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {viewingNotification && (
+            <Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">Title</Typography>
+                  <Typography variant="h6" sx={{ mt: 0.5, mb: 2 }}>
+                    {viewingNotification.title}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">Message</Typography>
+                  <Typography variant="body1" sx={{ mt: 0.5, mb: 2 }}>
+                    {viewingNotification.message}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">Type</Typography>
+                  <Chip 
+                    icon={getTypeIcon(viewingNotification.notification_type)}
+                    label={viewingNotification.notification_type} 
+                    color={getTypeColor(viewingNotification.notification_type)}
+                    sx={{ mt: 0.5 }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                  <Chip 
+                    label={viewingNotification.is_read ? 'Read' : 'Unread'} 
+                    color={viewingNotification.is_read ? 'success' : 'warning'}
+                    sx={{ mt: 0.5 }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">User ID</Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {viewingNotification.user_id}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary">Created At</Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {viewingNotification.created_at 
+                      ? new Date(viewingNotification.created_at).toLocaleString() 
+                      : 'N/A'}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
+          {viewingNotification && (
+            <Button 
+              variant="outlined" 
+              startIcon={<EditIcon />}
+              onClick={() => {
+                setOpenViewDialog(false);
+                handleOpenDialog(viewingNotification);
+              }}
+            >
+              Edit
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
     </Box>
   );

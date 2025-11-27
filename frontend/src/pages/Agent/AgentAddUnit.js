@@ -57,6 +57,7 @@ const AgentAddUnit = () => {
   const [formData, setFormData] = useState({
     title: '',
     location: '',
+    country: 'Uganda',
     unit_type: 'one_bedroom',
     floor: '',
     bedrooms: 1,
@@ -106,7 +107,7 @@ const AgentAddUnit = () => {
     setLoading(true);
     try {
       // Validate required fields
-      if (!formData.title || !formData.location || !formData.bedrooms || !formData.bathrooms || !formData.monthly_rent) {
+      if (!formData.title || !formData.location || !formData.country || !formData.bedrooms || !formData.bathrooms || !formData.monthly_rent) {
         setNotification({
           open: true,
           message: 'Please fill in all required fields',
@@ -146,14 +147,25 @@ const AgentAddUnit = () => {
         }
       }
 
+      // Prepare unit data - match admin form format exactly
+      // Don't send agent_id - backend will set it automatically for agents
+      // Don't send deposit_amount - backend will use default (0)
       let unitData = { 
-        ...formData,
+        title: formData.title,
+        location: formData.location,
+        country: formData.country || 'Uganda',
+        unit_type: formData.unit_type,
+        floor: formData.floor ? parseInt(formData.floor) : null,
         bedrooms: parseInt(formData.bedrooms) || 1,
         bathrooms: parseInt(formData.bathrooms) || 1,
         monthly_rent: parseFloat(formData.monthly_rent),
         inspection_fee: parseFloat(formData.inspection_fee) || 0,
-        floor: formData.floor ? parseInt(formData.floor) : null,
+        currency: formData.currency,
+        status: formData.status,
+        description: formData.description || null,
+        amenities: formData.amenities || null,
         images: imageStrings.length > 0 ? imageStrings.join('|||IMAGE_SEPARATOR|||') : null
+        // Note: agent_id and deposit_amount are NOT included - backend handles them
       };
 
       console.log('Sending rental unit data:', unitData);
@@ -234,6 +246,27 @@ const AgentAddUnit = () => {
                     required
                     placeholder="e.g., Kampala, Nakawa"
                   />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Country</InputLabel>
+                    <Select
+                      name="country"
+                      value={formData.country}
+                      label="Country"
+                      onChange={(e) => setFormData({...formData, country: e.target.value})}
+                    >
+                      <MenuItem value="Uganda">Uganda</MenuItem>
+                      <MenuItem value="Kenya">Kenya</MenuItem>
+                      <MenuItem value="Tanzania">Tanzania</MenuItem>
+                      <MenuItem value="Rwanda">Rwanda</MenuItem>
+                      <MenuItem value="Burundi">Burundi</MenuItem>
+                      <MenuItem value="South Sudan">South Sudan</MenuItem>
+                      <MenuItem value="Ethiopia">Ethiopia</MenuItem>
+                      <MenuItem value="Somalia">Somalia</MenuItem>
+                      <MenuItem value="Djibouti">Djibouti</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
@@ -585,6 +618,7 @@ const AgentAddUnit = () => {
               setFormData({
                 title: '',
                 location: '',
+                country: 'Uganda',
                 unit_type: 'one_bedroom',
                 floor: '',
                 bedrooms: 1,

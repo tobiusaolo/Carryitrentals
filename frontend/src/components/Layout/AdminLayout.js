@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
   Box,
@@ -11,8 +11,10 @@ import {
   MenuItem,
   Divider,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Badge
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Menu as MenuIcon,
   AccountCircle,
@@ -24,6 +26,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import AdminSidebar from './AdminSidebar';
+import authService from '../../services/authService';
 
 const AdminLayout = () => {
   const theme = useTheme();
@@ -33,6 +36,7 @@ const AdminLayout = () => {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -50,6 +54,37 @@ const AdminLayout = () => {
     dispatch(logout());
     handleProfileMenuClose();
   };
+
+  const loadUnreadCount = async () => {
+    try {
+      const api = authService.createAxiosInstance();
+      const response = await api.get('/notifications/unread-count');
+      setUnreadCount(response.data?.unread_count || 0);
+    } catch (err) {
+      console.error('Error loading unread count:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadUnreadCount();
+      // Refresh every 30 seconds
+      const interval = setInterval(loadUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Expose loadUnreadCount to window for manual refresh from other components
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.refreshNotificationCount = loadUnreadCount;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.refreshNotificationCount;
+      }
+    };
+  }, []);
 
   const drawerWidth = 280;
   const mobileDrawerWidth = 240;
@@ -86,16 +121,32 @@ const AdminLayout = () => {
             <MenuIcon />
           </IconButton>
           
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-            <AdminIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6" noWrap component="div" color="text.primary">
-              Admin Dashboard
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar
+              src={logoImage}
+              alt="Easy Rentals Logo"
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                display: { xs: 'none', sm: 'flex' }
+              }}
+              variant="rounded"
+            />
+            <Typography variant="h6" noWrap component="div" color="text.primary" sx={{ fontWeight: 600 }}>
+              Easy Rentals - Admin Dashboard
             </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton color="inherit">
-              <NotificationsIcon />
+            <IconButton 
+              color="inherit"
+              onClick={() => window.location.href = '/admin/notifications'}
+            >
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon />
+              </Badge>
             </IconButton>
             
             <IconButton

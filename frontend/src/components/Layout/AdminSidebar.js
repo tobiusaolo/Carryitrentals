@@ -13,6 +13,7 @@ import {
   Avatar,
   Chip
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Dashboard as DashboardIcon,
   Business as BusinessIcon,
@@ -144,28 +145,52 @@ const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Admin Header */}
-      <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Avatar sx={{ bgcolor: 'white', color: 'primary.main', mr: 2 }}>
-            <AdminIcon />
-          </Avatar>
-          <Box>
-            <Typography variant="h6" fontWeight="bold">
-              Admin Panel
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-              System Administration
-            </Typography>
+      <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white', position: 'relative', overflow: 'hidden' }}>
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Avatar
+              src={logoImage}
+              alt="Easy Rentals Logo"
+              sx={{ 
+                width: 48, 
+                height: 48, 
+                mr: 2,
+                border: '2px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+              variant="rounded"
+            />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: '1rem' }}>
+                Easy Rentals
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.75rem' }}>
+                Admin Dashboard
+              </Typography>
+            </Box>
           </Box>
+          <Chip 
+            label="Administrator" 
+            size="small" 
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.2)', 
+              color: 'white',
+              fontWeight: 'bold',
+              border: '1px solid rgba(255,255,255,0.3)'
+            }} 
+          />
         </Box>
-        <Chip 
-          label="Administrator" 
-          size="small" 
-          sx={{ 
-            bgcolor: 'rgba(255,255,255,0.2)', 
-            color: 'white',
-            fontWeight: 'bold'
-          }} 
+        <Box
+          sx={{
+            position: 'absolute',
+            top: -20,
+            right: -20,
+            width: 100,
+            height: 100,
+            borderRadius: '50%',
+            bgcolor: 'rgba(255,255,255,0.05)',
+            zIndex: 0
+          }}
         />
       </Box>
 

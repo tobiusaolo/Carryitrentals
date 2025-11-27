@@ -13,7 +13,9 @@ import {
   Typography,
   useTheme,
   useMediaQuery,
+  Avatar,
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Dashboard,
   Home,
@@ -66,13 +68,27 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
   const drawer = (
     <Box>
       {/* Logo/Brand */}
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="h6" color="primary" fontWeight="bold">
-          Rental Manager
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Professional Property Management
-        </Typography>
+      <Box sx={{ p: 2, textAlign: 'center', borderBottom: '1px solid', borderColor: 'divider', pb: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <Avatar
+            src={logoImage}
+            alt="Easy Rentals Logo"
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: 2,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              mb: 1
+            }}
+            variant="rounded"
+          />
+          <Typography variant="h6" color="primary" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
+            Easy Rentals
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+            Professional Property Management
+          </Typography>
+        </Box>
       </Box>
       
       <Divider />

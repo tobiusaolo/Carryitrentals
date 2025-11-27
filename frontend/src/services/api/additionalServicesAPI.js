@@ -24,9 +24,12 @@ export const additionalServicesAPI = {
     return axios.get(`${PRODUCTION_API_URL}/additional-services/${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Get active services only (public endpoint - uses production URL)
+  // Get active services only (public endpoint - uses correct API URL)
   getActiveServices: () => {
-    return axios.get(`${PRODUCTION_API_URL}/additional-services/?active_only=true`);
+    // Use the correct API base URL from environment or fallback to production
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+    const baseURL = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash if present
+    return axios.get(`${baseURL}/additional-services/?active_only=true`);
   },
 
   // Get a specific service by ID (public endpoint - uses production URL)

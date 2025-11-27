@@ -20,8 +20,10 @@ import {
   useTheme,
   Divider,
   Chip,
-  Alert
+  Alert,
+  Avatar
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Home as HomeIcon,
   Menu as MenuIcon,
@@ -56,22 +58,20 @@ const Guidelines = () => {
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             {/* Logo */}
             <Box 
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}
               onClick={() => navigate('/')}
             >
-              <Box
+              <Avatar
+                src={logoImage}
+                alt="Easy Rentals Logo"
                 sx={{
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   borderRadius: 2,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 }}
-              >
-                <HomeIcon sx={{ color: 'white', fontSize: 28 }} />
-              </Box>
+                variant="rounded"
+              />
               <Typography 
                 variant="h6" 
                 sx={{ 
@@ -79,10 +79,11 @@ const Guidelines = () => {
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  display: { xs: 'none', sm: 'block' }
+                  display: { xs: 'none', sm: 'block' },
+                  fontSize: '1.25rem'
                 }}
               >
-                CarryIT Property Manager
+                Easy Rentals
               </Typography>
             </Box>
 
@@ -315,7 +316,7 @@ const Guidelines = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Email sx={{ color: '#667eea', fontSize: 20 }} />
                     <Typography variant="body2">
-                      <strong>Email:</strong> carryit@gmail.com
+                      <strong>Email:</strong> info@easyrentals.com
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -388,7 +389,7 @@ const Guidelines = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Email sx={{ color: '#e91e63', fontSize: 20 }} />
                     <Typography variant="body2">
-                      <strong>Email:</strong> carryit@gmail.com
+                      <strong>Email:</strong> info@easyrentals.com
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -500,7 +501,7 @@ const Guidelines = () => {
                 <Grid item>
                   <Chip
                     icon={<Email sx={{ color: 'white !important' }} />}
-                    label="carryit@gmail.com"
+                    label="info@easyrentals.com"
                     sx={{
                       bgcolor: 'rgba(255,255,255,0.2)',
                       color: 'white',

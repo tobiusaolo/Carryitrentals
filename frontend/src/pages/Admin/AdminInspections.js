@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   Chip,
   Avatar,
@@ -32,7 +33,10 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar
+  ListItemAvatar,
+  Menu,
+  ButtonGroup,
+  Stack
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -51,10 +55,14 @@ import {
   QrCode as QrCodeIcon,
   Receipt as ReceiptIcon,
   Check as ApproveIcon,
-  Close as RejectIcon
+  Close as RejectIcon,
+  MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
+import authService from '../../services/authService';
+import { showSuccess, showError, showConfirm, showLoading, closeAlert, showInfo } from '../../utils/sweetAlert';
+import Swal from 'sweetalert2';
 
 const AdminInspections = () => {
   const dispatch = useDispatch();
@@ -65,22 +73,29 @@ const AdminInspections = () => {
   const [inspections, setInspections] = useState([]);
   const [units, setUnits] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
   const [formData, setFormData] = useState({
-    unit_id: '',
+    rental_unit_id: '',
     agent_id: '',
     inspection_type: '',
     scheduled_date: '',
-    status: 'scheduled',
+    preferred_time_slot: '',
+    status: 'pending',
     notes: '',
-    findings: ''
+    message: ''
   });
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [qrCodeDialogOpen, setQrCodeDialogOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedInspection, setSelectedInspection] = useState(null);
+  const [viewingInspection, setViewingInspection] = useState(null);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [selectedInspectionForMenu, setSelectedInspectionForMenu] = useState(null);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -89,164 +104,94 @@ const AdminInspections = () => {
       loadAgents();
       loadPaymentMethods();
     }
-  }, [user]);
+  }, [user, page, rowsPerPage]);
 
   const loadInspections = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Fetch real inspection bookings from API
-      const token = localStorage.getItem('token');
-      console.log('Loading inspections with token:', token ? 'Token exists' : 'No token');
+      // Use axios instance from authService which has proper interceptors
+      const api = authService.createAxiosInstance();
+      const skip = page * rowsPerPage;
+      console.log(`📥 Loading inspections: skip=${skip}, limit=${rowsPerPage}`);
       
-      const response = await fetch('https://carryit-backend.onrender.com/api/v1/admin/inspection-bookings', {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await api.get(`/admin/inspection-bookings?skip=${skip}&limit=${rowsPerPage}`);
+      
+      console.log(`✅ Inspection response:`, response.data);
+      
+      // Handle paginated response
+      let inspectionsData = [];
+      let total = 0;
+      
+      if (response.data && typeof response.data === 'object') {
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          inspectionsData = response.data;
+          total = response.data.length;
+        } else if (response.data.items && Array.isArray(response.data.items)) {
+          // Paginated response with items
+          inspectionsData = response.data.items;
+          total = response.data.total || response.data.items.length;
+        } else if (response.data.bookings && Array.isArray(response.data.bookings)) {
+          // Alternative paginated format
+          inspectionsData = response.data.bookings;
+          total = response.data.total || response.data.bookings.length;
+        } else {
+          // Try to find any array in the response
+          const keys = Object.keys(response.data);
+          for (const key of keys) {
+            if (Array.isArray(response.data[key])) {
+              inspectionsData = response.data[key];
+              total = response.data.total || response.data[key].length;
+              break;
+            }
+          }
         }
-      });
-      
-      console.log('API Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(errorData.detail || 'Failed to load inspection bookings');
       }
       
-      const data = await response.json();
-      console.log('Loaded inspections:', data.length);
-      setInspections(data);
+      console.log(`✅ Loaded ${inspectionsData.length} inspections (page ${page + 1}, total: ${total})`);
+      setInspections(inspectionsData);
+      setTotalCount(total);
       setError(null);
       setLoading(false);
-      return;
-      
-      // Old mock data (keeping as fallback)
-      const mockInspections = [
-        {
-          id: 1,
-          unit_id: 1,
-          unit_number: '101',
-          property_name: 'Kiwo Estates',
-          agent_id: 1,
-          agent_name: 'Agent Smith',
-          inspection_type: 'Move-in',
-          scheduled_date: '2024-10-25',
-          status: 'scheduled',
-          notes: 'Initial inspection before tenant move-in',
-          findings: '',
-          created_at: '2024-10-20',
-          inspection_number: 4 // This is the 4th inspection for this unit
-        },
-        {
-          id: 2,
-          unit_id: 2,
-          unit_number: '102',
-          property_name: 'Kiwo Estates',
-          agent_id: 2,
-          agent_name: 'Agent Johnson',
-          inspection_type: 'Routine',
-          scheduled_date: '2024-10-22',
-          status: 'completed',
-          notes: 'Monthly routine inspection',
-          findings: 'Minor maintenance needed in bathroom',
-          created_at: '2024-10-15',
-          inspection_number: 2 // This is the 2nd inspection for this unit
-        },
-        {
-          id: 3,
-          unit_id: 3,
-          unit_number: '1A',
-          property_name: 'Sunset Apartments',
-          agent_id: 1,
-          agent_name: 'Agent Smith',
-          inspection_type: 'Initial',
-          scheduled_date: '2024-10-28',
-          status: 'in_progress',
-          notes: 'First inspection for new unit',
-          findings: '',
-          created_at: '2024-10-18',
-          inspection_number: 1 // This is the 1st inspection for this unit
-        },
-        {
-          id: 4,
-          unit_id: 4,
-          unit_number: '2B',
-          property_name: 'Sunset Apartments',
-          agent_id: 3,
-          agent_name: 'Agent Brown',
-          inspection_type: 'Routine',
-          scheduled_date: '2024-10-30',
-          status: 'completed',
-          notes: 'Quarterly maintenance inspection',
-          findings: 'All systems functioning properly',
-          created_at: '2024-10-18',
-          inspection_number: 3 // This is the 3rd inspection for this unit
-        }
-      ];
-      setInspections(mockInspections);
     } catch (err) {
-      console.error('Error loading inspections:', err);
-      setError(err.message || 'Failed to load inspections');
-    } finally {
+      console.error('❌ Failed to load inspections:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        url: err.config?.url
+      });
+      setError(err.response?.data?.detail || err.message || 'Failed to load inspections');
+      setInspections([]);
+      setTotalCount(0);
       setLoading(false);
     }
   };
 
   const loadUnits = async () => {
     try {
-      // Mock units data - only available units for rent
-      const mockUnits = [
-        { 
-          id: 1, 
-          unit_number: '101', 
-          property_name: 'Kiwo Estates',
-          rental_status: 'available',
-          inspection_count: 3,
-          last_inspection: '2024-10-15'
-        },
-        { 
-          id: 2, 
-          unit_number: '102', 
-          property_name: 'Kiwo Estates',
-          rental_status: 'available',
-          inspection_count: 1,
-          last_inspection: '2024-10-20'
-        },
-        { 
-          id: 3, 
-          unit_number: '1A', 
-          property_name: 'Sunset Apartments',
-          rental_status: 'available',
-          inspection_count: 0,
-          last_inspection: null
-        },
-        { 
-          id: 4, 
-          unit_number: '2B', 
-          property_name: 'Sunset Apartments',
-          rental_status: 'available',
-          inspection_count: 2,
-          last_inspection: '2024-10-18'
-        }
-      ];
-      // Filter to only show units available for rent
-      const availableUnits = mockUnits.filter(unit => unit.rental_status === 'available');
-      setUnits(availableUnits);
+      // Fetch real rental units from API
+      const api = authService.createAxiosInstance();
+      const response = await api.get('/rental-units/');
+      setUnits(response.data);
     } catch (err) {
       console.error('Failed to load units:', err);
+      // Fallback to empty array if API fails
+      setUnits([]);
     }
   };
 
   const loadAgents = async () => {
     try {
-      // Mock agents data
-      const mockAgents = [
-        { id: 1, name: 'Agent Smith', email: 'smith@example.com', phone: '+256 700 111 111' },
-        { id: 2, name: 'Agent Johnson', email: 'johnson@example.com', phone: '+256 700 222 222' },
-        { id: 3, name: 'Agent Brown', email: 'brown@example.com', phone: '+256 700 333 333' }
-      ];
-      setAgents(mockAgents);
+      // Fetch real agents from API
+      const api = authService.createAxiosInstance();
+      const response = await api.get('/agents/');
+      setAgents(response.data);
     } catch (err) {
       console.error('Failed to load agents:', err);
+      // Fallback to empty array if API fails
+      setAgents([]);
     }
   };
 
@@ -294,7 +239,7 @@ const AdminInspections = () => {
         payment_id: 1,
         amount: 50,
         currency: 'UGX',
-        payment_url: `http://localhost:3000/inspection-payment/1`,
+        payment_url: `${window.location.origin}/inspection-payment/1`,
         qr_code: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
         payment_methods: paymentMethods
       };
@@ -313,25 +258,40 @@ const AdminInspections = () => {
   const handleOpenDialog = (inspection = null) => {
     if (inspection) {
       setEditingInspection(inspection);
+      // Map inspection data to form data
+      // Convert booking_date to datetime-local format (YYYY-MM-DDTHH:mm)
+      let bookingDateTime = '';
+      if (inspection.booking_date) {
+        const date = new Date(inspection.booking_date);
+        // Format as YYYY-MM-DDTHH:mm for datetime-local input
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        bookingDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+      }
       setFormData({
-        unit_id: inspection.unit_id,
-        agent_id: inspection.agent_id,
-        inspection_type: inspection.inspection_type,
-        scheduled_date: inspection.scheduled_date,
-        status: inspection.status,
-        notes: inspection.notes,
-        findings: inspection.findings
+        rental_unit_id: inspection.rental_unit_id || inspection.unit_id || '',
+        agent_id: inspection.agent_id || '',
+        inspection_type: inspection.inspection_type || '',
+        scheduled_date: bookingDateTime,
+        preferred_time_slot: inspection.preferred_time_slot || '',
+        status: inspection.status || 'pending',
+        notes: inspection.notes || '',
+        message: inspection.message || ''
       });
     } else {
       setEditingInspection(null);
       setFormData({
-        unit_id: '',
+        rental_unit_id: '',
         agent_id: '',
         inspection_type: '',
         scheduled_date: '',
-        status: 'scheduled',
+        preferred_time_slot: '',
+        status: 'pending',
         notes: '',
-        findings: ''
+        message: ''
       });
     }
     setOpenDialog(true);
@@ -342,45 +302,137 @@ const AdminInspections = () => {
     setEditingInspection(null);
   };
 
+  const handleView = async (inspection) => {
+    try {
+      const api = authService.createAxiosInstance();
+      const response = await api.get(`/admin/inspection-bookings/${inspection.id}`);
+      console.log('📋 Inspection details fetched:', {
+        id: response.data.id,
+        has_additional_services: !!response.data.additional_services,
+        additional_services_count: response.data.additional_services?.length || 0,
+        additional_service_ids: response.data.additional_service_ids,
+        full_data: response.data
+      });
+      setViewingInspection(response.data);
+    } catch (err) {
+      console.error('Failed to fetch inspection details:', err);
+      // Fallback to using the inspection from the list
+      console.log('📋 Using fallback inspection data:', {
+        id: inspection.id,
+        has_additional_services: !!inspection.additional_services,
+        additional_services_count: inspection.additional_services?.length || 0,
+        additional_service_ids: inspection.additional_service_ids
+      });
+      setViewingInspection(inspection);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.rental_unit_id && !editingInspection) {
+      showError('Validation Error', 'Please select a rental unit');
+      return;
+    }
+    
+    const loadingAlert = showLoading(
+      editingInspection ? 'Updating...' : 'Creating...',
+      'Please wait while we save the inspection'
+    );
+    setLoading(true);
+    
     try {
+      const api = authService.createAxiosInstance();
+      
       if (editingInspection) {
         // Update inspection
-        console.log('Updating inspection:', formData);
-        // TODO: Implement update API call
-      } else {
-        // Create inspection
-        console.log('Creating inspection:', formData);
-        // TODO: Implement create API call
+        const updateData = {
+          status: formData.status,
+          notes: formData.notes,
+          message: formData.message,
+          booking_date: formData.scheduled_date ? new Date(formData.scheduled_date).toISOString() : undefined,
+          preferred_time_slot: formData.preferred_time_slot || undefined
+        };
         
-        // Update unit inspection count locally
-        const selectedUnit = units.find(unit => unit.id === formData.unit_id);
-        if (selectedUnit) {
-          setUnits(prevUnits => 
-            prevUnits.map(unit => 
-              unit.id === formData.unit_id 
-                ? { ...unit, inspection_count: unit.inspection_count + 1 }
-                : unit
-            )
-          );
-        }
+        const response = await api.put(`/admin/inspection-bookings/${editingInspection.id}`, updateData);
+        console.log('Inspection updated:', response.data);
+        setError(null);
+      } else {
+        // Create new inspection booking via public endpoint
+        const createData = {
+          rental_unit_id: formData.rental_unit_id,
+          contact_name: 'Admin Created',
+          contact_phone: '+256700000000',
+          contact_email: 'admin@carryit.com',
+          booking_date: formData.scheduled_date ? new Date(formData.scheduled_date).toISOString() : new Date().toISOString(),
+          preferred_time_slot: formData.preferred_time_slot || 'morning',
+          message: formData.message || '',
+          additional_service_ids: []
+        };
+        
+        const response = await api.post('/inspection-bookings/public', createData);
+        console.log('Inspection created:', response.data);
+        setError(null);
       }
+      
+      closeAlert();
+      
+      // Close dialog first
       handleCloseDialog();
-      loadInspections();
+      
+      // Wait a brief moment for the backend to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Reload inspections to show updated data
+      await loadInspections();
+      
+      // Show success message
+      showSuccess(
+        editingInspection ? 'Inspection Updated' : 'Inspection Created',
+        editingInspection ? 'The inspection has been successfully updated.' : 'The inspection has been successfully created.'
+      );
     } catch (err) {
-      setError('Failed to save inspection');
+      console.error('Failed to save inspection:', err);
+      closeAlert();
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to save inspection';
+      setError(errorMessage);
+      showError('Save Failed', errorMessage);
+      setLoading(false);
     }
   };
 
   const handleDelete = async (inspectionId) => {
-    if (window.confirm('Are you sure you want to delete this inspection?')) {
+    const result = await showConfirm(
+      'Delete Inspection',
+      'Are you sure you want to delete this inspection? This action cannot be undone.',
+      'Yes, Delete',
+      'Cancel'
+    );
+    
+    if (result.isConfirmed) {
+      const loadingAlert = showLoading('Deleting...', 'Please wait while we delete the inspection');
       try {
-        console.log('Deleting inspection:', inspectionId);
-        // TODO: Implement delete API call
-        loadInspections();
+        const api = authService.createAxiosInstance();
+        const response = await api.delete(`/admin/inspection-bookings/${inspectionId}`);
+        console.log('Inspection deleted:', response.data);
+        
+        closeAlert();
+        
+        // Wait a brief moment for the backend to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Reload inspections to show updated data
+        await loadInspections();
+        setError(null);
+        showSuccess('Inspection Deleted', 'The inspection has been successfully deleted.');
       } catch (err) {
-        setError('Failed to delete inspection');
+        console.error('Failed to delete inspection:', err);
+        closeAlert();
+        const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete inspection';
+        setError(errorMessage);
+        showError('Delete Failed', errorMessage);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -410,51 +462,95 @@ const AdminInspections = () => {
   };
 
   const handleApproveBooking = async (bookingId) => {
+    const result = await showConfirm(
+      'Approve Inspection',
+      'Are you sure you want to approve this inspection? An SMS notification will be sent to the client.',
+      'Yes, Approve',
+      'Cancel'
+    );
+    
+    if (!result.isConfirmed) {
+      return;
+    }
+    
+    const loadingAlert = showLoading('Approving...', 'Please wait while we approve the inspection');
+    setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `https://carryit-backend.onrender.com/api/v1/admin/inspection-bookings/${bookingId}/approve`,
-        {},
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+      const api = authService.createAxiosInstance();
+      await api.patch(`/admin/inspection-bookings/${bookingId}/approve`, {});
       
+      closeAlert();
       setError(null);
+      
+      // Wait a brief moment for the backend to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Reload inspections to show updated status
-      loadInspections();
-      alert('Inspection approved successfully! SMS sent to client.');
+      await loadInspections();
+      showSuccess('Inspection Approved', 'The inspection has been approved and an SMS has been sent to the client.');
     } catch (err) {
       console.error('Error approving inspection:', err);
-      setError(err.response?.data?.detail || 'Failed to approve inspection');
+      closeAlert();
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to approve inspection';
+      setError(errorMessage);
+      showError('Approval Failed', errorMessage);
+      setLoading(false);
     }
   };
 
   const handleRejectBooking = async (bookingId) => {
-    const reason = prompt('Enter reason for rejection (optional):');
+    const { value: reason } = await Swal.fire({
+      title: 'Reject Inspection',
+      text: 'Enter reason for rejection (optional):',
+      input: 'textarea',
+      inputPlaceholder: 'Enter rejection reason...',
+      inputAttributes: {
+        'aria-label': 'Enter rejection reason'
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Reject',
+      confirmButtonColor: '#d32f2f',
+      cancelButtonText: 'Cancel',
+      cancelButtonColor: '#757575',
+      inputValidator: (value) => {
+        // Reason is optional, so no validation needed
+        return null;
+      }
+    });
     
+    if (reason === undefined) {
+      // User cancelled
+      return;
+    }
+    
+    const loadingAlert = showLoading('Rejecting...', 'Please wait while we reject the inspection');
+    setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `https://carryit-backend.onrender.com/api/v1/admin/inspection-bookings/${bookingId}/reject`,
+      const api = authService.createAxiosInstance();
+      await api.patch(
+        `/admin/inspection-bookings/${bookingId}/reject`,
         {},
         {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
           params: reason ? { reason } : {}
         }
       );
       
+      closeAlert();
       setError(null);
+      
+      // Wait a brief moment for the backend to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Reload inspections to show updated status
-      loadInspections();
-      alert('Inspection rejected. SMS sent to client.');
+      await loadInspections();
+      showSuccess('Inspection Rejected', 'The inspection has been rejected and an SMS has been sent to the client.');
     } catch (err) {
       console.error('Error rejecting inspection:', err);
-      setError(err.response?.data?.detail || 'Failed to reject inspection');
+      closeAlert();
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to reject inspection';
+      setError(errorMessage);
+      showError('Rejection Failed', errorMessage);
+      setLoading(false);
     }
   };
 
@@ -507,14 +603,14 @@ const AdminInspections = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
+                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
                   <ScheduleIcon />
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {inspections.filter(i => i.status === 'scheduled').length}
+                    {inspections.filter(i => i.status?.toLowerCase() === 'pending').length}
                   </Typography>
-                  <Typography color="text.secondary">Scheduled</Typography>
+                  <Typography color="text.secondary">Pending</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -524,14 +620,14 @@ const AdminInspections = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <BuildIcon />
+                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
+                  <CheckCircleIcon />
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {inspections.filter(i => i.status === 'in_progress').length}
+                    {inspections.filter(i => i.status?.toLowerCase() === 'confirmed').length}
                   </Typography>
-                  <Typography color="text.secondary">In Progress</Typography>
+                  <Typography color="text.secondary">Confirmed</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -546,7 +642,7 @@ const AdminInspections = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {inspections.filter(i => i.status === 'completed').length}
+                    {inspections.filter(i => i.status?.toLowerCase() === 'completed').length}
                   </Typography>
                   <Typography color="text.secondary">Completed</Typography>
                 </Box>
@@ -558,14 +654,14 @@ const AdminInspections = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <AssignmentIcon />
+                <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
+                  <WarningIcon />
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {units.reduce((sum, unit) => sum + unit.inspection_count, 0)}
+                    {inspections.filter(i => i.status?.toLowerCase() === 'cancelled').length}
                   </Typography>
-                  <Typography color="text.secondary">Total Unit Inspections</Typography>
+                  <Typography color="text.secondary">Cancelled</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -589,6 +685,12 @@ const AdminInspections = () => {
             </Button>
           </Box>
           
+          {loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          )}
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -599,13 +701,20 @@ const AdminInspections = () => {
                   <TableCell>Contact</TableCell>
                   <TableCell>Date & Time</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Additional Services</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {inspections.map((inspection) => (
+                {!loading && inspections.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                        No inspections found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && inspections.map((inspection) => (
                   <TableRow key={inspection.id}>
                     {/* Inspection ID */}
                     <TableCell>
@@ -626,14 +735,23 @@ const AdminInspections = () => {
                     <TableCell>
                       <Box>
                         <Typography variant="body2" fontWeight="bold">
-                          {inspection.rental_unit?.name || 'N/A'}
+                          {inspection.rental_unit?.title || inspection.rental_unit?.name || inspection.rental_unit_id || `Booking ID: ${inspection.id}`}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {inspection.rental_unit?.location || 'N/A'}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="primary">
-                          {inspection.rental_unit?.unit_type || ''}
-                        </Typography>
+                        {inspection.rental_unit?.location && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {inspection.rental_unit.location}
+                          </Typography>
+                        )}
+                        {inspection.rental_unit?.unit_type && (
+                          <Typography variant="caption" display="block" color="primary">
+                            {inspection.rental_unit.unit_type}
+                          </Typography>
+                        )}
+                        {inspection.rental_unit_id && !inspection.rental_unit && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Unit ID: {inspection.rental_unit_id}
+                          </Typography>
+                        )}
                       </Box>
                     </TableCell>
                     
@@ -679,85 +797,184 @@ const AdminInspections = () => {
                       />
                     </TableCell>
                     
-                    {/* Type */}
-                    <TableCell>
-                      <Chip 
-                        label={inspection.is_public_booking ? 'Walk-in' : 'Registered'} 
-                        variant="outlined"
-                        size="small" 
-                      />
-                    </TableCell>
-                    
-                    {/* Additional Services */}
-                    <TableCell>
-                      {inspection.additional_services && inspection.additional_services.length > 0 ? (
-                        <Box>
-                          {inspection.additional_services.map((service, idx) => (
-                            <Chip 
-                              key={idx}
-                              label={service.name}
-                              size="small" 
-                              color="secondary"
-                              sx={{ mb: 0.5, mr: 0.5 }}
-                            />
-                          ))}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          None
-                        </Typography>
-                      )}
-                    </TableCell>
-                    
                     {/* Actions */}
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        {/* Primary Actions - Status-based */}
                         {inspection.status?.toLowerCase() === 'pending' && (
                           <>
                             <Tooltip title="Approve Inspection">
-                              <IconButton 
-                                size="small" 
+                              <Button
+                                size="small"
+                                variant="contained"
                                 color="success"
+                                startIcon={<ApproveIcon />}
                                 onClick={() => handleApproveBooking(inspection.id)}
                                 sx={{
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  boxShadow: 2,
+                                  px: 2,
                                   '&:hover': {
-                                    bgcolor: 'success.light',
-                                    color: 'white'
-                                  }
+                                    boxShadow: 4,
+                                    transform: 'translateY(-1px)'
+                                  },
+                                  transition: 'all 0.2s'
                                 }}
                               >
-                                <ApproveIcon />
-                              </IconButton>
+                                Approve
+                              </Button>
                             </Tooltip>
                             <Tooltip title="Reject Inspection">
-                              <IconButton 
-                                size="small" 
+                              <Button
+                                size="small"
+                                variant="contained"
                                 color="error"
+                                startIcon={<RejectIcon />}
                                 onClick={() => handleRejectBooking(inspection.id)}
                                 sx={{
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  boxShadow: 2,
+                                  px: 2,
                                   '&:hover': {
-                                    bgcolor: 'error.light',
-                                    color: 'white'
-                                  }
+                                    boxShadow: 4,
+                                    transform: 'translateY(-1px)'
+                                  },
+                                  transition: 'all 0.2s'
                                 }}
                               >
-                                <RejectIcon />
-                              </IconButton>
+                                Reject
+                              </Button>
                             </Tooltip>
                           </>
                         )}
-                        <Tooltip title="View Details">
-                          <IconButton size="small">
-                            <ViewIcon />
+                        
+                        {/* Show status badge for non-pending inspections */}
+                        {inspection.status?.toLowerCase() !== 'pending' && (
+                          <Chip
+                            label={inspection.status}
+                            color={getStatusColor(inspection.status)}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        )}
+                        
+                        {/* Secondary Actions Menu */}
+                        <Tooltip title="More Actions">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              setActionMenuAnchor(e.currentTarget);
+                              setSelectedInspectionForMenu(inspection);
+                            }}
+                            sx={{
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              ml: 'auto',
+                              '&:hover': {
+                                bgcolor: 'action.hover',
+                                borderColor: 'primary.main',
+                                transform: 'scale(1.05)'
+                              },
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <MoreVertIcon />
                           </IconButton>
                         </Tooltip>
-                      </Box>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
+          
+          {/* Actions Menu */}
+          <Menu
+            anchorEl={actionMenuAnchor}
+            open={Boolean(actionMenuAnchor)}
+            onClose={() => {
+              setActionMenuAnchor(null);
+              setSelectedInspectionForMenu(null);
+            }}
+            PaperProps={{
+              sx: {
+                mt: 1.5,
+                minWidth: 200,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                borderRadius: 2
+              }
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem
+              onClick={() => {
+                if (selectedInspectionForMenu) {
+                  handleView(selectedInspectionForMenu);
+                }
+                setActionMenuAnchor(null);
+                setSelectedInspectionForMenu(null);
+              }}
+              sx={{ py: 1.5 }}
+            >
+              <ViewIcon sx={{ mr: 2, fontSize: 20, color: 'primary.main' }} />
+              <Typography variant="body2">View Details</Typography>
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (selectedInspectionForMenu) {
+                  handleOpenDialog(selectedInspectionForMenu);
+                }
+                setActionMenuAnchor(null);
+                setSelectedInspectionForMenu(null);
+              }}
+              sx={{ py: 1.5 }}
+            >
+              <EditIcon sx={{ mr: 2, fontSize: 20, color: 'info.main' }} />
+              <Typography variant="body2">Edit Inspection</Typography>
+            </MenuItem>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                if (selectedInspectionForMenu) {
+                  handleDelete(selectedInspectionForMenu.id);
+                }
+                setActionMenuAnchor(null);
+                setSelectedInspectionForMenu(null);
+              }}
+              sx={{ 
+                py: 1.5,
+                color: 'error.main',
+                '&:hover': {
+                  bgcolor: 'error.light',
+                  color: 'error.dark'
+                }
+              }}
+            >
+              <DeleteIcon sx={{ mr: 2, fontSize: 20 }} />
+              <Typography variant="body2" fontWeight={600}>Delete Inspection</Typography>
+            </MenuItem>
+          </Menu>
+          
+          <TablePagination
+            component="div"
+            count={totalCount}
+            page={page}
+            onPageChange={(event, newPage) => {
+              setPage(newPage);
+            }}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0); // Reset to first page when changing rows per page
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            labelRowsPerPage="Inspections per page:"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count !== -1 ? count : `more than ${to}`}`}
+          />
         </CardContent>
       </Card>
 
@@ -771,26 +988,18 @@ const AdminInspections = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth required>
-                  <InputLabel>Unit</InputLabel>
+                  <InputLabel>Rental Unit</InputLabel>
                   <Select
-                    name="unit_id"
-                    value={formData.unit_id}
-                    onChange={(e) => setFormData({...formData, unit_id: e.target.value})}
+                    name="rental_unit_id"
+                    value={formData.rental_unit_id}
+                    onChange={(e) => setFormData({...formData, rental_unit_id: e.target.value})}
                   >
                     {units.map((unit) => (
                       <MenuItem key={unit.id} value={unit.id}>
                         <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                           <Box sx={{ flex: 1 }}>
-                            Unit {unit.unit_number} - {unit.property_name}
+                            {unit.title} - {unit.location}
                           </Box>
-                          {unit.inspection_count > 0 && (
-                            <Chip 
-                              label={`${unit.inspection_count} inspections`}
-                              size="small"
-                              color="primary"
-                              sx={{ ml: 1 }}
-                            />
-                          )}
                         </Box>
                       </MenuItem>
                     ))}
@@ -798,18 +1007,22 @@ const AdminInspections = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
+                <FormControl fullWidth>
                   <InputLabel>Agent</InputLabel>
                   <Select
                     name="agent_id"
                     value={formData.agent_id}
                     onChange={(e) => setFormData({...formData, agent_id: e.target.value})}
                   >
-                    {agents.map((agent) => (
-                      <MenuItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </MenuItem>
-                    ))}
+                    {agents.length > 0 ? (
+                      agents.map((agent) => (
+                        <MenuItem key={agent.id} value={agent.id}>
+                          {agent.name || agent.first_name + ' ' + agent.last_name}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>No agents available</MenuItem>
+                    )}
                   </Select>
                 </FormControl>
               </Grid>
@@ -832,14 +1045,28 @@ const AdminInspections = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Scheduled Date"
+                  label="Booking Date & Time"
                   name="scheduled_date"
-                  type="date"
+                  type="datetime-local"
                   value={formData.scheduled_date}
                   onChange={(e) => setFormData({...formData, scheduled_date: e.target.value})}
                   InputLabelProps={{ shrink: true }}
                   required
                 />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Preferred Time Slot</InputLabel>
+                  <Select
+                    name="preferred_time_slot"
+                    value={formData.preferred_time_slot}
+                    onChange={(e) => setFormData({...formData, preferred_time_slot: e.target.value})}
+                  >
+                    <MenuItem value="morning">Morning</MenuItem>
+                    <MenuItem value="afternoon">Afternoon</MenuItem>
+                    <MenuItem value="evening">Evening</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
@@ -849,8 +1076,8 @@ const AdminInspections = () => {
                     value={formData.status}
                     onChange={(e) => setFormData({...formData, status: e.target.value})}
                   >
-                    <MenuItem value="scheduled">Scheduled</MenuItem>
-                    <MenuItem value="in_progress">In Progress</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="confirmed">Confirmed</MenuItem>
                     <MenuItem value="completed">Completed</MenuItem>
                     <MenuItem value="cancelled">Cancelled</MenuItem>
                   </Select>
@@ -859,23 +1086,25 @@ const AdminInspections = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Notes"
-                  name="notes"
+                  label="Message/Notes"
+                  name="message"
                   multiline
                   rows={3}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  value={formData.message}
+                  onChange={(e) => setFormData({...formData, message: e.target.value})}
+                  placeholder="Additional notes or message for the client"
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Findings"
-                  name="findings"
+                  label="Admin Notes"
+                  name="notes"
                   multiline
                   rows={3}
-                  value={formData.findings}
-                  onChange={(e) => setFormData({...formData, findings: e.target.value})}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  placeholder="Internal notes (not visible to client)"
                 />
               </Grid>
             </Grid>
@@ -1027,6 +1256,246 @@ const AdminInspections = () => {
           <Button variant="contained" color="success">
             Mark as Paid
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Inspection Dialog */}
+      <Dialog open={!!viewingInspection} onClose={() => setViewingInspection(null)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AssignmentIcon color="primary" />
+              <Typography variant="h6" component="span">Inspection Details</Typography>
+            </Box>
+            {viewingInspection && (
+              <Chip 
+                label={viewingInspection.status} 
+                color={getStatusColor(viewingInspection.status)}
+                size="medium"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {viewingInspection && (
+            <Box sx={{ mt: 2 }}>
+              {/* Basic Information Card */}
+              <Card variant="outlined" sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <HomeIcon color="primary" />
+                    Property Information
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Property</Typography>
+                      <Typography variant="body1" fontWeight="bold" sx={{ mb: 0.5 }}>
+                        {viewingInspection.rental_unit?.title || viewingInspection.rental_unit?.name || 'N/A'}
+                      </Typography>
+                      {viewingInspection.rental_unit?.location && (
+                        <Typography variant="body2" color="text.secondary">
+                          📍 {viewingInspection.rental_unit.location}
+                        </Typography>
+                      )}
+                      {viewingInspection.rental_unit?.unit_type && (
+                        <Chip 
+                          label={viewingInspection.rental_unit.unit_type} 
+                          size="small" 
+                          sx={{ mt: 1 }}
+                        />
+                      )}
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Inspection ID</Typography>
+                      <Typography variant="body1" fontWeight="bold">#{viewingInspection.id}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Booking Date</Typography>
+                      <Typography variant="body1">
+                        {viewingInspection.booking_date ? new Date(viewingInspection.booking_date).toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        }) : 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Preferred Time Slot</Typography>
+                      <Chip 
+                        label={viewingInspection.preferred_time_slot ? 
+                          viewingInspection.preferred_time_slot.charAt(0).toUpperCase() + viewingInspection.preferred_time_slot.slice(1) 
+                          : 'Not specified'} 
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {/* Client Information Card */}
+              <Card variant="outlined" sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <PersonIcon color="primary" />
+                    Client Information
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Name</Typography>
+                      <Typography variant="body1" fontWeight="bold">
+                        {viewingInspection.contact_name || viewingInspection.tenant?.name || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Contact Phone</Typography>
+                      <Typography variant="body1">
+                        {viewingInspection.contact_phone || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    {viewingInspection.contact_email && (
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>Email</Typography>
+                        <Typography variant="body1">{viewingInspection.contact_email}</Typography>
+                      </Grid>
+                    )}
+                    {viewingInspection.contact_country && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>Country</Typography>
+                        <Typography variant="body1">{viewingInspection.contact_country}</Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </CardContent>
+              </Card>
+
+              {/* Additional Services Card */}
+              {(() => {
+                const hasServices = viewingInspection.additional_services && viewingInspection.additional_services.length > 0;
+                const hasServiceIds = viewingInspection.additional_service_ids && 
+                  (Array.isArray(viewingInspection.additional_service_ids) ? viewingInspection.additional_service_ids.length > 0 : true);
+                
+                if (hasServices || hasServiceIds) {
+                  return (
+                    <Card variant="outlined" sx={{ mb: 3, bgcolor: 'action.hover' }}>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <BuildIcon color="primary" />
+                          Additional Services
+                          {hasServices && ` (${viewingInspection.additional_services.length})`}
+                          {!hasServices && hasServiceIds && ` (${Array.isArray(viewingInspection.additional_service_ids) ? viewingInspection.additional_service_ids.length : 'N/A'})`}
+                        </Typography>
+                        {hasServices ? (
+                          <Grid container spacing={2}>
+                            {viewingInspection.additional_services.map((service, idx) => (
+                              <Grid item xs={12} key={service.id || idx}>
+                                <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
+                                  <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                          {service.name || 'Service'}
+                                        </Typography>
+                                        {service.description && (
+                                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                            {service.description}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                      {service.price && service.price > 0 && (
+                                        <Chip 
+                                          label={`UGX ${service.price.toLocaleString()}`}
+                                          color="primary"
+                                          size="small"
+                                          sx={{ fontWeight: 600, ml: 2 }}
+                                        />
+                                      )}
+                                    </Box>
+                                  </CardContent>
+                                </Card>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        ) : (
+                          <Alert severity="info" sx={{ mt: 1 }}>
+                            <Typography variant="body2">
+                              Additional services are attached to this inspection, but service details are being loaded.
+                              {Array.isArray(viewingInspection.additional_service_ids) && (
+                                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                                  Service IDs: {viewingInspection.additional_service_ids.join(', ')}
+                                </Typography>
+                              )}
+                            </Typography>
+                          </Alert>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Messages & Notes Card */}
+              {(viewingInspection.message || viewingInspection.notes) && (
+                <Card variant="outlined" sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <AssignmentIcon color="primary" />
+                      Messages & Notes
+                    </Typography>
+                    {viewingInspection.message && (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>Client Message</Typography>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Typography variant="body1">{viewingInspection.message}</Typography>
+                        </Paper>
+                      </Box>
+                    )}
+                    {viewingInspection.notes && (
+                      <Box>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>Admin Notes</Typography>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.selected' }}>
+                          <Typography variant="body1">{viewingInspection.notes}</Typography>
+                        </Paper>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Timestamps */}
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                {viewingInspection.created_at && (
+                  <Typography variant="caption" color="text.secondary">
+                    Created: {new Date(viewingInspection.created_at).toLocaleString()}
+                  </Typography>
+                )}
+                {viewingInspection.updated_at && (
+                  <Typography variant="caption" color="text.secondary">
+                    Updated: {new Date(viewingInspection.updated_at).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Button onClick={() => setViewingInspection(null)}>Close</Button>
+          {viewingInspection && (
+            <Button 
+              variant="contained" 
+              startIcon={<EditIcon />}
+              onClick={() => {
+                setViewingInspection(null);
+                handleOpenDialog(viewingInspection);
+              }}
+            >
+              Edit Inspection
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

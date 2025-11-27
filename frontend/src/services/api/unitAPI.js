@@ -40,6 +40,9 @@ export const unitAPI = {
   // Get a single unit by ID
   getUnit: (id) => authService.get(`/units/${id}`),
 
+  // Get a single rental unit by ID
+  getRentalUnit: (id) => authService.get(`/rental-units/${id}`),
+
   // Create a new unit
   createUnit: (unitData) => authService.post(`/units/`, unitData, { timeout: 120000 }),
 

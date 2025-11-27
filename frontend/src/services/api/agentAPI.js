@@ -28,4 +28,8 @@ export const agentAPI = {
   // Update agent performance
   updateAgentPerformance: (agentId, performanceData) => 
     authService.put(`/agents/${agentId}/performance`, performanceData),
+  
+  // Toggle agent active status
+  toggleAgentActive: (agentId) => 
+    authService.patch(`/agents/${agentId}/toggle-active`),
 };

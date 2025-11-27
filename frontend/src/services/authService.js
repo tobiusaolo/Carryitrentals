@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
 
+
+
 class AuthService {
   constructor() {
     this.token = localStorage.getItem('token');
@@ -19,9 +21,13 @@ class AuthService {
 
   // Create axios instance with proper configuration
   createAxiosInstance() {
+    // Increase timeout for deployed API (Render.com can be slow on cold starts)
+    const isProduction = API_BASE_URL.includes('onrender.com') || API_BASE_URL.includes('render.com');
+    const timeout = isProduction ? 180000 : 120000; // 3 minutes for production, 2 minutes for local
+    
     const instance = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 120000, // 2 minutes - increased for image uploads, PDF generation, and slow operations
+      timeout: timeout,
     });
 
     // Request interceptor
@@ -39,17 +45,66 @@ class AuthService {
         if (!config.responseType || config.responseType !== 'blob') {
           config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
         }
+        
+        // Log request for debugging (only in development or for errors)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`, {
+            baseURL: config.baseURL,
+            timeout: config.timeout
+          });
+        }
+        
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('❌ Request interceptor error:', error);
+        return Promise.reject(error);
+      }
     );
 
     // Response interceptor
     instance.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Log successful responses in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+        }
+        return response;
+      },
       async (error) => {
         const originalRequest = error.config;
+        
+        // Enhanced error logging
+        if (error.response) {
+          // Server responded with error status
+          console.error(`❌ API Error [${error.response.status}]:`, {
+            url: error.config?.url,
+            method: error.config?.method,
+            status: error.response.status,
+            statusText: error.response.statusText,
+            data: error.response.data,
+            message: error.message
+          });
+        } else if (error.request) {
+          // Request was made but no response received
+          console.error('❌ Network Error - No response received:', {
+            url: error.config?.url,
+            method: error.config?.method,
+            message: error.message,
+            code: error.code,
+            timeout: error.config?.timeout
+          });
+          
+          // For timeout errors, provide helpful message
+          if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            console.warn('⏱️ Request timeout - This might be due to a cold start on the deployed server');
+          }
+        } else {
+          // Error setting up request
+          console.error('❌ Request Setup Error:', error.message);
+        }
 
+        // Handle 401 Unauthorized - token refresh
         if (error.response?.status === 401 && !originalRequest._retry) {
           if (this.isRefreshing) {
             // If already refreshing, queue the request
@@ -74,14 +129,30 @@ class AuthService {
               
               // Retry original request
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              console.log('🔄 Retrying request after token refresh');
               return instance(originalRequest);
             }
           } catch (refreshError) {
+            console.error('❌ Token refresh failed:', refreshError);
             this.processQueue(refreshError, null);
             this.logout();
             return Promise.reject(refreshError);
           } finally {
             this.isRefreshing = false;
+          }
+        }
+
+        // For network errors or timeouts, add retry logic for GET requests
+        if (
+          (!error.response && originalRequest && !originalRequest._retryCount) &&
+          originalRequest.method?.toLowerCase() === 'get'
+        ) {
+          originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+          if (originalRequest._retryCount <= 2) {
+            console.log(`🔄 Retrying request (attempt ${originalRequest._retryCount}/2)...`);
+            // Wait a bit before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * originalRequest._retryCount));
+            return instance(originalRequest);
           }
         }
 
@@ -257,6 +328,11 @@ class AuthService {
   async delete(url, config = {}) {
     const api = this.createAxiosInstance();
     return api.delete(url, config);
+  }
+
+  async patch(url, data, config = {}) {
+    const api = this.createAxiosInstance();
+    return api.patch(url, data, config);
   }
 }
 

@@ -56,8 +56,9 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api/api';
 import axios from 'axios';
-import NotificationSystem from '../../components/UI/NotificationSystem';
-import StatusBadge from '../../components/UI/StatusBadge';
+import authService from '../../services/authService';
+import { showSuccess, showError, showConfirm, showLoading, closeAlert, showWarning, showInfo } from '../../utils/sweetAlert';
+import Swal from 'sweetalert2';
 
 const AdminAirbnb = () => {
   const [activeTab, setActiveTab] = useState(0); // 0=Listings, 1=Bookings, 2=Payments
@@ -66,13 +67,14 @@ const AdminAirbnb = () => {
   const [payments, setPayments] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [openBookingDialog, setOpenBookingDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+  const [viewingAirbnb, setViewingAirbnb] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [editingAirbnb, setEditingAirbnb] = useState(null);
   const [selectedImages, setSelectedImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
   
   const [formData, setFormData] = useState({
     title: '',
@@ -105,15 +107,13 @@ const AdminAirbnb = () => {
   const loadAirbnbs = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/airbnb/');
-      setAirbnbs(response.data);
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+      const response = await apiInstance.get('/airbnb/');
+      setAirbnbs(response.data || []);
     } catch (err) {
       console.error('Error loading Airbnbs:', err);
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to load Airbnb listings',
-        severity: 'error'
-      });
+      showError('Load Failed', err.response?.data?.detail || 'Failed to load Airbnb listings');
     } finally {
       setLoading(false);
     }
@@ -122,18 +122,62 @@ const AdminAirbnb = () => {
   const loadBookings = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('https://carryit-backend.onrender.com/api/v1/admin/airbnb/bookings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      setBookings(response.data);
+      // Use authService for consistent authentication and base URL
+      const apiInstance = authService.createAxiosInstance();
+      
+      // Try the admin endpoint first
+      try {
+        const response = await apiInstance.get('/admin/airbnb/bookings');
+        const bookings = Array.isArray(response.data) ? response.data : [];
+        
+        // Sort by created_at descending (newest first)
+        bookings.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateB - dateA;
+        });
+        
+        setBookings(bookings);
+        return;
+      } catch (adminErr) {
+        console.warn('Admin endpoint failed, trying alternative approach:', adminErr);
+        // Fallback: Fetch all bookings by iterating through all Airbnbs
+        const airbnbsResponse = await apiInstance.get('/airbnb/');
+        const airbnbs = airbnbsResponse.data || [];
+        
+        // Fetch bookings for each Airbnb
+        const allBookings = [];
+        for (const airbnb of airbnbs) {
+          try {
+            const bookingsResponse = await apiInstance.get(`/airbnb/${airbnb.id}/bookings`);
+            const bookings = Array.isArray(bookingsResponse.data) ? bookingsResponse.data : [];
+            
+            // Add Airbnb title to each booking for display
+            bookings.forEach(booking => {
+              allBookings.push({
+                ...booking,
+                airbnb_title: airbnb.title,
+                airbnb_location: airbnb.location
+              });
+            });
+          } catch (err) {
+            console.warn(`Failed to load bookings for Airbnb ${airbnb.id}:`, err);
+            // Continue with other Airbnbs
+          }
+        }
+        
+        // Sort by created_at descending (newest first)
+        allBookings.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateB - dateA;
+        });
+        
+        setBookings(allBookings);
+      }
     } catch (err) {
       console.error('Error loading bookings:', err);
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to load bookings',
-        severity: 'error'
-      });
+      showError('Load Failed', err.response?.data?.detail || 'Failed to load bookings');
     } finally {
       setLoading(false);
     }
@@ -142,66 +186,185 @@ const AdminAirbnb = () => {
   const loadPayments = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('https://carryit-backend.onrender.com/api/v1/admin/airbnb/payments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      setPayments(response.data);
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+      
+      // Use admin payments endpoint
+      try {
+        const response = await apiInstance.get('/admin/airbnb/payments');
+        const payments = Array.isArray(response.data) ? response.data : [];
+        setPayments(payments);
+      } catch (adminErr) {
+        console.warn('Admin payments endpoint failed, trying fallback:', adminErr);
+        // Fallback: Fetch all bookings and extract payment information
+        const bookingsResponse = await apiInstance.get('/admin/airbnb/bookings');
+        const bookings = Array.isArray(bookingsResponse.data) ? bookingsResponse.data : [];
+        
+        // Convert bookings with payment info to payment records
+        const allPayments = bookings
+          .filter(booking => booking.payment_reference)
+          .map(booking => ({
+            id: booking.id,
+            booking_id: booking.id,
+            guest_name: booking.guest_name,
+            airbnb_title: booking.airbnb_title || 'N/A',
+            amount: booking.prepayment_amount || booking.total_amount,
+            currency: booking.currency,
+            payment_method: booking.payment_method,
+            payment_status: booking.payment_status,
+            payment_date: booking.payment_date || booking.created_at,
+            payment_reference: booking.payment_reference
+          }));
+        
+        setPayments(allPayments);
+      }
     } catch (err) {
       console.error('Error loading payments:', err);
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to load payments',
-        severity: 'error'
-      });
+      showError('Load Failed', err.response?.data?.detail || 'Failed to load payments');
     } finally {
       setLoading(false);
     }
   };
 
   const handleApproveBooking = async (bookingId) => {
+    console.log('🔵 Approve booking clicked, bookingId:', bookingId, 'type:', typeof bookingId);
+    
+    const result = await showConfirm(
+      'Approve Booking',
+      'Are you sure you want to approve this booking? An SMS notification will be sent to the guest.',
+      'Yes, Approve',
+      'Cancel'
+    );
+    
+    if (!result.isConfirmed) {
+      console.log('❌ User cancelled approval');
+      return;
+    }
+    
+    const loadingAlert = showLoading('Approving...', 'Please wait while we approve the booking');
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `https://carryit-backend.onrender.com/api/v1/admin/airbnb/bookings/${bookingId}/approve`,
-        {},
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      setNotification({
-        open: true,
-        message: 'Booking approved successfully! SMS sent to guest.',
-        severity: 'success'
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+      
+      // Ensure bookingId is a string
+      const bookingIdStr = String(bookingId);
+      console.log('📤 Sending approve request to:', `/admin/airbnb/bookings/${bookingIdStr}/approve`);
+      
+      // Use admin approve endpoint
+      const response = await apiInstance.patch(`/admin/airbnb/bookings/${bookingIdStr}/approve`);
+      
+      console.log('✅ Approve response:', response.data);
+      closeAlert();
+      
+      // Immediately update the local state to reflect the change
+      setBookings(prevBookings => {
+        const updated = prevBookings.map(booking => {
+          const bookingIdStr = String(booking.id);
+          const targetIdStr = String(bookingId);
+          if (bookingIdStr === targetIdStr || bookingIdStr === bookingId || booking.id === bookingId) {
+            console.log('🔄 Updating booking status in local state:', bookingIdStr, '-> approved');
+            return { ...booking, status: 'approved' };
+          }
+          return booking;
+        });
+        console.log('📊 Updated bookings state, approved booking should be updated');
+        return updated;
       });
-      loadBookings();
+      
+      showSuccess('Booking Approved', 'The booking has been approved and an SMS has been sent to the guest.');
+      
+      // Wait a moment for backend to fully process, then refresh to get latest data
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await loadBookings();
+      await loadPayments(); // Refresh payments tab as well
     } catch (err) {
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to approve booking',
-        severity: 'error'
+      console.error('❌ Error approving booking:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        url: err.config?.url
       });
+      closeAlert();
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to approve booking';
+      showError('Approval Failed', errorMessage);
     }
   };
 
   const handleDeclineBooking = async (bookingId) => {
+    console.log('🔴 Decline booking clicked, bookingId:', bookingId, 'type:', typeof bookingId);
+    
+    const { value: reason } = await Swal.fire({
+      title: 'Decline Booking',
+      text: 'Enter reason for declining (optional):',
+      input: 'textarea',
+      inputPlaceholder: 'Enter decline reason...',
+      inputAttributes: {
+        'aria-label': 'Enter decline reason'
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Decline',
+      confirmButtonColor: '#d32f2f',
+      cancelButtonText: 'Cancel',
+      cancelButtonColor: '#757575',
+      inputValidator: (value) => {
+        // Reason is optional, so no validation needed
+        return null;
+      }
+    });
+    
+    if (reason === undefined) {
+      // User cancelled
+      console.log('❌ User cancelled decline');
+      return;
+    }
+    
+    const loadingAlert = showLoading('Declining...', 'Please wait while we decline the booking');
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `https://carryit-backend.onrender.com/api/v1/admin/airbnb/bookings/${bookingId}/decline`,
-        {},
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      setNotification({
-        open: true,
-        message: 'Booking declined. SMS sent to guest.',
-        severity: 'info'
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+      
+      // Ensure bookingId is a string
+      const bookingIdStr = String(bookingId);
+      console.log('📤 Sending decline request to:', `/admin/airbnb/bookings/${bookingIdStr}/decline`);
+      
+      // Use admin decline endpoint
+      const response = await apiInstance.patch(`/admin/airbnb/bookings/${bookingIdStr}/decline`, reason ? { reason } : {});
+      
+      console.log('✅ Decline response:', response.data);
+      closeAlert();
+      
+      // Immediately update the local state to reflect the change
+      setBookings(prevBookings => {
+        const updated = prevBookings.map(booking => {
+          const bookingIdStr = String(booking.id);
+          const targetIdStr = String(bookingId);
+          if (bookingIdStr === targetIdStr || bookingIdStr === bookingId || booking.id === bookingId) {
+            console.log('🔄 Updating booking status in local state:', bookingIdStr, '-> declined');
+            return { ...booking, status: 'declined' };
+          }
+          return booking;
+        });
+        console.log('📊 Updated bookings state, declined booking should be updated');
+        return updated;
       });
-      loadBookings();
+      
+      showSuccess('Booking Declined', 'The booking has been declined and an SMS has been sent to the guest.');
+      
+      // Wait a moment for backend to fully process, then refresh to get latest data
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await loadBookings();
     } catch (err) {
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to decline booking',
-        severity: 'error'
+      console.error('❌ Error declining booking:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        url: err.config?.url
       });
+      closeAlert();
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to decline booking';
+      showError('Decline Failed', errorMessage);
     }
   };
 
@@ -251,6 +414,7 @@ const AdminAirbnb = () => {
         title: airbnb.title,
         description: airbnb.description,
         location: airbnb.location,
+        country: airbnb.country || 'Uganda',
         price_per_night: airbnb.price_per_night,
         currency: airbnb.currency || 'UGX',
         max_guests: airbnb.max_guests,
@@ -267,6 +431,7 @@ const AdminAirbnb = () => {
         title: '',
         description: '',
         location: '',
+        country: 'Uganda',
         price_per_night: '',
         currency: 'UGX',
         max_guests: 2,
@@ -285,6 +450,20 @@ const AdminAirbnb = () => {
     setOpenDialog(false);
     setEditingAirbnb(null);
     setSelectedImages([]);
+    // Reset form data
+    setFormData({
+      title: '',
+      description: '',
+      location: '',
+      price_per_night: '',
+      currency: 'UGX',
+      max_guests: 2,
+      bedrooms: 1,
+      bathrooms: 1,
+      amenities: '',
+      house_rules: '',
+      is_available: 'available'
+    });
   };
 
   const handleChange = (e) => {
@@ -295,11 +474,7 @@ const AdminAirbnb = () => {
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
     if (selectedImages.length + files.length > 10) {
-      setNotification({
-        open: true,
-        message: 'Maximum 10 images allowed',
-        severity: 'warning'
-      });
+      showWarning('Image Limit', 'Maximum 10 images allowed. Please remove some images before adding more.');
       return;
     }
     setSelectedImages(prev => [...prev, ...files]);
@@ -310,9 +485,13 @@ const AdminAirbnb = () => {
   };
 
   const handleSubmit = async () => {
+    const loadingAlert = showLoading(
+      editingAirbnb ? 'Updating...' : 'Creating...',
+      'Please wait while we save the Airbnb listing'
+    );
+    setSaveLoading(true);
+    
     try {
-      setSaveLoading(true);
-      
       let imagesBase64 = '';
       if (selectedImages.length > 0) {
         const promises = selectedImages.map(file => {
@@ -335,91 +514,138 @@ const AdminAirbnb = () => {
         ...(imagesBase64 && { images: imagesBase64 })
       };
 
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+
       if (editingAirbnb) {
-        await api.put(`/airbnb/${editingAirbnb.id}`, payload);
-        setNotification({
-          open: true,
-          message: 'Airbnb listing updated successfully!',
-          severity: 'success'
-        });
+        await apiInstance.put(`/airbnb/${editingAirbnb.id}`, payload);
+        closeAlert();
+        showSuccess('Listing Updated', 'The Airbnb listing has been successfully updated.');
       } else {
-        await api.post('/airbnb/', payload);
-        setNotification({
-          open: true,
-          message: 'Airbnb listing created successfully!',
-          severity: 'success'
-        });
+        await apiInstance.post('/airbnb/', payload);
+        closeAlert();
+        showSuccess('Listing Created', 'The Airbnb listing has been successfully created.');
       }
       
+      // Success - close dialog and refresh data
       handleCloseDialog();
-      loadAirbnbs();
+      
+      // Wait a moment for backend to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await loadAirbnbs(); // Ensure data is refreshed
     } catch (err) {
       console.error('Error saving Airbnb:', err);
-      setNotification({
-        open: true,
-        message: err.response?.data?.detail || 'Failed to save Airbnb listing',
-        severity: 'error'
-      });
+      closeAlert();
+      showError('Save Failed', err.response?.data?.detail || 'Failed to save Airbnb listing');
     } finally {
       setSaveLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this Airbnb listing?')) {
-      try {
-        await api.delete(`/airbnb/${id}`);
-        setNotification({
-          open: true,
-          message: 'Airbnb listing deleted successfully!',
-          severity: 'success'
-        });
-        loadAirbnbs();
-      } catch (err) {
-        console.error('Error deleting Airbnb:', err);
-        setNotification({
-          open: true,
-          message: err.response?.data?.detail || 'Failed to delete Airbnb listing',
-          severity: 'error'
-        });
-      }
+    const result = await showConfirm(
+      'Delete Listing',
+      'Are you sure you want to delete this Airbnb listing? This action cannot be undone.',
+      'Yes, Delete',
+      'Cancel'
+    );
+    
+    if (!result.isConfirmed) {
+      return;
+    }
+    
+    const loadingAlert = showLoading('Deleting...', 'Please wait while we delete the listing');
+    try {
+      // Use authService for consistent authentication
+      const apiInstance = authService.createAxiosInstance();
+      await apiInstance.delete(`/airbnb/${id}`);
+      
+      closeAlert();
+      
+      // Wait a moment for backend to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await loadAirbnbs();
+      
+      showSuccess('Listing Deleted', 'The Airbnb listing has been successfully deleted.');
+    } catch (err) {
+      console.error('Error deleting Airbnb:', err);
+      closeAlert();
+      showError('Delete Failed', err.response?.data?.detail || 'Failed to delete Airbnb listing');
+    }
+  };
+
+  const handleView = async (airbnb) => {
+    try {
+      // Fetch full Airbnb details to ensure we have complete data including images
+      const apiInstance = authService.createAxiosInstance();
+      const response = await apiInstance.get(`/airbnb/${airbnb.id}`);
+      const fullAirbnb = response.data || response;
+      setViewingAirbnb(fullAirbnb);
+      setOpenViewDialog(true);
+    } catch (err) {
+      console.error('Failed to fetch full Airbnb details:', err);
+      // Fallback to using the airbnb from the list
+      setViewingAirbnb(airbnb);
+      setOpenViewDialog(true);
     }
   };
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            Airbnb Management
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage listings, bookings, and payments
-          </Typography>
-        </Box>
-        {activeTab === 0 && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => handleOpenDialog()}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              textTransform: 'none',
-              fontWeight: 600
-            }}
-          >
-            Add Airbnb Listing
-          </Button>
-        )}
-      </Box>
+      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: 'white' }}>
+                <Hotel sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Airbnb Management
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                Manage listings, bookings, and payments
+              </Typography>
+            </Box>
+            {activeTab === 0 && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => handleOpenDialog()}
+                sx={{
+                  bgcolor: 'white',
+                  color: '#667eea',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.9)',
+                    transform: 'translateY(-2px)',
+                    boxShadow: 4
+                  },
+                  transition: 'all 0.2s'
+                }}
+              >
+                Add Airbnb Listing
+              </Button>
+            )}
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
-      <Paper sx={{ mb: 3, borderRadius: 2 }}>
+      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 2 }}>
         <Tabs 
           value={activeTab} 
           onChange={(e, newValue) => setActiveTab(newValue)}
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              minHeight: 64
+            }
+          }}
+          indicatorColor="primary"
+          textColor="primary"
         >
           <Tab 
             label={
@@ -446,24 +672,30 @@ const AdminAirbnb = () => {
             } 
           />
         </Tabs>
-      </Paper>
+      </Card>
 
       {/* Loading */}
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {loading && (
+        <Card sx={{ mb: 3, borderRadius: 2 }}>
+          <LinearProgress sx={{ height: 6, borderRadius: 1 }} />
+        </Card>
+      )}
 
       {/* TAB 0: LISTINGS */}
       {activeTab === 0 && (
-        <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-          <Table>
-            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: 'primary.main' }}>
               <TableRow>
-                <TableCell><strong>Title</strong></TableCell>
-                <TableCell><strong>Location</strong></TableCell>
-                <TableCell><strong>Price/Night</strong></TableCell>
-                <TableCell><strong>Guests</strong></TableCell>
-                <TableCell><strong>Bedrooms</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell align="center"><strong>Actions</strong></TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Title</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Location</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Country</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Price/Night</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guests</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Bedrooms</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
+                <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -484,7 +716,22 @@ const AdminAirbnb = () => {
                         {airbnb.title}
                       </Typography>
                     </TableCell>
-                    <TableCell>{airbnb.location}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{airbnb.location}</Typography>
+                      {airbnb.country && (
+                        <Typography variant="caption" color="text.secondary">
+                          {airbnb.country}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={airbnb.country || 'N/A'}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Chip 
                         label={`${airbnb.currency} ${parseFloat(airbnb.price_per_night).toLocaleString()}`}
@@ -503,6 +750,11 @@ const AdminAirbnb = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
+                      <Tooltip title="View Details">
+                        <IconButton size="small" onClick={() => handleView(airbnb)} color="info">
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Edit">
                         <IconButton size="small" onClick={() => handleOpenDialog(airbnb)} color="primary">
                           <Edit fontSize="small" />
@@ -520,24 +772,26 @@ const AdminAirbnb = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        </Card>
       )}
 
       {/* TAB 1: BOOKINGS */}
       {activeTab === 1 && (
-        <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-          <Table>
-            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: 'primary.main' }}>
               <TableRow>
-                <TableCell><strong>Booking ID</strong></TableCell>
-                <TableCell><strong>Property</strong></TableCell>
-                <TableCell><strong>Guest</strong></TableCell>
-                <TableCell><strong>Check-in</strong></TableCell>
-                <TableCell><strong>Check-out</strong></TableCell>
-                <TableCell><strong>Guests</strong></TableCell>
-                <TableCell><strong>Total Amount</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Payment</strong></TableCell>
-                <TableCell align="center"><strong>Actions</strong></TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Booking ID</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Property</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guest</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Check-in</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Check-out</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guests</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Total Amount</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Payment</TableCell>
+                <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -559,9 +813,19 @@ const AdminAirbnb = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {booking.airbnb_title || 'N/A'}
+                      <Typography variant="body2" fontWeight={600}>
+                        {booking.airbnb_title || booking.airbnb_id || 'N/A'}
                       </Typography>
+                      {booking.airbnb_location && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {booking.airbnb_location}
+                        </Typography>
+                      )}
+                      {booking.airbnb_id && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          ID: {booking.airbnb_id}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Box>
@@ -609,22 +873,52 @@ const AdminAirbnb = () => {
                           <Visibility fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {booking.status === 'pending' && (
+                      {booking.status && booking.status.toLowerCase() === 'pending' && (
                         <>
-                          <Tooltip title="Approve">
+                          <Tooltip title="Approve Booking">
                             <IconButton 
                               size="small" 
-                              onClick={() => handleApproveBooking(booking.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('🔵 Approve button clicked for booking:', booking);
+                                if (booking.id) {
+                                  handleApproveBooking(booking.id);
+                                } else {
+                                  showError('Error', 'Booking ID is missing');
+                                }
+                              }}
                               color="success"
+                              sx={{
+                                '&:hover': {
+                                  bgcolor: 'success.light',
+                                  color: 'white'
+                                }
+                              }}
                             >
                               <ApproveIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Decline">
+                          <Tooltip title="Decline Booking">
                             <IconButton 
                               size="small" 
-                              onClick={() => handleDeclineBooking(booking.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('🔴 Decline button clicked for booking:', booking);
+                                if (booking.id) {
+                                  handleDeclineBooking(booking.id);
+                                } else {
+                                  showError('Error', 'Booking ID is missing');
+                                }
+                              }}
                               color="error"
+                              sx={{
+                                '&:hover': {
+                                  bgcolor: 'error.light',
+                                  color: 'white'
+                                }
+                              }}
                             >
                               <DeclineIcon fontSize="small" />
                             </IconButton>
@@ -638,22 +932,24 @@ const AdminAirbnb = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        </Card>
       )}
 
       {/* TAB 2: PAYMENTS */}
       {activeTab === 2 && (
-        <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-          <Table>
-            <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: 'primary.main' }}>
               <TableRow>
-                <TableCell><strong>Transaction ID</strong></TableCell>
-                <TableCell><strong>Booking ID</strong></TableCell>
-                <TableCell><strong>Guest</strong></TableCell>
-                <TableCell><strong>Property</strong></TableCell>
-                <TableCell><strong>Amount</strong></TableCell>
-                <TableCell><strong>Payment Method</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Date</strong></TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Transaction ID</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Booking ID</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guest</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Property</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Amount</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Payment Method</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Date</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -704,6 +1000,7 @@ const AdminAirbnb = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        </Card>
       )}
 
       {/* Booking Details Dialog */}
@@ -879,31 +1176,35 @@ const AdminAirbnb = () => {
             </Grid>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenBookingDialog(false)}>Close</Button>
+        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Button onClick={() => setOpenBookingDialog(false)} variant="outlined">
+            Close
+          </Button>
           {selectedBooking?.status === 'pending' && (
             <>
               <Button
                 variant="contained"
                 color="success"
-                onClick={() => {
-                  handleApproveBooking(selectedBooking.id);
+                onClick={async () => {
                   setOpenBookingDialog(false);
+                  await handleApproveBooking(selectedBooking.id);
                 }}
                 startIcon={<ApproveIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
               >
-                Approve
+                Approve Booking
               </Button>
               <Button
                 variant="contained"
                 color="error"
-                onClick={() => {
-                  handleDeclineBooking(selectedBooking.id);
+                onClick={async () => {
                   setOpenBookingDialog(false);
+                  await handleDeclineBooking(selectedBooking.id);
                 }}
                 startIcon={<DeclineIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
               >
-                Decline
+                Decline Booking
               </Button>
             </>
           )}
@@ -939,7 +1240,7 @@ const AdminAirbnb = () => {
                 required
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Location"
@@ -948,6 +1249,30 @@ const AdminAirbnb = () => {
                 onChange={handleChange}
                 required
               />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Country</InputLabel>
+                <Select
+                  name="country"
+                  value={formData.country}
+                  label="Country"
+                  onChange={handleChange}
+                >
+                  <MenuItem value="Uganda">Uganda</MenuItem>
+                  <MenuItem value="Kenya">Kenya</MenuItem>
+                  <MenuItem value="Tanzania">Tanzania</MenuItem>
+                  <MenuItem value="Rwanda">Rwanda</MenuItem>
+                  <MenuItem value="Burundi">Burundi</MenuItem>
+                  <MenuItem value="South Sudan">South Sudan</MenuItem>
+                  <MenuItem value="Ethiopia">Ethiopia</MenuItem>
+                  <MenuItem value="Somalia">Somalia</MenuItem>
+                  <MenuItem value="Djibouti">Djibouti</MenuItem>
+                  <MenuItem value="Eritrea">Eritrea</MenuItem>
+                  <MenuItem value="Sudan">Sudan</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={6}>
               <TextField
@@ -1062,6 +1387,11 @@ const AdminAirbnb = () => {
                   Upload Images (Max 10)
                 </Button>
               </label>
+              <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
+                <Typography variant="body2">
+                  <strong>Image Format Tip:</strong> Accepted formats are JPEG, JPG, PNG, or GIF. Maximum file size is 10MB per image.
+                </Typography>
+              </Alert>
               {selectedImages.length > 0 && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="caption" gutterBottom>
@@ -1105,13 +1435,145 @@ const AdminAirbnb = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Notification */}
-      <NotificationSystem
-        open={notification.open}
-        message={notification.message}
-        severity={notification.severity}
-        onClose={() => setNotification({ ...notification, open: false })}
-      />
+      {/* View Airbnb Dialog */}
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Hotel />
+            <Typography variant="h6" fontWeight={600}>
+              {viewingAirbnb?.title || 'Airbnb Listing Details'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {viewingAirbnb && (
+            <Grid container spacing={3}>
+              {/* Images */}
+              {viewingAirbnb.images && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                    Images
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <ImageList cols={3} gap={8} sx={{ maxHeight: 400 }}>
+                    {viewingAirbnb.images.split('|||IMAGE_SEPARATOR|||').map((image, index) => (
+                      image && (
+                        <ImageListItem key={index}>
+                          <img
+                            src={image}
+                            alt={`${viewingAirbnb.title} - Image ${index + 1}`}
+                            style={{ height: 200, objectFit: 'cover', width: '100%' }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </ImageListItem>
+                      )
+                    ))}
+                  </ImageList>
+                </Grid>
+              )}
+
+              {/* Basic Information */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: '#f9f9f9' }}>
+                  <Typography variant="subtitle1" fontWeight={600} gutterBottom color="primary">
+                    <HomeIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                    Basic Information
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Title:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{viewingAirbnb.title}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Location:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{viewingAirbnb.location}{viewingAirbnb.country ? `, ${viewingAirbnb.country}` : ''}</Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Description:</Typography>
+                      <Typography variant="body2">{viewingAirbnb.description || 'No description provided'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Price per Night:</Typography>
+                      <Typography variant="h6" fontWeight={700} color="primary">
+                        {viewingAirbnb.currency} {parseFloat(viewingAirbnb.price_per_night || 0).toLocaleString()}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Max Guests:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{viewingAirbnb.max_guests}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Bedrooms:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{viewingAirbnb.bedrooms}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Bathrooms:</Typography>
+                      <Typography variant="body1" fontWeight={600}>{viewingAirbnb.bathrooms}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Typography variant="caption" color="text.secondary">Status:</Typography>
+                      <Box sx={{ mt: 0.5 }}>
+                        <Chip
+                          label={viewingAirbnb.is_available}
+                          size="small"
+                          color={viewingAirbnb.is_available === 'available' ? 'success' : 'default'}
+                        />
+                      </Box>
+                    </Grid>
+                    {viewingAirbnb.amenities && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">Amenities:</Typography>
+                        <Typography variant="body2">{viewingAirbnb.amenities}</Typography>
+                      </Grid>
+                    )}
+                    {viewingAirbnb.house_rules && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">House Rules:</Typography>
+                        <Typography variant="body2">{viewingAirbnb.house_rules}</Typography>
+                      </Grid>
+                    )}
+                    {viewingAirbnb.created_at && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary">Created At:</Typography>
+                        <Typography variant="body2">
+                          {new Date(viewingAirbnb.created_at).toLocaleString()}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {viewingAirbnb.updated_at && (
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" color="text.secondary">Last Updated:</Typography>
+                        <Typography variant="body2">
+                          {new Date(viewingAirbnb.updated_at).toLocaleString()}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
+          {viewingAirbnb && (
+            <Button
+              variant="contained"
+              onClick={() => {
+                setOpenViewDialog(false);
+                handleOpenDialog(viewingAirbnb);
+              }}
+              startIcon={<Edit />}
+            >
+              Edit
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 };

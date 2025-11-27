@@ -47,7 +47,9 @@ import {
   LocationOn,
   Event as CalendarIcon
 } from '@mui/icons-material';
+import { Avatar } from '@mui/material';
 import axios from 'axios';
+import logoImage from '../../assets/images/er13.png';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -161,20 +163,18 @@ const LandingPage = () => {
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             {/* Logo - Extreme Left */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }} onClick={() => navigate('/')}>
+              <Avatar
+                src={logoImage}
+                alt="Easy Rentals Logo"
                 sx={{
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   borderRadius: 2,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 }}
-              >
-                <HomeIcon sx={{ color: 'white', fontSize: 28 }} />
-              </Box>
+                variant="rounded"
+              />
               <Typography 
                 variant="h6" 
                 sx={{ 
@@ -182,10 +182,11 @@ const LandingPage = () => {
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  display: { xs: 'none', sm: 'block' }
+                  display: { xs: 'none', sm: 'block' },
+                  fontSize: '1.25rem'
                 }}
               >
-                CarryIT Property Manager
+                Easy Rentals
               </Typography>
             </Box>
 
@@ -813,21 +814,19 @@ const LandingPage = () => {
           <Grid container spacing={4}>
             <Grid item xs={12} md={4}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Box
+                <Avatar
+                  src={logoImage}
+                  alt="Easy Rentals Logo"
                   sx={{
-                    width: 40,
-                    height: 40,
+                    width: 48,
+                    height: 48,
                     borderRadius: 2,
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                   }}
-                >
-                  <HomeIcon sx={{ color: 'white' }} />
-                </Box>
+                  variant="rounded"
+                />
                 <Typography variant="h6" fontWeight={700}>
-                  CarryIT
+                  Easy Rentals
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ opacity: 0.7, mb: 2 }}>
@@ -875,7 +874,7 @@ const LandingPage = () => {
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <Email sx={{ fontSize: 20, opacity: 0.7 }} />
                   <Typography variant="body2" sx={{ opacity: 0.7 }}>
-                    info@carryit.com
+                    info@easyrentals.com
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -889,7 +888,7 @@ const LandingPage = () => {
           </Grid>
           <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', mt: 6, pt: 4, textAlign: 'center' }}>
             <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              © 2025 CarryIT Property Manager. All rights reserved.
+              © 2025 Easy Rentals. All rights reserved.
             </Typography>
           </Box>
         </Container>

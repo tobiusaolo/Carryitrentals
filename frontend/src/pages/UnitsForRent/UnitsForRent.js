@@ -79,6 +79,7 @@ const UnitsForRent = () => {
   const [formData, setFormData] = useState({
     title: '',
     location: '',
+    country: 'Uganda',
     unit_type: 'apartment',
     floor: '',
     bedrooms: '',
@@ -139,6 +140,7 @@ const UnitsForRent = () => {
       setFormData({
         title: unit.title,
         location: unit.location,
+        country: unit.country || 'Uganda',
         unit_type: unit.unit_type || 'apartment',
         floor: unit.floor || '',
         bedrooms: unit.bedrooms,
@@ -159,6 +161,7 @@ const UnitsForRent = () => {
       setFormData({
         title: '',
         location: '',
+        country: 'Uganda',
         unit_type: 'apartment',
         floor: '',
         bedrooms: '',
@@ -207,6 +210,25 @@ const UnitsForRent = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingUnit(null);
+    setSelectedImages([]);
+    setActiveStep(0);
+    // Reset form data
+    setFormData({
+      title: '',
+      location: '',
+      unit_type: 'apartment',
+      floor: '',
+      bedrooms: '',
+      bathrooms: '',
+      monthly_rent: '',
+      currency: 'USD',
+      inspection_fee: '',
+      status: 'available',
+      description: '',
+      amenities: '',
+      images: '',
+      agent_id: ''
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -261,11 +283,14 @@ const UnitsForRent = () => {
         await unitAPI.createRentalUnit(unitData);
       }
       
+      // Success - close dialog and refresh data
       handleCloseDialog();
-      loadRentalUnits();
+      await loadRentalUnits(); // Ensure data is refreshed
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Failed to save unit:', err);
       setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Failed to save unit');
+      // Don't close dialog on error so user can fix and retry
     } finally {
       setLoading(false);
     }
@@ -281,7 +306,9 @@ const UnitsForRent = () => {
     if (window.confirm('Are you sure you want to delete this unit?')) {
       try {
         await unitAPI.deleteRentalUnit(unitId);
-        loadRentalUnits();
+        // Success - refresh data immediately
+        await loadRentalUnits();
+        setError(null); // Clear any previous errors
       } catch (err) {
         console.error('Failed to delete unit:', err);
         setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'Failed to delete unit');
@@ -515,6 +542,30 @@ const UnitsForRent = () => {
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth required>
+                      <InputLabel>Country</InputLabel>
+                      <Select
+                        name="country"
+                        value={formData.country}
+                        label="Country"
+                        onChange={(e) => setFormData({...formData, country: e.target.value})}
+                      >
+                        <MenuItem value="Uganda">Uganda</MenuItem>
+                        <MenuItem value="Kenya">Kenya</MenuItem>
+                        <MenuItem value="Tanzania">Tanzania</MenuItem>
+                        <MenuItem value="Rwanda">Rwanda</MenuItem>
+                        <MenuItem value="Burundi">Burundi</MenuItem>
+                        <MenuItem value="South Sudan">South Sudan</MenuItem>
+                        <MenuItem value="Ethiopia">Ethiopia</MenuItem>
+                        <MenuItem value="Somalia">Somalia</MenuItem>
+                        <MenuItem value="Djibouti">Djibouti</MenuItem>
+                        <MenuItem value="Eritrea">Eritrea</MenuItem>
+                        <MenuItem value="Sudan">Sudan</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
                       <InputLabel>Unit Type</InputLabel>
                       <Select
@@ -708,6 +759,11 @@ const UnitsForRent = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Please select 5-10 images of the unit. Images should show different angles and rooms.
                   </Typography>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Image Format Tip:</strong> Accepted formats are JPEG, JPG, PNG, or GIF. Maximum file size is 10MB per image.
+                    </Typography>
+                  </Alert>
                   
                   {selectedImages.length > 0 && (
                     <ImageList sx={{ width: '100%', height: 300 }} cols={3} rowHeight={150}>
@@ -795,7 +851,7 @@ const UnitsForRent = () => {
                 {viewingUnit?.title}
               </Typography>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                {viewingUnit?.location}
+                {viewingUnit?.location}{viewingUnit?.country ? `, ${viewingUnit.country}` : ''}
               </Typography>
             </Box>
           </Box>
@@ -847,16 +903,33 @@ const UnitsForRent = () => {
                     }} cols={{ xs: 1, sm: 2, md: 3, lg: 4 }} rowHeight={200}>
                       {viewingUnit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim()).map((image, index) => {
                         console.log(`Image ${index + 1}:`, image.substring(0, 100) + '...');
+                        // Images are stored as base64 strings in Firestore, use directly
+                        // If it's not base64 (legacy file path), convert to URL
+                        const getImageUrl = (img) => {
+                          // If it's already base64 or full URL, return as-is
+                          if (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://')) {
+                            return img;
+                          }
+                          // Legacy file path - convert to URL
+                          if (img.startsWith('/')) {
+                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                            return `${apiBaseUrl.replace('/api/v1', '')}${img}`;
+                          }
+                          // Relative path
+                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                          return `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${img}`;
+                        };
+                        const imageUrl = getImageUrl(image);
                         return (
                           <ImageListItem key={index}>
                             <img
-                              src={image}
+                              src={imageUrl}
                               alt={`Unit image ${index + 1}`}
                               loading="lazy"
                               style={{ objectFit: 'cover' }}
                               onLoad={() => console.log(`Image ${index + 1} loaded successfully`)}
                               onError={(e) => {
-                                console.error('Image failed to load:', image.substring(0, 100) + '...');
+                                console.error('Image failed to load:', imageUrl.substring(0, 100));
                                 e.target.style.display = 'none';
                               }}
                             />
@@ -866,13 +939,20 @@ const UnitsForRent = () => {
                                 <IconButton
                                   sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
                                   onClick={() => {
-                                    // Create a new window with the base64 image
+                                    // Create a new window with the image
                                     const newWindow = window.open();
+                                    // Images are stored as base64, use directly or convert legacy paths
+                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                                    const fullImageUrl = image.startsWith('data:image/') || image.startsWith('http://') || image.startsWith('https://')
+                                      ? image 
+                                      : image.startsWith('/') 
+                                        ? `${apiBaseUrl.replace('/api/v1', '')}${image}`
+                                        : `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${image}`;
                                     newWindow.document.write(`
                                       <html>
                                         <head><title>Unit Image ${index + 1}</title></head>
                                         <body style="margin:0; padding:0; text-align:center;">
-                                          <img src="${image}" style="max-width:100%; max-height:100vh;" />
+                                          <img src="${fullImageUrl}" style="max-width:100%; max-height:100vh;" />
                                         </body>
                                       </html>
                                     `);
@@ -908,7 +988,7 @@ const UnitsForRent = () => {
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Location</Typography>
-                    <Typography variant="body1">{viewingUnit.location}</Typography>
+                    <Typography variant="body1">{viewingUnit.location}{viewingUnit.country ? `, ${viewingUnit.country}` : ''}</Typography>
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary">Unit Type</Typography>

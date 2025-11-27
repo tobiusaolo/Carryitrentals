@@ -22,8 +22,10 @@ import {
   Slide,
   Divider,
   Chip,
-  LinearProgress
+  LinearProgress,
+  Avatar
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Email as EmailIcon,
   Lock as LockIcon,
@@ -144,14 +146,26 @@ const Register = () => {
             >
               <HomeIcon sx={{ fontSize: 60 }} />
             </Box>
+            <Avatar
+              src={logoImage}
+              alt="Easy Rentals Logo"
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: 3,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                mb: 2
+              }}
+              variant="rounded"
+            />
             <Typography variant="h3" fontWeight={800} gutterBottom>
-              Join CarryIT
+              Join Easy Rentals
             </Typography>
             <Typography variant="h5" sx={{ mb: 4, opacity: 0.9 }}>
               Start Managing Smarter
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, opacity: 0.8, maxWidth: 400 }}>
-              Join thousands of property owners who trust CarryIT to manage their rental business
+              Join thousands of property owners who trust Easy Rentals to manage their rental business
             </Typography>
 
             {/* Benefits */}
@@ -188,21 +202,20 @@ const Register = () => {
           <Container maxWidth="sm">
             <Box sx={{ mb: 3, textAlign: 'center' }}>
               {/* Mobile Logo */}
-              <Box
+              <Avatar
+                src={logoImage}
+                alt="Easy Rentals Logo"
                 sx={{
-                  width: 60,
-                  height: 60,
+                  width: 64,
+                  height: 64,
                   borderRadius: 3,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                   display: { xs: 'flex', md: 'none' },
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   mx: 'auto',
                   mb: 2
                 }}
-              >
-                <HomeIcon sx={{ fontSize: 32, color: 'white' }} />
-              </Box>
+                variant="rounded"
+              />
 
               <Typography variant="h4" fontWeight={700} gutterBottom>
                 Create Account

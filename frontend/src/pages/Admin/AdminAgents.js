@@ -29,7 +29,9 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
-  LinearProgress
+  LinearProgress,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,11 +44,21 @@ import {
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  ToggleOn as ToggleOnIcon,
+  ToggleOff as ToggleOffIcon,
+  LocationOn as LocationIcon,
+  Badge as BadgeIcon,
+  Work as WorkIcon,
+  Notes as NotesIcon,
+  Star as StarIcon,
+  TrendingUp as TrendingUpIcon,
+  Home as HomeIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { agentAPI } from '../../services/api/agentAPI';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
+import authService from '../../services/authService';
 
 const AdminAgents = () => {
   const dispatch = useDispatch();
@@ -84,11 +96,14 @@ const AdminAgents = () => {
   const loadAgents = async () => {
     setLoading(true);
     try {
-      const response = await agentAPI.getAgents();
+      // Use authService for consistent authentication
+      const api = authService.createAxiosInstance();
+      const response = await api.get('/agents/');
       setAgents(response.data || []);
+      setError(null);
     } catch (err) {
       console.error('Failed to load agents:', err);
-      setError('Failed to load agents');
+      setError(err.response?.data?.detail || 'Failed to load agents');
     } finally {
       setLoading(false);
     }
@@ -154,20 +169,28 @@ const AdminAgents = () => {
     const loadingAlert = showLoading('Saving agent...', 'Please wait');
     
     try {
+      const api = authService.createAxiosInstance();
+      
       if (editingAgent) {
         // Update agent
-        await agentAPI.updateAgent(editingAgent.id, formData);
+        await api.put(`/agents/${editingAgent.id}`, formData);
         closeAlert();
         showSuccess('Agent Updated!', 'The agent information has been successfully updated.');
         handleCloseDialog();
-        loadAgents();
+        
+        // Wait a moment for backend to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadAgents();
       } else {
         // Create agent
-        await agentAPI.createAgent(formData);
+        await api.post('/agents/', formData);
         closeAlert();
         showSuccess('Agent Created!', 'New agent has been successfully added to the system.');
         handleCloseDialog();
-        loadAgents();
+        
+        // Wait a moment for backend to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadAgents();
       }
     } catch (err) {
       console.error('Failed to save agent:', err);
@@ -177,6 +200,40 @@ const AdminAgents = () => {
       setError(errorMsg);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (agent) => {
+    const action = agent.is_active ? 'deactivate' : 'activate';
+    const result = await showConfirm(
+      `${action === 'activate' ? 'Activate' : 'Deactivate'} Agent?`,
+      `Are you sure you want to ${action} ${agent.name}? ${action === 'deactivate' ? 'The agent will not be able to login until reactivated.' : 'The agent will be able to login and access the system.'}`,
+      `Yes, ${action === 'activate' ? 'Activate' : 'Deactivate'}`,
+      'Cancel'
+    );
+    
+    if (result.isConfirmed) {
+      const loadingAlert = showLoading(`${action === 'activate' ? 'Activating' : 'Deactivating'} agent...`, 'Please wait');
+      
+      try {
+        // Use the dedicated toggle endpoint
+        await agentAPI.toggleAgentActive(agent.id);
+        closeAlert();
+        showSuccess(
+          `Agent ${action === 'activate' ? 'Activated' : 'Deactivated'}!`, 
+          `${agent.name} has been ${action === 'activate' ? 'activated' : 'deactivated'} successfully.`
+        );
+        
+        // Wait a moment for backend to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadAgents();
+      } catch (err) {
+        console.error(`Failed to ${action} agent:`, err);
+        closeAlert();
+        const errorMsg = err.response?.data?.detail || err.message || `Failed to ${action} agent`;
+        showError(`${action === 'activate' ? 'Activation' : 'Deactivation'} Failed`, errorMsg);
+        setError(errorMsg);
+      }
     }
   };
 
@@ -192,10 +249,14 @@ const AdminAgents = () => {
       const loadingAlert = showLoading('Deleting agent...', 'Please wait');
       
       try {
-        await agentAPI.deleteAgent(agentId);
+        const api = authService.createAxiosInstance();
+        await api.delete(`/agents/${agentId}`);
         closeAlert();
         showSuccess('Agent Deleted!', 'The agent has been successfully removed from the system.');
-        loadAgents();
+        
+        // Wait a moment for backend to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await loadAgents();
       } catch (err) {
         console.error('Failed to delete agent:', err);
         closeAlert();
@@ -290,7 +351,7 @@ const AdminAgents = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {agents.reduce((sum, agent) => sum + agent.assigned_units, 0)}
+                    {agents.reduce((sum, agent) => sum + (agent.assigned_units || 0), 0)}
                   </Typography>
                   <Typography color="text.secondary">Assigned Units</Typography>
                 </Box>
@@ -307,7 +368,7 @@ const AdminAgents = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4">
-                    {agents.reduce((sum, agent) => sum + agent.completed_inspections, 0)}
+                    {agents.reduce((sum, agent) => sum + (agent.completed_inspections || 0), 0)}
                   </Typography>
                   <Typography color="text.secondary">Completed Inspections</Typography>
                 </Box>
@@ -342,7 +403,6 @@ const AdminAgents = () => {
                   <TableCell>Agent</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Personal Info</TableCell>
-                  <TableCell>Specialization</TableCell>
                   <TableCell>Performance</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Actions</TableCell>
@@ -351,7 +411,7 @@ const AdminAgents = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={6} align="center">
                       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
                         <CircularProgress />
                       </Box>
@@ -359,7 +419,7 @@ const AdminAgents = () => {
                   </TableRow>
                 ) : agents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={6} align="center">
                       <Box sx={{ py: 3 }}>
                         <Typography variant="body1" color="text.secondary">
                           No agents found. Click "Add Agent" to create one.
@@ -408,19 +468,12 @@ const AdminAgents = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Chip 
-                        label={agent.specialization} 
-                        color="primary" 
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
                       <Box>
                         <Typography variant="body2">
-                          <strong>{agent.assigned_units}</strong> units assigned
+                          <strong>{agent.assigned_units || 0}</strong> units assigned
                         </Typography>
                         <Typography variant="body2">
-                          <strong>{agent.completed_inspections}</strong> inspections completed
+                          <strong>{agent.completed_inspections || 0}</strong> inspections completed
                         </Typography>
                       </Box>
                     </TableCell>
@@ -432,6 +485,15 @@ const AdminAgents = () => {
                       />
                     </TableCell>
                     <TableCell>
+                      <Tooltip title={agent.is_active ? "Deactivate Agent" : "Activate Agent"}>
+                        <IconButton 
+                          size="small" 
+                          color={agent.is_active ? "success" : "default"}
+                          onClick={() => handleToggleActive(agent)}
+                        >
+                          {agent.is_active ? <ToggleOnIcon /> : <ToggleOffIcon />}
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="View Details">
                         <IconButton size="small" onClick={() => handleViewAgent(agent)}>
                           <ViewIcon />
@@ -616,12 +678,23 @@ const AdminAgents = () => {
 
               {/* Status */}
               <Grid item xs={12}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
-                  <CheckCircleIcon sx={{ mr: 1, color: formData.is_active ? 'success.main' : 'text.secondary' }} />
-                  <Typography variant="body2">
-                    {formData.is_active ? 'Agent is active' : 'Agent is inactive'}
-                  </Typography>
-                </Box>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <CheckCircleIcon sx={{ mr: 1, color: formData.is_active ? 'success.main' : 'text.secondary' }} />
+                      <Typography variant="body2">
+                        {formData.is_active ? 'Agent is Active' : 'Agent is Inactive'}
+                      </Typography>
+                    </Box>
+                  }
+                />
               </Grid>
             </Grid>
           </DialogContent>
@@ -642,64 +715,270 @@ const AdminAgents = () => {
       </Dialog>
 
       {/* View Agent Dialog */}
-      <Dialog open={viewDialogOpen} onClose={handleCloseViewDialog} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PersonIcon />
-          Agent Details - {selectedAgent?.name}
-        </DialogTitle>
-        <DialogContent>
-          {selectedAgent && (
-            <Box>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Name</Typography>
-                  <Typography variant="body1">{selectedAgent.name}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Email</Typography>
-                  <Typography variant="body1">{selectedAgent.email}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
-                  <Typography variant="body1">{selectedAgent.phone}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Age</Typography>
-                  <Typography variant="body1">{selectedAgent.age}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Location</Typography>
-                  <Typography variant="body1">{selectedAgent.location}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">NIN Number</Typography>
-                  <Typography variant="body1">{selectedAgent.nin_number}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Specialization</Typography>
-                  <Typography variant="body1">{selectedAgent.specialization}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-                  <Chip 
-                    label={selectedAgent.is_active ? "Active" : "Inactive"} 
-                    color={selectedAgent.is_active ? "success" : "default"}
-                    size="small" 
-                  />
-                </Grid>
-                {selectedAgent.notes && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">Notes</Typography>
-                    <Typography variant="body1">{selectedAgent.notes}</Typography>
-                  </Grid>
+      <Dialog 
+        open={viewDialogOpen} 
+        onClose={handleCloseViewDialog} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+          }
+        }}
+      >
+        {selectedAgent && (
+          <>
+            <DialogTitle sx={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              p: 3,
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <Box sx={{ position: 'relative', zIndex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Avatar 
+                    src={selectedAgent.profile_picture} 
+                    sx={{ 
+                      width: 80, 
+                      height: 80, 
+                      border: '4px solid white',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    {selectedAgent.name?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="h5" fontWeight="bold" gutterBottom>
+                      {selectedAgent.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                      <Chip 
+                        label={selectedAgent.is_active ? "Active" : "Inactive"} 
+                        color={selectedAgent.is_active ? "success" : "default"}
+                        sx={{ 
+                          bgcolor: selectedAgent.is_active ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)',
+                          color: 'white',
+                          fontWeight: 600
+                        }}
+                        icon={selectedAgent.is_active ? <CheckCircleIcon /> : <WarningIcon />}
+                      />
+                      {selectedAgent.specialization && (
+                        <Chip 
+                          label={selectedAgent.specialization}
+                          sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            fontWeight: 500
+                          }}
+                          icon={<WorkIcon />}
+                        />
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            </DialogTitle>
+            
+            <DialogContent sx={{ p: 0 }}>
+              <Box>
+                {/* Performance Metrics Card */}
+                {selectedAgent.assigned_units !== undefined && (
+                  <Card variant="outlined" sx={{ m: 3, mb: 2, bgcolor: 'action.hover' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <TrendingUpIcon color="primary" />
+                        Performance Overview
+                      </Typography>
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
+                            <HomeIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                            <Typography variant="h4" fontWeight="bold" color="primary.main">
+                              {selectedAgent.assigned_units || 0}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Units Assigned
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
+                            <StarIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                            <Typography variant="h4" fontWeight="bold" color="warning.main">
+                              {selectedAgent.performance_rating || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Performance Rating
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'background.paper', borderRadius: 2 }}>
+                            <AssignmentIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                            <Typography variant="h4" fontWeight="bold" color="success.main">
+                              {selectedAgent.completed_inspections || 0}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Completed Inspections
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
                 )}
-              </Grid>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseViewDialog}>Close</Button>
-        </DialogActions>
+
+                {/* Contact Information Card */}
+                <Card variant="outlined" sx={{ m: 3, mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                      <PhoneIcon color="primary" />
+                      Contact Information
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                          <EmailIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                          <Box>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                              Email Address
+                            </Typography>
+                            <Typography variant="body1" fontWeight="medium">
+                              {selectedAgent.email || 'N/A'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                          <PhoneIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                          <Box>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                              Phone Number
+                            </Typography>
+                            <Typography variant="body1" fontWeight="medium">
+                              {selectedAgent.phone || 'N/A'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                      {selectedAgent.location && (
+                        <Grid item xs={12} sm={6}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                            <LocationIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Location
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium">
+                                {selectedAgent.location}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </CardContent>
+                </Card>
+
+                {/* Personal Information Card */}
+                <Card variant="outlined" sx={{ m: 3, mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                      <PersonIcon color="primary" />
+                      Personal Information
+                    </Typography>
+                    <Grid container spacing={3}>
+                      {selectedAgent.age && (
+                        <Grid item xs={12} sm={6}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                            <PersonIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Age
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium">
+                                {selectedAgent.age} years old
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
+                      {selectedAgent.nin_number && (
+                        <Grid item xs={12} sm={6}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                            <BadgeIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                NIN Number
+                              </Typography>
+                              <Typography variant="body1" fontWeight="medium" sx={{ fontFamily: 'monospace' }}>
+                                {selectedAgent.nin_number}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
+                      {selectedAgent.specialization && (
+                        <Grid item xs={12} sm={6}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                            <WorkIcon sx={{ color: 'primary.main', mt: 0.5 }} />
+                            <Box>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Specialization
+                              </Typography>
+                              <Chip 
+                                label={selectedAgent.specialization}
+                                color="primary"
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </CardContent>
+                </Card>
+
+                {/* Notes Card */}
+                {selectedAgent.notes && (
+                  <Card variant="outlined" sx={{ m: 3, mb: 2 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <NotesIcon color="primary" />
+                        Notes
+                      </Typography>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.hover' }}>
+                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {selectedAgent.notes}
+                        </Typography>
+                      </Paper>
+                    </CardContent>
+                  </Card>
+                )}
+              </Box>
+            </DialogContent>
+            
+            <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+              <Button onClick={handleCloseViewDialog} variant="outlined">
+                Close
+              </Button>
+              <Button 
+                variant="contained" 
+                startIcon={<EditIcon />}
+                onClick={() => {
+                  handleCloseViewDialog();
+                  handleOpenDialog(selectedAgent);
+                }}
+              >
+                Edit Agent
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

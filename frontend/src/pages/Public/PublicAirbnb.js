@@ -39,6 +39,7 @@ import {
   InputLabel,
   Select
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
   Search,
   FilterList,
@@ -56,9 +57,34 @@ import {
   Phone,
   CreditCard,
   FavoriteBorder,
-  Star
+  Star,
+  Visibility
 } from '@mui/icons-material';
 import axios from 'axios';
+import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
+import Footer from '../../components/Footer';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+
+// Country to flag emoji mapping
+const getCountryFlag = (country) => {
+  if (!country) return '';
+  const flagMap = {
+    'Uganda': '🇺🇬',
+    'Kenya': '🇰🇪',
+    'Tanzania': '🇹🇿',
+    'Rwanda': '🇷🇼',
+    'Burundi': '🇧🇮',
+    'South Sudan': '🇸🇸',
+    'Ethiopia': '🇪🇹',
+    'Somalia': '🇸🇴',
+    'Djibouti': '🇩🇯',
+    'Eritrea': '🇪🇷',
+    'Sudan': '🇸🇩',
+    'Other': '🌍'
+  };
+  return flagMap[country] || '🌍';
+};
 
 const PublicAirbnb = () => {
   const navigate = useNavigate();
@@ -85,7 +111,7 @@ const PublicAirbnb = () => {
   const loadAirbnbs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('https://carryit-backend.onrender.com/api/v1/airbnb/public');
+      const response = await axios.get(`${API_BASE_URL}/airbnb/public`);
       
       // Parse images
       const airbnbsWithImages = response.data.map(airbnb => {
@@ -109,29 +135,46 @@ const PublicAirbnb = () => {
   const filterAirbnbs = () => {
     let filtered = [...airbnbs];
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(airbnb =>
-        airbnb.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        airbnb.location?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    // Search filter - handle edge cases
+    if (searchTerm && searchTerm.trim() !== '') {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(airbnb => {
+        const title = (airbnb.title || '').toLowerCase();
+        const location = (airbnb.location || '').toLowerCase();
+        return title.includes(searchLower) || location.includes(searchLower);
+      });
     }
 
-    // Country filter
-    if (country) {
-      filtered = filtered.filter(airbnb =>
-        airbnb.location?.toLowerCase().includes(country.toLowerCase())
-      );
+    // Country filter - handle edge cases
+    if (country && country.trim() !== '') {
+      filtered = filtered.filter(airbnb => {
+        const airbnbCountry = (airbnb.country || '').toLowerCase().trim();
+        const airbnbLocation = (airbnb.location || '').toLowerCase();
+        const filterCountry = country.toLowerCase().trim();
+        return airbnbCountry === filterCountry || airbnbLocation.includes(filterCountry);
+      });
     }
 
-    // Min guests filter
-    if (minGuests) {
-      filtered = filtered.filter(airbnb => airbnb.max_guests >= parseInt(minGuests));
+    // Min guests filter - handle edge cases
+    if (minGuests && minGuests.trim() !== '') {
+      const minGuestsNum = parseInt(minGuests);
+      if (!isNaN(minGuestsNum) && minGuestsNum > 0) {
+        filtered = filtered.filter(airbnb => {
+          const maxGuests = parseInt(airbnb.max_guests || 0);
+          return !isNaN(maxGuests) && maxGuests >= minGuestsNum;
+        });
+      }
     }
 
-    // Max price filter
-    if (maxPrice) {
-      filtered = filtered.filter(airbnb => airbnb.price_per_night <= parseFloat(maxPrice));
+    // Max price filter - handle edge cases
+    if (maxPrice && maxPrice.trim() !== '') {
+      const maxPriceNum = parseFloat(maxPrice);
+      if (!isNaN(maxPriceNum) && maxPriceNum > 0) {
+        filtered = filtered.filter(airbnb => {
+          const price = parseFloat(airbnb.price_per_night || 0);
+          return !isNaN(price) && price <= maxPriceNum;
+        });
+      }
     }
 
     setFilteredAirbnbs(filtered);
@@ -143,7 +186,10 @@ const PublicAirbnb = () => {
 
 
   // Get unique countries for filter
-  const countries = [...new Set(airbnbs.map(a => a.location?.split(',').pop()?.trim()).filter(Boolean))];
+  const countries = [...new Set([
+    ...airbnbs.map(a => a.country).filter(Boolean),
+    ...airbnbs.map(a => a.location?.split(',').pop()?.trim()).filter(Boolean)
+  ])];
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f9fafb' }}>
@@ -161,22 +207,20 @@ const PublicAirbnb = () => {
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             {/* Logo */}
             <Box 
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}
               onClick={() => navigate('/')}
             >
-              <Box
+              <Avatar
+                src={logoImage}
+                alt="Easy Rentals Logo"
                 sx={{
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   borderRadius: 2,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 }}
-              >
-                <HomeIcon sx={{ color: 'white', fontSize: 28 }} />
-              </Box>
+                variant="rounded"
+              />
               <Typography 
                 variant="h6" 
                 sx={{ 
@@ -184,10 +228,11 @@ const PublicAirbnb = () => {
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  display: { xs: 'none', sm: 'block' }
+                  display: { xs: 'none', sm: 'block' },
+                  fontSize: '1.25rem'
                 }}
               >
-                CarryIT Airbnb
+                Easy Rentals
               </Typography>
             </Box>
 
@@ -436,6 +481,25 @@ const PublicAirbnb = () => {
                     }}
                   />
                 </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCountry('');
+                      setMinGuests('');
+                      setMaxPrice('');
+                    }}
+                    sx={{
+                      py: 1.8,
+                      borderRadius: 2,
+                      textTransform: 'none'
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </Grid>
               </Grid>
             </CardContent>
           </Card>
@@ -459,134 +523,291 @@ const PublicAirbnb = () => {
             </Typography>
           </Box>
         ) : (
-          <Grid container spacing={2.5}>
+          <Grid container spacing={3}>
             {filteredAirbnbs.map((airbnb, index) => (
-              <Grid item xs={12} sm={6} md={4} key={airbnb.id}>
+              <Grid item xs={12} sm={6} md={4} lg={3} key={airbnb.id}>
                 <Fade in={true} timeout={600 + (index * 100)}>
                   <Card
                     sx={{
                       height: '100%',
-                      borderRadius: '16px',
-                      border: 'none',
-                      boxShadow: 'none',
-                      transition: 'all 0.2s ease-in-out',
+                      borderRadius: '24px',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       cursor: 'pointer',
                       overflow: 'hidden',
+                      position: 'relative',
+                      bgcolor: 'white',
                       '&:hover': {
-                        boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-                        transform: 'scale(1.02)'
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.12)',
+                        transform: 'translateY(-8px)',
+                        borderColor: 'rgba(102, 126, 234, 0.2)'
                       }
                     }}
                     onClick={() => handleViewDetails(airbnb)}
                   >
-                    {/* Airbnb Image - Compact Size */}
+                    {/* Premium Image Section */}
                     <Box
                       sx={{
-                        height: 220,
+                        height: { xs: 280, sm: 320 },
+                        position: 'relative',
+                        overflow: 'hidden',
                         background: airbnb.images?.[0]
                           ? `url(${airbnb.images[0]}) center/cover`
-                          : 'linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%)',
-                        position: 'relative',
-                        borderRadius: '16px 16px 0 0'
+                          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%)',
+                          zIndex: 1
+                        }
                       }}
                     >
-                      {/* Booked Badge (Priority) */}
-                      {airbnb.is_booked ? (
-                        <Chip
-                          label="Booked"
-                          size="small"
-                          sx={{
-                            position: 'absolute',
-                            top: 12,
-                            left: 12,
-                            bgcolor: '#ff5722',
-                            color: 'white',
-                            fontWeight: 700,
-                            fontSize: '0.75rem',
-                            borderRadius: '12px',
-                            px: 1.5,
-                            boxShadow: '0 2px 8px rgba(255,87,34,0.4)'
-                          }}
-                        />
-                      ) : (
-                        /* Guest Favorite Badge */
-                        (airbnb.bookings_count > 5 || Math.random() > 0.5) && (
+                      {/* Premium Badges */}
+                      <Box sx={{ position: 'absolute', top: 16, left: 16, zIndex: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {airbnb.is_booked ? (
                           <Chip
-                            label="Guest favorite"
+                            label="Booked"
                             size="small"
                             sx={{
-                              position: 'absolute',
-                              top: 12,
-                              left: 12,
-                              bgcolor: 'white',
-                              color: '#222',
-                              fontWeight: 600,
-                              fontSize: '0.75rem',
-                              borderRadius: '12px',
-                              px: 1.5
+                              bgcolor: 'rgba(255, 87, 34, 0.95)',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: '0.7rem',
+                              borderRadius: '20px',
+                              px: 1.5,
+                              py: 0.5,
+                              boxShadow: '0 4px 12px rgba(255, 87, 34, 0.4)',
+                              backdropFilter: 'blur(10px)'
                             }}
                           />
-                        )
-                      )}
+                        ) : (
+                          <>
+                            {airbnb.is_available === 'available' && (
+                              <Chip
+                                label="Available"
+                                size="small"
+                                sx={{
+                                  bgcolor: 'rgba(76, 175, 80, 0.95)',
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  fontSize: '0.7rem',
+                                  borderRadius: '20px',
+                                  px: 1.5,
+                                  py: 0.5,
+                                  boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+                                  backdropFilter: 'blur(10px)'
+                                }}
+                              />
+                            )}
+                            {(airbnb.bookings_count > 5 || Math.random() > 0.5) && (
+                              <Chip
+                                label="Guest Favorite"
+                                size="small"
+                                sx={{
+                                  bgcolor: 'rgba(255,255,255,0.95)',
+                                  color: '#667eea',
+                                  fontWeight: 700,
+                                  fontSize: '0.7rem',
+                                  borderRadius: '20px',
+                                  px: 1.5,
+                                  py: 0.5,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                  backdropFilter: 'blur(10px)'
+                                }}
+                              />
+                            )}
+                          </>
+                        )}
+                      </Box>
                       
-                      {/* Favorite Heart Icon */}
-                      <IconButton
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          bgcolor: 'rgba(255,255,255,0.9)',
-                          width: 32,
-                          height: 32,
-                          '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <FavoriteBorder sx={{ fontSize: 18, color: '#222' }} />
-                      </IconButton>
+                      {/* Favorite & Image Count */}
+                      <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 2, display: 'flex', gap: 1 }}>
+                        {airbnb.images && airbnb.images.length > 1 && (
+                          <Chip
+                            icon={<Visibility sx={{ fontSize: 14, color: 'white !important' }} />}
+                            label={airbnb.images.length}
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(0,0,0,0.6)',
+                              color: 'white',
+                              fontWeight: 600,
+                              fontSize: '0.7rem',
+                              borderRadius: '20px',
+                              backdropFilter: 'blur(10px)'
+                            }}
+                          />
+                        )}
+                        <IconButton
+                          sx={{
+                            bgcolor: 'rgba(255,255,255,0.95)',
+                            width: 40,
+                            height: 40,
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            '&:hover': { 
+                              bgcolor: 'white', 
+                              transform: 'scale(1.1)',
+                              '& .MuiSvgIcon-root': { color: '#e91e63' }
+                            },
+                            transition: 'all 0.3s ease'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <FavoriteBorder sx={{ fontSize: 20, color: '#333', transition: 'all 0.3s' }} />
+                        </IconButton>
+                      </Box>
+
+                      {/* Country Flag Badge */}
+                      {airbnb.country && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 16,
+                            left: 16,
+                            zIndex: 2,
+                            bgcolor: 'rgba(255,255,255,0.95)',
+                            borderRadius: '20px',
+                            px: 1.5,
+                            py: 0.5,
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ lineHeight: 1 }}>
+                            {getCountryFlag(airbnb.country)}
+                          </Typography>
+                          <Typography variant="caption" fontWeight={700} color="#333">
+                            {airbnb.country}
+                          </Typography>
+                        </Box>
+                      )}
 
                       {!airbnb.images?.[0] && (
-                        <Bed sx={{ fontSize: 60, color: 'rgba(255,255,255,0.3)', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                        <Box sx={{ 
+                          position: 'absolute', 
+                          top: '50%', 
+                          left: '50%', 
+                          transform: 'translate(-50%, -50%)',
+                          zIndex: 1
+                        }}>
+                          <Bed sx={{ fontSize: 80, color: 'rgba(255,255,255,0.5)' }} />
+                        </Box>
                       )}
                     </Box>
 
-                    <CardContent sx={{ p: 2, pb: 2 }}>
-                      {/* Property Type & Location */}
-                      <Typography 
-                        variant="body2" 
-                        fontWeight={600}
-                        color="#222"
-                        sx={{ mb: 0.5 }}
-                        noWrap
-                      >
-                        {airbnb.title?.split(' ').slice(0, 3).join(' ')} in {airbnb.location?.split(',').pop()?.trim() || 'Location'}
-                      </Typography>
+                    {/* Premium Content Section */}
+                    <CardContent sx={{ p: 3, pb: 2.5 }}>
+                      {/* Title & Location */}
+                      <Box sx={{ mb: 1.5 }}>
+                        <Typography 
+                          variant="h6" 
+                          fontWeight={700}
+                          color="#1a202c"
+                          sx={{ 
+                            mb: 0.5,
+                            fontSize: '1.1rem',
+                            lineHeight: 1.3,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {airbnb.title || 'Premium Property'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          <LocationOn sx={{ fontSize: 16, color: '#667eea' }} />
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{ 
+                              fontSize: '0.875rem',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            {airbnb.location?.split(',').pop()?.trim() || 'Location'}
+                          </Typography>
+                        </Box>
+                      </Box>
                       
-                      {/* Features - Subtle */}
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                        {airbnb.max_guests} guest{airbnb.max_guests !== 1 ? 's' : ''} · {airbnb.bedrooms} bedroom{airbnb.bedrooms !== 1 ? 's' : ''} · {airbnb.bathrooms} bath{airbnb.bathrooms !== 1 ? 's' : ''}
-                      </Typography>
+                      {/* Property Features - Premium Icons */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 2, 
+                        mb: 2,
+                        py: 1.5,
+                        borderTop: '1px solid rgba(0,0,0,0.06)',
+                        borderBottom: '1px solid rgba(0,0,0,0.06)'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <GuestsIcon sx={{ fontSize: 18, color: '#667eea' }} />
+                          <Typography variant="body2" fontWeight={600} color="#4a5568">
+                            {airbnb.max_guests}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Bed sx={{ fontSize: 18, color: '#667eea' }} />
+                          <Typography variant="body2" fontWeight={600} color="#4a5568">
+                            {airbnb.bedrooms}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Bathtub sx={{ fontSize: 18, color: '#667eea' }} />
+                          <Typography variant="body2" fontWeight={600} color="#4a5568">
+                            {airbnb.bathrooms}
+                          </Typography>
+                        </Box>
+                      </Box>
 
-                      {/* Price & Rating */}
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, mt: 1 }}>
-                        <Typography variant="body1" fontWeight={700} color="#222">
-                          {airbnb.currency}{parseFloat(airbnb.price_per_night).toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          night
-                        </Typography>
+                      {/* Price & Rating - Premium Layout */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <Box>
+                          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, mb: 0.5 }}>
+                            <Typography 
+                              variant="h5" 
+                              fontWeight={800} 
+                              sx={{ 
+                                color: '#667eea',
+                                fontSize: '1.5rem',
+                                lineHeight: 1
+                              }}
+                            >
+                              {airbnb.currency}{parseFloat(airbnb.price_per_night).toLocaleString()}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                            per night
+                          </Typography>
+                        </Box>
                         {airbnb.bookings_count > 0 && (
-                          <>
-                            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.3 }}>
-                              •
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 0.5,
+                            bgcolor: '#f7fafc',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: '12px'
+                          }}>
+                            <Star sx={{ fontSize: 16, color: '#fbbf24' }} />
+                            <Typography variant="body2" fontWeight={700} color="#1a202c">
+                              {(4.7 + Math.random() * 0.3).toFixed(1)}
                             </Typography>
-                            <Star sx={{ fontSize: 12, color: '#222' }} />
-                            <Typography variant="caption" fontWeight={600} color="#222">
-                              {(4.7 + Math.random() * 0.3).toFixed(2)}
-                            </Typography>
-                          </>
+                          </Box>
                         )}
                       </Box>
                     </CardContent>
@@ -598,6 +819,11 @@ const PublicAirbnb = () => {
         )}
       </Box>
 
+      {/* Social Media Floating Buttons */}
+      <SocialMediaFloatButtons />
+
+      {/* Footer */}
+      <Footer />
     </Box>
   );
 };
