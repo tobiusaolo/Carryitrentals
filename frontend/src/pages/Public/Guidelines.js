@@ -21,7 +21,13 @@ import {
   Divider,
   Chip,
   Alert,
-  Avatar
+  Avatar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import logoImage from '../../assets/images/er13.png';
 import {
@@ -35,6 +41,33 @@ import {
   Info,
   Handshake
 } from '@mui/icons-material';
+import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
+import Footer from '../../components/Footer';
+
+// Currency conversion rates (approximate, update as needed)
+// Based on approximate exchange rates: 1 USD ≈ 3700 UGX
+const CURRENCY_RATES = {
+  'UGX': 1, // Base currency
+  'KES': 0.033, // 1 UGX = 0.033 KES (approximately 30 UGX = 1 KES)
+  'TZS': 0.043, // 1 UGX = 0.043 TZS (approximately 23 UGX = 1 TZS)
+  'RWF': 0.036, // 1 UGX = 0.036 RWF (approximately 28 UGX = 1 RWF)
+  'BIF': 0.54, // 1 UGX = 0.54 BIF (approximately 1.85 UGX = 1 BIF, based on 1 USD = 3700 UGX = 2000 BIF)
+  'SSP': 0.14, // 1 UGX = 0.14 SSP (approximately 7 UGX = 1 SSP, based on 1 USD = 3700 UGX = 500 SSP)
+};
+
+const INSPECTION_FEE_UGX = 50000;
+
+// Calculate fees for each currency
+const getInspectionFees = () => {
+  return [
+    { country: 'Uganda', currency: 'UGX', flag: '🇺🇬', fee: INSPECTION_FEE_UGX },
+    { country: 'Kenya', currency: 'KES', flag: '🇰🇪', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.KES) },
+    { country: 'Tanzania', currency: 'TZS', flag: '🇹🇿', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.TZS) },
+    { country: 'Rwanda', currency: 'RWF', flag: '🇷🇼', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.RWF) },
+    { country: 'Burundi', currency: 'BIF', flag: '🇧🇮', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.BIF) },
+    { country: 'South Sudan', currency: 'SSP', flag: '🇸🇸', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.SSP) },
+  ];
+};
 
 const Guidelines = () => {
   const navigate = useNavigate();
@@ -42,8 +75,10 @@ const Guidelines = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
+  const inspectionFees = getInspectionFees();
+
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f9fafb' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
       {/* Top Navigation */}
       <AppBar 
         position="sticky" 
@@ -173,11 +208,11 @@ const Guidelines = () => {
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth="lg" sx={{ py: 6, flex: 1 }}>
         <Grid container spacing={4}>
           {/* Inspection Fees Section */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #667eea' }}>
+          <Grid item xs={12}>
+            <Card sx={{ borderRadius: 3, border: '2px solid #667eea', boxShadow: 3 }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                   <Box
@@ -200,13 +235,45 @@ const Guidelines = () => {
 
                 <Alert severity="info" sx={{ mb: 3 }}>
                   <Typography variant="h6" fontWeight={700} color="primary">
-                    UGX 30,000 per house
+                    UGX 50,000 per house
                   </Typography>
                 </Alert>
 
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                  Each house inspection costs <strong>UGX 30,000</strong>.
+                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, mb: 3 }}>
+                  Each house inspection costs <strong>UGX 50,000</strong>. Below is a breakdown of inspection fees across different countries and currencies:
                 </Typography>
+
+                {/* Inspection Fees Chart/Table */}
+                <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 2, boxShadow: 2 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#667eea' }}>
+                        <TableCell sx={{ color: 'white', fontWeight: 700 }}>Country</TableCell>
+                        <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Flag</TableCell>
+                        <TableCell align="right" sx={{ color: 'white', fontWeight: 700 }}>Currency</TableCell>
+                        <TableCell align="right" sx={{ color: 'white', fontWeight: 700 }}>Inspection Fee</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {inspectionFees.map((fee, index) => (
+                        <TableRow 
+                          key={fee.country}
+                          sx={{ 
+                            '&:nth-of-type(odd)': { bgcolor: '#f5f5f5' },
+                            '&:hover': { bgcolor: '#e3f2fd' }
+                          }}
+                        >
+                          <TableCell sx={{ fontWeight: 600 }}>{fee.country}</TableCell>
+                          <TableCell align="center" sx={{ fontSize: '1.5rem' }}>{fee.flag}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{fee.currency}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: '#667eea' }}>
+                            {fee.currency} {typeof fee.fee === 'number' ? fee.fee.toLocaleString() : fee.fee}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
 
                 <Paper sx={{ p: 2, bgcolor: '#f0f4ff', mb: 2 }}>
                   <Typography variant="body2" fontWeight={600} gutterBottom color="primary">
@@ -226,7 +293,7 @@ const Guidelines = () => {
 
           {/* Acceptance Fees Section */}
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #4caf50' }}>
+            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #4caf50', boxShadow: 3 }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                   <Box
@@ -243,31 +310,89 @@ const Guidelines = () => {
                     <CheckCircle sx={{ color: 'white', fontSize: 32 }} />
                   </Box>
                   <Typography variant="h5" fontWeight={700}>
-                    Acceptance Fees
+                    Acceptance Fees (Rentals)
                   </Typography>
                 </Box>
 
                 <Alert severity="success" sx={{ mb: 3 }}>
                   <Typography variant="h6" fontWeight={700} color="success.main">
-                    10% of Monthly Rent
+                    10% of Initial Payment
                   </Typography>
                 </Alert>
 
                 <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                  Once you accept to take a house, additional fees will apply.
+                  Once you accept to take a house, an acceptance fee will apply. This fee is calculated as <strong>10% of your initial payment</strong>.
                 </Typography>
 
                 <Paper sx={{ p: 2, bgcolor: '#e8f5e9', mb: 2 }}>
                   <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
                     📋 How It's Calculated:
                   </Typography>
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    The acceptance fee is <strong>10% of the total initial payment</strong> you make when accepting the house.
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    <strong>Example 1:</strong> If you pay 3 months rent upfront (e.g., UGX 1,500,000), the acceptance fee = 10% × UGX 1,500,000 = <strong>UGX 150,000</strong>
+                  </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    The acceptance fee is <strong>10% of one month's rental payment</strong> for the house you accept.
+                    <strong>Example 2:</strong> If you pay 1 month rent upfront (e.g., UGX 500,000), the acceptance fee = 10% × UGX 500,000 = <strong>UGX 50,000</strong>
                   </Typography>
                 </Paper>
 
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  Example: If monthly rent is UGX 500,000, acceptance fee = UGX 50,000
+                  * Acceptance fee is calculated based on your initial payment amount
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Airbnb Fees Section */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #e91e63', boxShadow: 3 }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                  <Box
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 3,
+                      background: 'linear-gradient(135deg, #e91e63 0%, #c2185b 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Handshake sx={{ color: 'white', fontSize: 32 }} />
+                  </Box>
+                  <Typography variant="h5" fontWeight={700}>
+                    Airbnb Service Fee
+                  </Typography>
+                </Box>
+
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                  <Typography variant="h6" fontWeight={700} color="#e91e63">
+                    10% of Payment to Host
+                  </Typography>
+                </Alert>
+
+                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
+                  For Airbnb bookings, we charge a service fee of <strong>10% of the payment made to the host</strong>.
+                </Typography>
+
+                <Paper sx={{ p: 2, bgcolor: '#fce4ec', mb: 2 }}>
+                  <Typography variant="body2" fontWeight={600} gutterBottom color="#e91e63">
+                    📋 How It's Calculated:
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    The service fee is <strong>10% of the total amount paid to the host</strong> for the booking.
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Example:</strong> If the total booking amount paid to the host is UGX 1,000,000, the service fee = 10% × UGX 1,000,000 = <strong>UGX 100,000</strong>
+                  </Typography>
+                </Paper>
+
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                  * Service fee applies to all Airbnb bookings
                 </Typography>
               </CardContent>
             </Card>
@@ -316,7 +441,7 @@ const Guidelines = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Email sx={{ color: '#667eea', fontSize: 20 }} />
                     <Typography variant="body2">
-                      <strong>Email:</strong> info@easyrentals.com
+                      <strong>Email:</strong> carryit@gmail.com
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -389,7 +514,7 @@ const Guidelines = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Email sx={{ color: '#e91e63', fontSize: 20 }} />
                     <Typography variant="body2">
-                      <strong>Email:</strong> info@easyrentals.com
+                      <strong>Email:</strong> carryit@gmail.com
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -432,13 +557,13 @@ const Guidelines = () => {
                     📋 For Renters:
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
-                    • Inspection fee: UGX 30,000 per house
+                    • Inspection fee: UGX 50,000 per house
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
                     • Multiple inspections: Fees negotiable with agent
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
-                    • Acceptance fee: 10% of first month's rent
+                    • Acceptance fee: 10% of initial payment (e.g., if paying 3 months upfront, fee is 10% of 3 months)
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     • All fees must be paid before move-in
@@ -501,7 +626,7 @@ const Guidelines = () => {
                 <Grid item>
                   <Chip
                     icon={<Email sx={{ color: 'white !important' }} />}
-                    label="info@easyrentals.com"
+                    label="carryit@gmail.com"
                     sx={{
                       bgcolor: 'rgba(255,255,255,0.2)',
                       color: 'white',
@@ -566,9 +691,14 @@ const Guidelines = () => {
           </Grid>
         </Grid>
       </Container>
+
+      {/* Floating Social Media Buttons */}
+      <SocialMediaFloatButtons />
+
+      {/* Footer */}
+      <Footer />
     </Box>
   );
 };
 
 export default Guidelines;
-
