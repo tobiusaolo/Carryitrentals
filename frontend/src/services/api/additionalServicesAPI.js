@@ -1,7 +1,7 @@
 import api from './api';
 import axios from 'axios';
 
-const PRODUCTION_API_URL = 'https://carryit-backend.onrender.com/api/v1';
+const PRODUCTION_API_URL = 'https://carryit-backend-su8h.onrender.com/api/v1';
 
 export const additionalServicesAPI = {
   // Get all additional services (public endpoint - uses production URL)
@@ -27,7 +27,7 @@ export const additionalServicesAPI = {
   // Get active services only (public endpoint - uses correct API URL)
   getActiveServices: () => {
     // Use the correct API base URL from environment or fallback to production
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
     const baseURL = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash if present
     return axios.get(`${baseURL}/additional-services/?active_only=true`);
   },

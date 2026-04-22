@@ -13,12 +13,13 @@ import {
   Divider,
   useTheme,
   useMediaQuery,
+  alpha
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  AccountCircle,
   Logout,
   Settings,
+  Person,
 } from '@mui/icons-material';
 import Sidebar from './Sidebar';
 import { logout } from '../../store/slices/authSlice';
@@ -50,48 +51,45 @@ const Layout = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      {/* App Bar */}
+    <Box sx={{ display: 'flex', bgcolor: '#F7F7F7', minHeight: '100vh' }}>
+      {/* App Bar - Premium Glassmorphism */}
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
-          width: { md: `calc(100% - ${240}px)` },
-          ml: { md: `${240}px` },
-          backgroundColor: 'white',
-          color: 'text.primary',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+          width: { md: `calc(100% - ${280}px)` },
+          ml: { md: `${280}px` },
+          backgroundColor: alpha('#FFF', 0.8),
+          backdropFilter: 'blur(12px)',
+          color: '#222',
+          borderBottom: '1px solid #EEE',
+          zIndex: theme.zIndex.drawer + 1
         }}
       >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            Easy Rentals
-          </Typography>
+        <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2, display: { md: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.02em', display: { xs: 'none', md: 'block' } }}>
+              Owner Portal
+            </Typography>
+          </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Welcome, {user?.first_name} {user?.last_name}
-            </Typography>
+            {!isMobile && (
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                {user?.first_name} {user?.last_name}
+              </Typography>
+            )}
             
-            <IconButton
-              size="large"
-              edge="end"
-              aria-label="account of current user"
-              aria-controls="primary-search-account-menu"
-              aria-haspopup="true"
-              onClick={handleProfileMenuOpen}
-              color="inherit"
-            >
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+            <IconButton onClick={handleProfileMenuOpen} sx={{ p: 0.5, border: '1px solid #EEE' }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: '#667eea', fontWeight: 800, fontSize: '0.9rem' }}>
                 {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
               </Avatar>
             </IconButton>
@@ -104,48 +102,32 @@ const Layout = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleProfileMenuClose}
-        onClick={handleProfileMenuClose}
         PaperProps={{
           elevation: 0,
           sx: {
-            overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
             mt: 1.5,
-            '& .MuiAvatar-root': {
-              width: 32,
-              height: 32,
-              ml: -0.5,
-              mr: 1,
-            },
-            '&:before': {
-              content: '""',
-              display: 'block',
-              position: 'absolute',
-              top: 0,
-              right: 14,
-              width: 10,
-              height: 10,
-              bgcolor: 'background.paper',
-              transform: 'translateY(-50%) rotate(45deg)',
-              zIndex: 0,
-            },
+            borderRadius: '16px',
+            border: '1px solid #EEE',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+            minWidth: 180,
+            p: 1
           },
         }}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={handleProfileMenuClose}>
-          <AccountCircle sx={{ mr: 1 }} />
-          Profile
+        <MenuItem onClick={handleProfileMenuClose} sx={{ borderRadius: '8px', mb: 0.5 }}>
+          <Person sx={{ mr: 1.5, fontSize: 20, color: 'text.secondary' }} />
+          <Typography variant="body2" fontWeight={600}>Profile</Typography>
         </MenuItem>
-        <MenuItem onClick={handleProfileMenuClose}>
-          <Settings sx={{ mr: 1 }} />
-          Settings
+        <MenuItem onClick={handleProfileMenuClose} sx={{ borderRadius: '8px', mb: 0.5 }}>
+          <Settings sx={{ mr: 1.5, fontSize: 20, color: 'text.secondary' }} />
+          <Typography variant="body2" fontWeight={600}>Settings</Typography>
         </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleLogout}>
-          <Logout sx={{ mr: 1 }} />
-          Logout
+        <Divider sx={{ my: 1 }} />
+        <MenuItem onClick={handleLogout} sx={{ borderRadius: '8px', color: '#ef4444' }}>
+          <Logout sx={{ mr: 1.5, fontSize: 20 }} />
+          <Typography variant="body2" fontWeight={700}>Logout</Typography>
         </MenuItem>
       </Menu>
 
@@ -161,10 +143,8 @@ const Layout = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { md: `calc(100% - ${240}px)` },
+          width: { md: `calc(100% - ${280}px)` },
           mt: '64px',
-          backgroundColor: 'background.default',
           minHeight: 'calc(100vh - 64px)',
         }}
       >
@@ -175,13 +155,3 @@ const Layout = () => {
 };
 
 export default Layout;
-
-
-
-
-
-
-
-
-
-

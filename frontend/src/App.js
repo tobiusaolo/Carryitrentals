@@ -54,6 +54,8 @@ import PublicAirbnb from './pages/Public/PublicAirbnb';
 import AirbnbDetails from './pages/Public/AirbnbDetails';
 import Guidelines from './pages/Public/Guidelines';
 import OwnerAirbnb from './pages/Airbnb/OwnerAirbnb';
+import OwnerLogin from './pages/Auth/OwnerLogin';
+import OwnerRegister from './pages/Auth/OwnerRegister';
 
 function App() {
   return (
@@ -67,10 +69,17 @@ function App() {
       <Route path="/airbnb" element={<PublicAirbnb />} />
       <Route path="/airbnb/:id" element={<AirbnbDetails />} />
       <Route path="/guidelines" element={<Guidelines />} />
+      
+      {/* Client Auth Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      
+      {/* Professional Auth Routes (Hidden from main public UI) */}
       <Route path="/admin-login" element={<AdminLoginPage />} />
       <Route path="/agent-login" element={<AgentLogin />} />
+      <Route path="/owner-login" element={<OwnerLogin />} />
+      <Route path="/owner-register" element={<OwnerRegister />} />
+      
       <Route path="/inspection-payment/:paymentId" element={<InspectionPayment />} />
       <Route path="/test" element={<div>Test Route</div>} />
       <Route path="/test-login" element={<TestLogin />} />
@@ -139,6 +148,8 @@ function App() {
         <Route path="inspections" element={<AgentInspections />} />
         <Route path="profile" element={<AgentProfile />} />
       </Route>
+      
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

@@ -25,11 +25,12 @@ import {
   Lock as LockIcon,
   Visibility,
   VisibilityOff,
+  Business,
+  Person
 } from '@mui/icons-material';
 import { registerUser, clearError } from '../../store/slices/authSlice';
-import PublicHeader from '../../components/Navigation/PublicHeader';
 
-const Register = () => {
+const OwnerRegister = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, error } = useSelector((state) => state.auth);
@@ -43,7 +44,7 @@ const Register = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    role: 'tenant', // Default role for public registration is now tenant/client
+    role: 'owner',
   });
 
   const handleChange = (e) => {
@@ -65,22 +66,20 @@ const Register = () => {
     const result = await dispatch(registerUser(userData));
     
     if (result.type === 'auth/register/fulfilled') {
-      navigate('/login');
+      navigate('/owner-login');
     }
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#F7F7F7', display: 'flex', flexDirection: 'column' }}>
-      <PublicHeader />
-      
-      <Container maxWidth="sm" sx={{ mt: 8, mb: 8 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#F7F7F7', display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 8 }}>
+      <Container maxWidth="sm">
         <Fade in={true} timeout={800}>
           <Paper 
             elevation={0} 
             sx={{ 
-              p: { xs: 3, md: 5 }, 
+              p: 5, 
               borderRadius: '24px', 
-              border: '1px solid #EBEBEB',
+              border: '1px solid #DDD',
               boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
             }}
           >
@@ -94,20 +93,21 @@ const Register = () => {
                   borderRadius: '12px',
                   mx: 'auto',
                   mb: 2,
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)',
                 }}
                 variant="rounded"
               />
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#222' }}>
-                Join CarryIT
+                List your Property
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Find your next perfect stay in East Africa
+                Join our network of elite property owners
               </Typography>
             </Box>
 
             {error && (
               <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>
-                {typeof error === 'string' ? error : 'Registration failed. Please check your details.'}
+                {typeof error === 'string' ? error : (error.detail || 'Registration failed')}
               </Alert>
             )}
 
@@ -136,7 +136,7 @@ const Register = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
-                    fullWidth label="Choose a Username" name="username" required
+                    fullWidth label="Desired Username" name="username" required
                     value={formData.username} onChange={handleChange}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
                   />
@@ -171,31 +171,18 @@ const Register = () => {
                 fullWidth type="submit" variant="contained"
                 disabled={isLoading || (formData.confirmPassword && formData.password !== formData.confirmPassword)}
                 sx={{
-                  mt: 4, py: 1.5, borderRadius: '12px', bgcolor: '#ff385c', fontWeight: 800, fontSize: '1rem', textTransform: 'none',
-                  '&:hover': { bgcolor: '#e31c5f' }
+                  mt: 4, py: 1.5, borderRadius: '12px', bgcolor: '#222', fontWeight: 700, fontSize: '1rem', textTransform: 'none',
+                  '&:hover': { bgcolor: '#444' }
                 }}
               >
-                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Join the Community'}
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Create Owner Account'}
               </Button>
             </Box>
 
-            <Divider sx={{ my: 4 }}>
-              <Typography variant="body2" color="text.secondary">or</Typography>
-            </Divider>
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                Already have an account?
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Already have an owner account? <Link component={RouterLink} to="/owner-login" sx={{ color: '#222', fontWeight: 800 }}>Sign In</Link>
               </Typography>
-              <Link component={RouterLink} to="/login" sx={{ color: '#222', fontWeight: 800, textDecoration: 'underline' }}>
-                Sign in
-              </Link>
-
-              <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid #F0F0F0' }}>
-                <Link component={RouterLink} to="/owner-register" sx={{ color: '#717171', fontSize: '0.8rem', fontWeight: 500 }}>
-                  Property Owner? List your unit here
-                </Link>
-              </Box>
             </Box>
           </Paper>
         </Fade>
@@ -204,4 +191,4 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default OwnerRegister;

@@ -8,34 +8,29 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
   Box,
   Typography,
-  useTheme,
-  useMediaQuery,
   Avatar,
+  alpha,
+  Button
 } from '@mui/material';
 import logoImage from '../../assets/images/er13.png';
 import {
   Dashboard,
   Home,
   Apartment,
-  Assignment,
   Payment,
-  Build,
   Analytics,
   CalendarToday,
   Person,
   ElectricalServices,
   QrCode,
-  Settings,
   Message,
-  AccountBalance,
   Description,
   Bed as AirbnbIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
 const menuItems = [
   { text: 'Dashboard', icon: <Dashboard />, path: '/owner/dashboard' },
@@ -45,7 +40,6 @@ const menuItems = [
   { text: 'Airbnb', icon: <AirbnbIcon />, path: '/owner/airbnb' },
   { text: 'Tenants', icon: <Person />, path: '/owner/tenants' },
   { text: 'Payments', icon: <Payment />, path: '/owner/payments' },
-  { text: 'Property QR', icon: <QrCode />, path: '/owner/property-qr' },
   { text: 'Utilities', icon: <ElectricalServices />, path: '/owner/utilities' },
   { text: 'Inspections', icon: <CalendarToday />, path: '/owner/inspections' },
   { text: 'Communications', icon: <Message />, path: '/owner/communications' },
@@ -53,198 +47,107 @@ const menuItems = [
   { text: 'Analytics', icon: <Analytics />, path: '/owner/analytics' },
 ];
 
-    const adminMenuItems = [
-      { text: 'Admin Dashboard', icon: <Settings />, path: '/admin' },
-      { text: 'Admin Properties', icon: <Home />, path: '/admin/properties' },
-      { text: 'Admin Analytics', icon: <Analytics />, path: '/admin/analytics' },
-    ];
-
 const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
 
   const drawer = (
-    <Box>
-      {/* Logo/Brand */}
-      <Box sx={{ p: 2, textAlign: 'center', borderBottom: '1px solid', borderColor: 'divider', pb: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-          <Avatar
-            src={logoImage}
-            alt="Easy Rentals Logo"
-            sx={{
-              width: 56,
-              height: 56,
-              borderRadius: 2,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              mb: 1
-            }}
-            variant="rounded"
-          />
-          <Typography variant="h6" color="primary" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-            Easy Rentals
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-            Professional Property Management
-          </Typography>
-        </Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'white' }}>
+      {/* Brand Header */}
+      <Box sx={{ px: 4, py: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar
+          src={logoImage}
+          alt="CarryIT"
+          sx={{ width: 40, height: 40, borderRadius: '10px' }}
+          variant="rounded"
+        />
+        <Typography variant="h6" sx={{ fontWeight: 900, color: '#222', letterSpacing: '-0.03em' }}>
+          CarryIT
+        </Typography>
       </Box>
       
-      <Divider />
-      
-      {/* User Info */}
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Person color="primary" />
-          <Box>
-            <Typography variant="subtitle2" fontWeight="medium">
-              {user?.first_name} {user?.last_name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-              {user?.role}
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-      
-      <Divider />
-      
-      {/* Navigation Menu */}
-      <List>
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <ListItem key={item.text} disablePadding>
-              <ListItemButton
-                onClick={() => {
-                  navigate(item.path);
-                  if (isMobile) {
-                    handleDrawerToggle();
-                  }
-                }}
-                sx={{
-                  backgroundColor: isActive ? 'primary.light' : 'transparent',
-                  color: isActive ? 'primary.contrastText' : 'text.primary',
-                  '&:hover': {
-                    backgroundColor: isActive ? 'primary.light' : 'action.hover',
-                  },
-                  mx: 1,
-                  borderRadius: 1,
-                }}
-              >
-                <ListItemIcon
+      {/* Navigation */}
+      <Box sx={{ flex: 1, px: 2, pb: 4, overflowY: 'auto', '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: '#EEE', borderRadius: '4px' } }}>
+        <List sx={{ gap: 0.5, display: 'flex', flexDirection: 'column' }}>
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <ListItem key={item.text} disablePadding>
+                <ListItemButton
+                  onClick={() => {
+                    navigate(item.path);
+                    if (isMobile) handleDrawerToggle();
+                  }}
                   sx={{
-                    color: isActive ? 'primary.contrastText' : 'text.secondary',
-                    minWidth: 40,
+                    py: 1.2,
+                    px: 2,
+                    borderRadius: '12px',
+                    bgcolor: isActive ? alpha('#667eea', 0.08) : 'transparent',
+                    color: isActive ? '#667eea' : '#555',
+                    '&:hover': {
+                      bgcolor: isActive ? alpha('#667eea', 0.12) : '#F7F7F7',
+                      color: isActive ? '#667eea' : '#222',
+                    },
+                    transition: 'all 0.2s ease',
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    fontWeight: isActive ? 600 : 400,
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
-        
-        {/* Admin Menu Items */}
-        {user?.role === 'admin' && (
-          <>
-            <Divider sx={{ my: 1 }} />
-            <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="overline" color="text.secondary">
-                Admin Panel
-              </Typography>
-            </Box>
-            {adminMenuItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <ListItem key={item.text} disablePadding>
-                  <ListItemButton
-                    onClick={() => {
-                      navigate(item.path);
-                      if (isMobile) {
-                        handleDrawerToggle();
-                      }
-                    }}
+                  <ListItemIcon
                     sx={{
-                      backgroundColor: isActive ? 'primary.light' : 'transparent',
-                      color: isActive ? 'primary.contrastText' : 'text.primary',
-                      '&:hover': {
-                        backgroundColor: isActive ? 'primary.light' : 'action.hover',
-                      },
-                      mx: 1,
-                      borderRadius: 1,
+                      color: isActive ? '#667eea' : '#888',
+                      minWidth: 36,
                     }}
                   >
-                    <ListItemIcon
-                      sx={{
-                        color: isActive ? 'primary.contrastText' : 'text.secondary',
-                        minWidth: 40,
-                      }}
-                    >
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontWeight: isActive ? 600 : 400,
-                      }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </>
-        )}
-      </List>
+                    {React.cloneElement(item.icon, { sx: { fontSize: 22 } })}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontWeight: isActive ? 800 : 600,
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            );
+          })}
+        </List>
+      </Box>
+
+      {/* Admin Quick Switch (If applicable) */}
+      {user?.role === 'admin' && (
+        <Box sx={{ p: 2, mt: 'auto' }}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => navigate('/admin')}
+            sx={{
+              bgcolor: '#222', color: 'white', py: 1.5, borderRadius: '12px', textTransform: 'none', fontWeight: 800,
+              '&:hover': { bgcolor: '#444' }
+            }}
+          >
+            Admin Panel
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 
   return (
-    <Box
-      component="nav"
-      sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
-    >
-      {/* Mobile drawer */}
+    <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
       <Drawer
-        variant="temporary"
-        open={mobileOpen}
+        variant={isMobile ? "temporary" : "permanent"}
+        open={isMobile ? mobileOpen : true}
         onClose={handleDrawerToggle}
-        ModalProps={{
-          keepMounted: true, // Better open performance on mobile.
-        }}
+        ModalProps={{ keepMounted: true }}
         sx={{
-          display: { xs: 'block', md: 'none' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
             width: drawerWidth,
-            backgroundColor: 'background.paper',
+            borderRight: '1px solid #EEE',
+            boxShadow: isMobile ? 'none' : '4px 0 24px rgba(0,0,0,0.02)'
           },
         }}
-      >
-        {drawer}
-      </Drawer>
-      
-      {/* Desktop drawer */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          display: { xs: 'none', md: 'block' },
-          '& .MuiDrawer-paper': {
-            boxSizing: 'border-box',
-            width: drawerWidth,
-            backgroundColor: 'background.paper',
-            borderRight: '1px solid',
-            borderColor: 'divider',
-          },
-        }}
-        open
       >
         {drawer}
       </Drawer>
@@ -253,4 +156,3 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
 };
 
 export default Sidebar;
-

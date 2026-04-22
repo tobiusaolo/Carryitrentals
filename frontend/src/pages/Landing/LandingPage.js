@@ -69,7 +69,7 @@ const LandingPage = () => {
     const fetchRentalUnits = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('https://carryit-backend.onrender.com/api/v1/rental-units/public');
+        const response = await axios.get('https://carryit-backend-su8h.onrender.com/api/v1/rental-units/public');
         
         // Parse images for each unit
         const unitsWithImages = response.data.map(unit => {

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
 
 
 
@@ -24,7 +24,7 @@ class AuthService {
     // Increase timeout for deployed API (Render.com can be slow on cold starts)
     const isProduction = API_BASE_URL.includes('onrender.com') || API_BASE_URL.includes('render.com');
     const timeout = isProduction ? 180000 : 120000; // 3 minutes for production, 2 minutes for local
-    
+
     const instance = axios.create({
       baseURL: API_BASE_URL,
       timeout: timeout,
@@ -45,7 +45,7 @@ class AuthService {
         if (!config.responseType || config.responseType !== 'blob') {
           config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
         }
-        
+
         // Log request for debugging (only in development or for errors)
         if (process.env.NODE_ENV === 'development') {
           console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`, {
@@ -53,7 +53,7 @@ class AuthService {
             timeout: config.timeout
           });
         }
-        
+
         return config;
       },
       (error) => {
@@ -73,7 +73,7 @@ class AuthService {
       },
       async (error) => {
         const originalRequest = error.config;
-        
+
         // Enhanced error logging
         if (error.response) {
           // Server responded with error status
@@ -94,7 +94,7 @@ class AuthService {
             code: error.code,
             timeout: error.config?.timeout
           });
-          
+
           // For timeout errors, provide helpful message
           if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
             console.warn('⏱️ Request timeout - This might be due to a cold start on the deployed server');
@@ -123,10 +123,10 @@ class AuthService {
             if (newToken) {
               this.token = newToken;
               localStorage.setItem('token', newToken);
-              
+
               // Process failed queue
               this.processQueue(null, newToken);
-              
+
               // Retry original request
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               console.log('🔄 Retrying request after token refresh');
@@ -171,7 +171,7 @@ class AuthService {
         resolve(token);
       }
     });
-    
+
     this.failedQueue = [];
   }
 
@@ -179,21 +179,21 @@ class AuthService {
     try {
       console.log('AuthService: Attempting registration to:', `${API_BASE_URL}/auth/register`);
       console.log('AuthService: Registration data:', userData);
-      
+
       const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
 
       console.log('AuthService: Registration response:', response.data);
-      
+
       return { success: true, data: response.data };
     } catch (error) {
       console.error('AuthService: Registration error:', error);
       console.error('AuthService: Error response:', error.response?.data);
       console.error('AuthService: Error status:', error.response?.status);
       console.error('AuthService: Error message:', error.message);
-      
-      return { 
-        success: false, 
-        error: error.response?.data?.detail || error.message || 'Registration failed' 
+
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Registration failed'
       };
     }
   }
@@ -202,7 +202,7 @@ class AuthService {
     try {
       console.log('AuthService: Attempting login to:', `${API_BASE_URL}/auth/login`);
       console.log('AuthService: Login data:', { email, password });
-      
+
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         email,
         password
@@ -211,23 +211,23 @@ class AuthService {
       console.log('AuthService: Login response:', response.data);
 
       const { access_token, refresh_token } = response.data;
-      
+
       this.token = access_token;
       this.refreshToken = refresh_token;
-      
+
       localStorage.setItem('token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
-      
+
       return { success: true, data: response.data };
     } catch (error) {
       console.error('AuthService: Login error:', error);
       console.error('AuthService: Error response:', error.response?.data);
       console.error('AuthService: Error status:', error.response?.status);
       console.error('AuthService: Error message:', error.message);
-      
-      return { 
-        success: false, 
-        error: error.response?.data?.detail || error.message || 'Login failed' 
+
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Login failed'
       };
     }
   }
@@ -257,9 +257,9 @@ class AuthService {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Get current user error:', error);
-      return { 
-        success: false, 
-        error: error.response?.data?.detail || 'Failed to get user' 
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to get user'
       };
     }
   }
@@ -276,16 +276,16 @@ class AuthService {
         console.error('Error parsing user:', e);
       }
     }
-    
+
     this.token = null;
     this.refreshToken = null;
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
-    
+
     // Redirect to appropriate login page based on role
     const currentPath = window.location.pathname;
-    
+
     if (userRole === 'agent' || currentPath.startsWith('/agent')) {
       if (currentPath !== '/agent-login') {
         window.location.href = '/agent-login';

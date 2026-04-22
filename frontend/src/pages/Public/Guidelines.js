@@ -8,56 +8,45 @@ import {
   Grid,
   Card,
   CardContent,
-  AppBar,
-  Toolbar,
   Button,
-  Drawer,
-  List,
-  ListItem,
-  ListItemText,
-  IconButton,
-  useMediaQuery,
-  useTheme,
   Divider,
   Chip,
   Alert,
-  Avatar,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  Fade,
+  alpha,
+  List
 } from '@mui/material';
-import logoImage from '../../assets/images/er13.png';
 import {
-  Home as HomeIcon,
-  Menu as MenuIcon,
   AttachMoney,
   CheckCircle,
   Email,
   Phone,
   Business,
   Info,
-  Handshake
+  Handshake,
+  ArrowForward,
 } from '@mui/icons-material';
 import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
 import Footer from '../../components/Footer';
+import PublicHeader from '../../components/Navigation/PublicHeader';
 
-// Currency conversion rates (approximate, update as needed)
-// Based on approximate exchange rates: 1 USD ≈ 3700 UGX
 const CURRENCY_RATES = {
-  'UGX': 1, // Base currency
-  'KES': 0.033, // 1 UGX = 0.033 KES (approximately 30 UGX = 1 KES)
-  'TZS': 0.043, // 1 UGX = 0.043 TZS (approximately 23 UGX = 1 TZS)
-  'RWF': 0.036, // 1 UGX = 0.036 RWF (approximately 28 UGX = 1 RWF)
-  'BIF': 0.54, // 1 UGX = 0.54 BIF (approximately 1.85 UGX = 1 BIF, based on 1 USD = 3700 UGX = 2000 BIF)
-  'SSP': 0.14, // 1 UGX = 0.14 SSP (approximately 7 UGX = 1 SSP, based on 1 USD = 3700 UGX = 500 SSP)
+  'UGX': 1,
+  'KES': 0.033,
+  'TZS': 0.043,
+  'RWF': 0.036,
+  'BIF': 0.54,
+  'SSP': 0.14,
 };
 
 const INSPECTION_FEE_UGX = 50000;
 
-// Calculate fees for each currency
 const getInspectionFees = () => {
   return [
     { country: 'Uganda', currency: 'UGX', flag: '🇺🇬', fee: INSPECTION_FEE_UGX },
@@ -71,631 +60,211 @@ const getInspectionFees = () => {
 
 const Guidelines = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-
   const inspectionFees = getInspectionFees();
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Navigation */}
-      <AppBar 
-        position="sticky" 
-        elevation={0}
-        sx={{ 
-          bgcolor: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          py: 1
-        }}
-      >
-        <Container maxWidth="xl">
-          <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            {/* Logo */}
-            <Box 
-              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}
-              onClick={() => navigate('/')}
-            >
-              <Avatar
-                src={logoImage}
-                alt="Easy Rentals Logo"
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                }}
-                variant="rounded"
-              />
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  fontWeight: 800,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  display: { xs: 'none', sm: 'block' },
-                  fontSize: '1.25rem'
-                }}
-              >
-                Easy Rentals
-              </Typography>
-            </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'white', display: 'flex', flexDirection: 'column' }}>
+      <PublicHeader />
 
-            {/* Desktop Menu */}
-            {!isMobile && (
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button 
-                  onClick={() => navigate('/')}
-                  sx={{ 
-                    color: '#374151',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    '&:hover': { color: '#667eea' }
-                  }}
-                >
-                  Rentals
-                </Button>
-                <Button 
-                  onClick={() => navigate('/airbnb')}
-                  sx={{ 
-                    color: '#374151',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    '&:hover': { color: '#667eea' }
-                  }}
-                >
-                  Airbnb
-                </Button>
-                <Button 
-                  onClick={() => navigate('/guidelines')}
-                  sx={{ 
-                    color: '#667eea',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    borderBottom: '2px solid #667eea'
-                  }}
-                >
-                  Guidelines
-                </Button>
-              </Box>
-            )}
-
-            {/* Mobile Menu */}
-            {isMobile && (
-              <IconButton onClick={() => setMobileMenuOpen(true)}>
-                <MenuIcon />
-              </IconButton>
-            )}
-          </Toolbar>
-        </Container>
-      </AppBar>
-
-      {/* Mobile Drawer */}
-      <Drawer anchor="right" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
-        <Box sx={{ width: 250, pt: 2 }}>
-          <List>
-            <ListItem button onClick={() => { navigate('/'); setMobileMenuOpen(false); }}>
-              <ListItemText primary="Rentals" />
-            </ListItem>
-            <ListItem button onClick={() => { navigate('/airbnb'); setMobileMenuOpen(false); }}>
-              <ListItemText primary="Airbnb" />
-            </ListItem>
-            <ListItem button onClick={() => { navigate('/guidelines'); setMobileMenuOpen(false); }}>
-              <ListItemText primary="Guidelines" />
-            </ListItem>
-          </List>
-        </Box>
-      </Drawer>
-
-      {/* Hero Section */}
+      {/* Hero Section - World Class Immersive */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.3)), url("https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=2000")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           color: 'white',
-          py: 8,
-          textAlign: 'center'
+          py: { xs: 10, md: 20 },
+          textAlign: 'center',
+          position: 'relative',
         }}
       >
         <Container maxWidth="md">
-          <Info sx={{ fontSize: 80, mb: 2, opacity: 0.9 }} />
-          <Typography variant="h3" fontWeight={800} gutterBottom>
-            Guidelines & Information
-          </Typography>
-          <Typography variant="h6" sx={{ opacity: 0.95, maxWidth: 600, mx: 'auto' }}>
-            Everything you need to know about renting, inspections, and listing your property
-          </Typography>
+          <Fade in={true} timeout={1000}>
+            <Box>
+              <Typography 
+                variant="h1" 
+                sx={{ 
+                  fontWeight: 900, 
+                  fontSize: { xs: '3rem', md: '5rem' }, 
+                  lineHeight: 1, 
+                  mb: 2,
+                  letterSpacing: '-0.04em'
+                }}
+              >
+                Simple, Reliable,<br/>Transparent.
+              </Typography>
+              <Typography variant="h6" sx={{ opacity: 0.9, maxWidth: 600, mx: 'auto', fontWeight: 400, mb: 4, fontSize: '1.25rem' }}>
+                Everything you need to know about navigating the CarryIT platform as a tenant or property owner.
+              </Typography>
+              <Button 
+                variant="contained" 
+                size="large"
+                sx={{ 
+                  bgcolor: '#ff385c', 
+                  color: 'white', 
+                  borderRadius: '12px', 
+                  px: 4, 
+                  py: 2, 
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  '&:hover': { bgcolor: '#e31c5f' }
+                }}
+                onClick={() => navigate('/rentals')}
+              >
+                Browse Listings
+              </Button>
+            </Box>
+          </Fade>
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 6, flex: 1 }}>
-        <Grid container spacing={4}>
-          {/* Inspection Fees Section */}
+      <Container maxWidth="lg" sx={{ py: 12, flex: 1 }}>
+        <Grid container spacing={8}>
+          
+          {/* Inspection Fees - Dimensional Layout */}
           <Grid item xs={12}>
-            <Card sx={{ borderRadius: 3, border: '2px solid #667eea', boxShadow: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <AttachMoney sx={{ color: 'white', fontSize: 32 }} />
+            <Box sx={{ mb: 6, textAlign: 'center' }}>
+              <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-0.03em', mb: 2 }}>Inspection Services</Typography>
+              <Typography variant="body1" sx={{ color: '#717171', fontSize: '1.1rem' }}>Transparent pricing for physical and virtual property viewings across East Africa.</Typography>
+            </Box>
+            
+            <Grid container spacing={4} alignItems="center">
+              <Grid item xs={12} md={5}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    borderRadius: '24px',
+                    border: '1px solid #EBEBEB',
+                    bgcolor: alpha('#F7F7F7', 0.5),
+                  }}
+                >
+                  <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>Standard Viewing Fee</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 4 }}>
+                    <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff385c' }}>UGX 50k</Typography>
+                    <Typography variant="body1" sx={{ color: '#717171' }}>/ property</Typography>
                   </Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    Inspection Fees
-                  </Typography>
-                </Box>
-
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  <Typography variant="h6" fontWeight={700} color="primary">
-                    UGX 50,000 per house
-                  </Typography>
-                </Alert>
-
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, mb: 3 }}>
-                  Each house inspection costs <strong>UGX 50,000</strong>. Below is a breakdown of inspection fees across different countries and currencies:
-                </Typography>
-
-                {/* Inspection Fees Chart/Table */}
-                <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 2, boxShadow: 2 }}>
+                  <List sx={{ mb: 4 }}>
+                    {['Physical showing by agent', 'Virtual video-call tours', 'Verified unit checklist', 'Instant feedback report'].map((item, i) => (
+                      <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <CheckCircle sx={{ color: '#10b981', fontSize: 20 }} />
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>{item}</Typography>
+                      </Box>
+                    ))}
+                  </List>
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12} md={7}>
+                <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '20px', border: '1px solid #EBEBEB', overflow: 'hidden' }}>
                   <Table>
                     <TableHead>
-                      <TableRow sx={{ bgcolor: '#667eea' }}>
-                        <TableCell sx={{ color: 'white', fontWeight: 700 }}>Country</TableCell>
-                        <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Flag</TableCell>
-                        <TableCell align="right" sx={{ color: 'white', fontWeight: 700 }}>Currency</TableCell>
-                        <TableCell align="right" sx={{ color: 'white', fontWeight: 700 }}>Inspection Fee</TableCell>
+                      <TableRow sx={{ bgcolor: '#F7F7F7' }}>
+                        <TableCell sx={{ fontWeight: 800, py: 2.5 }}>Region</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 800 }}>Currency</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Local Fee</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {inspectionFees.map((fee, index) => (
-                        <TableRow 
-                          key={fee.country}
-                          sx={{ 
-                            '&:nth-of-type(odd)': { bgcolor: '#f5f5f5' },
-                            '&:hover': { bgcolor: '#e3f2fd' }
-                          }}
-                        >
-                          <TableCell sx={{ fontWeight: 600 }}>{fee.country}</TableCell>
-                          <TableCell align="center" sx={{ fontSize: '1.5rem' }}>{fee.flag}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>{fee.currency}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: '#667eea' }}>
-                            {fee.currency} {typeof fee.fee === 'number' ? fee.fee.toLocaleString() : fee.fee}
+                      {inspectionFees.map((fee) => (
+                        <TableRow key={fee.country} hover sx={{ '&:last-child td': { border: 0 } }}>
+                          <TableCell sx={{ fontWeight: 700 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Typography sx={{ fontSize: '1.5rem' }}>{fee.flag}</Typography>
+                              {fee.country}
+                            </Box>
+                          </TableCell>
+                          <TableCell align="center" sx={{ color: '#717171', fontWeight: 600 }}>{fee.currency}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
+                            {fee.currency} {fee.fee.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
-
-                <Paper sx={{ p: 2, bgcolor: '#f0f4ff', mb: 2 }}>
-                  <Typography variant="body2" fontWeight={600} gutterBottom color="primary">
-                    💡 Multiple Inspections?
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    If you book inspections for <strong>more than one house</strong>, the inspection fees will be further negotiated with the agent.
-                  </Typography>
-                </Paper>
-
-                <Typography variant="caption" color="text.secondary">
-                  * Inspection fees are payable before the inspection date
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Acceptance Fees Section */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #4caf50', boxShadow: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <CheckCircle sx={{ color: 'white', fontSize: 32 }} />
-                  </Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    Acceptance Fees (Rentals)
-                  </Typography>
-                </Box>
-
-                <Alert severity="success" sx={{ mb: 3 }}>
-                  <Typography variant="h6" fontWeight={700} color="success.main">
-                    10% of Initial Payment
-                  </Typography>
-                </Alert>
-
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                  Once you accept to take a house, an acceptance fee will apply. This fee is calculated as <strong>10% of your initial payment</strong>.
-                </Typography>
-
-                <Paper sx={{ p: 2, bgcolor: '#e8f5e9', mb: 2 }}>
-                  <Typography variant="body2" fontWeight={600} gutterBottom color="success.main">
-                    📋 How It's Calculated:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    The acceptance fee is <strong>10% of the total initial payment</strong> you make when accepting the house.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    <strong>Example 1:</strong> If you pay 3 months rent upfront (e.g., UGX 1,500,000), the acceptance fee = 10% × UGX 1,500,000 = <strong>UGX 150,000</strong>
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Example 2:</strong> If you pay 1 month rent upfront (e.g., UGX 500,000), the acceptance fee = 10% × UGX 500,000 = <strong>UGX 50,000</strong>
-                  </Typography>
-                </Paper>
-
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  * Acceptance fee is calculated based on your initial payment amount
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Airbnb Fees Section */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, border: '2px solid #e91e63', boxShadow: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, #e91e63 0%, #c2185b 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Handshake sx={{ color: 'white', fontSize: 32 }} />
-                  </Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    Airbnb Service Fee
-                  </Typography>
-                </Box>
-
-                <Alert severity="warning" sx={{ mb: 3 }}>
-                  <Typography variant="h6" fontWeight={700} color="#e91e63">
-                    10% of Payment to Host
-                  </Typography>
-                </Alert>
-
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                  For Airbnb bookings, we charge a service fee of <strong>10% of the payment made to the host</strong>.
-                </Typography>
-
-                <Paper sx={{ p: 2, bgcolor: '#fce4ec', mb: 2 }}>
-                  <Typography variant="body2" fontWeight={600} gutterBottom color="#e91e63">
-                    📋 How It's Calculated:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    The service fee is <strong>10% of the total amount paid to the host</strong> for the booking.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Example:</strong> If the total booking amount paid to the host is UGX 1,000,000, the service fee = 10% × UGX 1,000,000 = <strong>UGX 100,000</strong>
-                  </Typography>
-                </Paper>
-
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  * Service fee applies to all Airbnb bookings
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Add Your Property - Rentals */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Business sx={{ color: 'white', fontSize: 32 }} />
-                  </Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    List Your Rental Property
-                  </Typography>
-                </Box>
-
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, mb: 3 }}>
-                  Want to add your house for rental? Get in touch with our team for further implementation.
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Contact Us:
-                </Typography>
-
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Email sx={{ color: '#667eea', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Email:</strong> stuartkevinz852@gmail.com
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Email sx={{ color: '#667eea', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Email:</strong> carryit@gmail.com
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Phone sx={{ color: '#667eea', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Phone:</strong> +256 754 577 922
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<Email />}
-                  href="mailto:stuartkevinz852@gmail.com"
-                  sx={{
-                    mt: 3,
-                    background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    py: 1.5
-                  }}
-                >
-                  Contact for Rental Listing
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Add Your Property - Airbnb */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', borderRadius: 3, boxShadow: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 3,
-                      background: 'linear-gradient(135deg, #e91e63 0%, #c2185b 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Handshake sx={{ color: 'white', fontSize: 32 }} />
-                  </Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    List Your Airbnb Property
-                  </Typography>
-                </Box>
-
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, mb: 3 }}>
-                  Want to add your house for Airbnb? Contact the same offices for further implementation and onboarding.
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                  Contact Us:
-                </Typography>
-
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Email sx={{ color: '#e91e63', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Email:</strong> stuartkevinz852@gmail.com
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Email sx={{ color: '#e91e63', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Email:</strong> carryit@gmail.com
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Phone sx={{ color: '#e91e63', fontSize: 20 }} />
-                    <Typography variant="body2">
-                      <strong>Phone:</strong> +256 754 577 922
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<Email />}
-                  href="mailto:stuartkevinz852@gmail.com"
-                  sx={{
-                    mt: 3,
-                    background: 'linear-gradient(135deg, #e91e63 0%, #c2185b 100%)',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    py: 1.5
-                  }}
-                >
-                  Contact for Airbnb Listing
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Important Notes */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 4, borderRadius: 3, bgcolor: '#fff3e0', border: '2px solid #ff9800' }}>
-              <Typography variant="h5" fontWeight={700} gutterBottom color="#e65100">
-                ⚠️ Important Information
-              </Typography>
-              <Divider sx={{ my: 2 }} />
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                    📋 For Renters:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Inspection fee: UGX 50,000 per house
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Multiple inspections: Fees negotiable with agent
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Acceptance fee: 10% of initial payment (e.g., if paying 3 months upfront, fee is 10% of 3 months)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    • All fees must be paid before move-in
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                    🏠 For Property Owners:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Contact us to list your rental property
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Contact us to list your Airbnb property
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    • Professional property management
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    • Secure payment processing
-                  </Typography>
-                </Grid>
               </Grid>
-            </Paper>
+            </Grid>
           </Grid>
 
-          {/* Contact Section */}
-          <Grid item xs={12}>
-            <Paper
-              sx={{
-                p: 5,
-                borderRadius: 3,
-                textAlign: 'center',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white'
-              }}
-            >
-              <Typography variant="h4" fontWeight={700} gutterBottom>
-                Ready to Get Started?
-              </Typography>
-              <Typography variant="h6" sx={{ mb: 4, opacity: 0.95 }}>
-                Contact us today for property listings and management services
-              </Typography>
+          {/* Service Fees - Card Section */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ borderRadius: '24px', p: 2, border: '1px solid #EBEBEB', boxShadow: '0 8px 24px rgba(0,0,0,0.05)', transition: 'transform 0.3s ease', '&:hover': { transform: 'translateY(-8px)' } }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ mb: 3, color: '#ff385c' }}><CheckCircle sx={{ fontSize: 40 }} /></Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>Rental Acceptance</Typography>
+                <Typography variant="body1" sx={{ color: '#717171', lineHeight: 1.8, fontSize: '1.1rem' }}>
+                  A one-time service fee of **10% of the initial payment** is required upon successful rental agreement. This covers legal documentation and move-in coordination.
+                </Typography>
+                <Divider sx={{ my: 4 }} />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#222' }}>
+                  Example: 3 months payment of UGX 1.5M = UGX 150,000 fee.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
 
-              <Grid container spacing={2} justifyContent="center" sx={{ mb: 3 }}>
-                <Grid item>
-                  <Chip
-                    icon={<Email sx={{ color: 'white !important' }} />}
-                    label="stuartkevinz852@gmail.com"
-                    sx={{
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      py: 2.5,
-                      px: 1
-                    }}
-                  />
-                </Grid>
-                <Grid item>
-                  <Chip
-                    icon={<Email sx={{ color: 'white !important' }} />}
-                    label="carryit@gmail.com"
-                    sx={{
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      py: 2.5,
-                      px: 1
-                    }}
-                  />
-                </Grid>
-                <Grid item>
-                  <Chip
-                    icon={<Phone sx={{ color: 'white !important' }} />}
-                    label="+256 754 577 922"
-                    sx={{
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      py: 2.5,
-                      px: 1
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={<Email />}
-                  href="mailto:stuartkevinz852@gmail.com"
-                  sx={{
-                    bgcolor: 'white',
-                    color: '#667eea',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    px: 4,
-                    '&:hover': { bgcolor: '#f5f5f5' }
-                  }}
-                >
-                  Send Email
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  startIcon={<Phone />}
-                  href="tel:+256754577922"
-                  sx={{
-                    borderColor: 'white',
-                    color: 'white',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    px: 4,
-                    '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
-                  }}
-                >
-                  Call Us
-                </Button>
-              </Box>
-            </Paper>
+          <Grid item xs={12} md={6}>
+            <Card sx={{ borderRadius: '24px', p: 2, border: '1px solid #EBEBEB', boxShadow: '0 8px 24px rgba(0,0,0,0.05)', transition: 'transform 0.3s ease', '&:hover': { transform: 'translateY(-8px)' } }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ mb: 3, color: '#ff385c' }}><Handshake sx={{ fontSize: 40 }} /></Box>
+                <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>Airbnb Service</Typography>
+                <Typography variant="body1" sx={{ color: '#717171', lineHeight: 1.8, fontSize: '1.1rem' }}>
+                  For vacation and short-term stays, we charge a standard **10% service fee** integrated into the booking price. No hidden costs for guests.
+                </Typography>
+                <Divider sx={{ my: 4 }} />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#222' }}>
+                  This fee helps us maintain 24/7 guest support and platform security.
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
+
+        {/* CTA Section */}
+        <Box 
+          sx={{ 
+            mt: 12, 
+            p: { xs: 4, md: 8 }, 
+            borderRadius: '32px', 
+            bgcolor: '#222', 
+            color: 'white', 
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 2 }}>
+            <Typography variant="h2" sx={{ fontWeight: 900, mb: 3, fontSize: { xs: '2.5rem', md: '4rem' } }}>Own a Property?</Typography>
+            <Typography variant="h6" sx={{ opacity: 0.8, mb: 6, fontWeight: 400, maxWidth: 600, mx: 'auto' }}>
+              Join the fastest growing property management ecosystem in East Africa. List your first unit for free today.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button 
+                variant="contained" 
+                size="large"
+                sx={{ bgcolor: '#FFF', color: '#222', fontWeight: 800, px: 6, py: 2, borderRadius: '12px', '&:hover': { bgcolor: '#F7F7F7' } }}
+                onClick={() => navigate('/register')}
+              >
+                Get Started
+              </Button>
+              <Button 
+                variant="outlined" 
+                size="large"
+                endIcon={<ArrowForward />}
+                sx={{ color: '#FFF', borderColor: '#FFF', fontWeight: 800, px: 6, py: 2, borderRadius: '12px', '&:hover': { borderColor: '#F7F7F7', bgcolor: 'rgba(255,255,255,0.1)' } }}
+                onClick={() => navigate('/login')}
+              >
+                Sign In
+              </Button>
+            </Box>
+          </Box>
+          <Box sx={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.03)', zIndex: 1 }} />
+          <Box sx={{ position: 'absolute', bottom: -50, left: -50, width: 200, height: 200, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.03)', zIndex: 1 }} />
+        </Box>
       </Container>
 
-      {/* Floating Social Media Buttons */}
       <SocialMediaFloatButtons />
-
-      {/* Footer */}
       <Footer />
     </Box>
   );

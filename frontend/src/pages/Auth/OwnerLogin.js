@@ -1,30 +1,39 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   TextField,
   Button,
   Typography,
+  Link,
   Alert,
   CircularProgress,
   Container,
   Paper,
+  Grid,
+  InputAdornment,
+  IconButton,
+  Fade,
   Divider,
-  Link,
   Avatar,
-  Fade
+  LinearProgress
 } from '@mui/material';
+import logoImage from '../../assets/images/er13.png';
 import {
-  AdminPanelSettings as AdminIcon,
-  Security as SecurityIcon,
+  Email as EmailIcon,
+  Lock as LockIcon,
+  Visibility,
+  VisibilityOff,
+  Business
 } from '@mui/icons-material';
 import { loginUser, getCurrentUser, clearError } from '../../store/slices/authSlice';
 
-const AdminLoginPage = () => {
+const OwnerLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, error } = useSelector((state) => state.auth);
+  const [showPassword, setShowPassword] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -47,20 +56,20 @@ const AdminLoginPage = () => {
       const userResult = await dispatch(getCurrentUser());
       if (userResult.type === 'auth/getCurrentUser/fulfilled') {
         const userRole = userResult.payload?.role;
-        if (userRole === 'admin') {
+        if (userRole === 'owner') {
+          navigate('/owner/dashboard');
+        } else if (userRole === 'admin') {
           navigate('/admin');
         } else {
-          dispatch(clearError());
-          setFormData({ email: '', password: '' });
+          navigate('/');
         }
       }
     }
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#F7F7F7', display: 'flex', flexDirection: 'column' }}>
-      
-      <Container maxWidth="xs" sx={{ mt: 12, mb: 4 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#F7F7F7', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <Container maxWidth="xs">
         <Fade in={true} timeout={800}>
           <Paper 
             elevation={0} 
@@ -68,30 +77,28 @@ const AdminLoginPage = () => {
               p: 4, 
               borderRadius: '24px', 
               border: '1px solid #DDD',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.05)'
+              boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
             }}
           >
             <Box sx={{ textAlign: 'center', mb: 4 }}>
               <Avatar
+                src={logoImage}
+                alt="CarryIT"
                 sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
+                  width: 56,
+                  height: 56,
+                  borderRadius: '12px',
                   mx: 'auto',
                   mb: 2,
-                  bgcolor: '#D32F2F',
-                  color: 'white',
-                  boxShadow: '0 4px 12px rgba(211, 47, 47, 0.3)',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)',
                 }}
                 variant="rounded"
-              >
-                <AdminIcon sx={{ fontSize: 40 }} />
-              </Avatar>
+              />
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#222' }}>
-                Admin Access
+                Owner Portal
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                System Administrator Login
+                Manage your properties and earnings
               </Typography>
             </Box>
 
@@ -104,7 +111,7 @@ const AdminLoginPage = () => {
             <Box component="form" onSubmit={handleSubmit}>
               <TextField
                 fullWidth
-                label="Admin Email"
+                label="Owner Email"
                 name="email"
                 type="email"
                 required
@@ -112,17 +119,38 @@ const AdminLoginPage = () => {
                 onChange={handleChange}
                 margin="normal"
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Business sx={{ color: '#222', fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                }}
               />
               <TextField
                 fullWidth
                 label="Password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={formData.password}
                 onChange={handleChange}
                 margin="normal"
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockIcon sx={{ color: '#222', fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
 
               <Button
@@ -134,29 +162,24 @@ const AdminLoginPage = () => {
                   mt: 4,
                   py: 1.5,
                   borderRadius: '12px',
-                  bgcolor: '#D32F2F',
+                  bgcolor: '#222',
                   fontWeight: 700,
                   fontSize: '1rem',
                   textTransform: 'none',
-                  '&:hover': { bgcolor: '#B71C1C' }
+                  '&:hover': { bgcolor: '#444' }
                 }}
               >
-                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Login to Admin'}
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign In as Owner'}
               </Button>
             </Box>
 
-            <Divider sx={{ my: 4 }} />
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Link href="/login" sx={{ color: '#222', fontWeight: 600 }}>
-                Return to Owner Login
-              </Link>
-            </Box>
-
-            <Box sx={{ mt: 3, p: 2, bgcolor: '#FEE2E2', borderRadius: '12px', border: '1px solid #FECACA' }}>
-              <Typography variant="caption" color="#991B1B" display="block">
-                <strong>Development Note:</strong> Admin credentials are restricted.
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Want to list your property? <Link component={RouterLink} to="/owner-register" sx={{ color: '#222', fontWeight: 800 }}>Join now</Link>
               </Typography>
+              <Box sx={{ mt: 2 }}>
+                <Link component={RouterLink} to="/login" sx={{ color: '#717171', fontSize: '0.8rem' }}>Not an owner? Client Login</Link>
+              </Box>
             </Box>
           </Paper>
         </Fade>
@@ -165,4 +188,4 @@ const AdminLoginPage = () => {
   );
 };
 
-export default AdminLoginPage;
+export default OwnerLogin;

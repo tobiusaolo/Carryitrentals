@@ -912,11 +912,11 @@ const UnitsForRent = () => {
                           }
                           // Legacy file path - convert to URL
                           if (img.startsWith('/')) {
-                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
                             return `${apiBaseUrl.replace('/api/v1', '')}${img}`;
                           }
                           // Relative path
-                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
                           return `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${img}`;
                         };
                         const imageUrl = getImageUrl(image);
@@ -942,7 +942,7 @@ const UnitsForRent = () => {
                                     // Create a new window with the image
                                     const newWindow = window.open();
                                     // Images are stored as base64, use directly or convert legacy paths
-                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
                                     const fullImageUrl = image.startsWith('data:image/') || image.startsWith('http://') || image.startsWith('https://')
                                       ? image 
                                       : image.startsWith('/') 

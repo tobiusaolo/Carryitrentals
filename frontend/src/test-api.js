@@ -4,7 +4,7 @@ import axios from 'axios';
 const testLogin = async () => {
   try {
     console.log('Testing API call...');
-    const response = await axios.post('https://carryit-backend.onrender.com/api/v1/auth/login', {
+    const response = await axios.post('https://carryit-backend-su8h.onrender.com/api/v1/auth/login', {
       email: 'admin@example.com',
       password: 'admin123'
     });
