@@ -5,13 +5,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
@@ -27,9 +20,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Tooltip,
-  Fab,
-  Divider,
   Stepper,
   Step,
   StepLabel,
@@ -37,7 +27,10 @@ import {
   ImageList,
   ImageListItem,
   ImageListItemBar,
-  LinearProgress
+  LinearProgress,
+  FormControlLabel,
+  Checkbox,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -49,6 +42,7 @@ import {
   Person as PersonIcon,
   LocationOn as LocationOnIcon,
   CheckCircle as CheckCircleIcon,
+  Verified as VerifiedIcon,
   Warning as WarningIcon,
   Schedule as ScheduleIcon,
   CloudUpload as UploadIcon,
@@ -66,7 +60,29 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { unitAPI } from '../../services/api/unitAPI';
 import { agentAPI } from '../../services/api/agentAPI';
+import { propertyAPI } from '../../services/api/propertyAPI';
 import { showSuccess, showError, showWarning, showLoading, closeAlert } from '../../utils/sweetAlert';
+import PageHeader from '../../components/UI/PageHeader';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
+import DataTable from '../../components/UI/DataTable';
+import TableActions from '../../components/UI/TableActions';
+import { colors } from '../../theme/designTokens';
+import { RENTAL_STATUS_OPTIONS, normalizeRentalStatus } from '../../utils/rentalStatus';
+import {
+  UNIT_TYPE_OPTIONS,
+  CURRENCY_OPTIONS,
+  COUNTRY_OPTIONS,
+  emptyRentalFormState,
+  MIN_RENTAL_LISTING_IMAGES,
+  isCommercialUnit,
+} from '../../constants/rentalUnit';
+import {
+  buildRentalUnitPayload,
+  rentalFormFromUnit,
+  imagesPayloadFromSelection,
+  splitListingImages,
+} from '../../utils/rentalUnitForm';
 
 const AdminUnits = () => {
   const dispatch = useDispatch();
@@ -76,6 +92,8 @@ const AdminUnits = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [rentalUnits, setRentalUnits] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [internalUnits, setInternalUnits] = useState([]);
   const [agents, setAgents] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUnit, setEditingUnit] = useState(null);
@@ -83,30 +101,43 @@ const AdminUnits = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    location: '',
-    country: 'Uganda',
-    unit_type: 'one_bedroom',
-    floor: null,
-    bedrooms: 1,
-    bathrooms: 1,
-    monthly_rent: 0,
-    currency: 'USD',
-    inspection_fee: 0,
-    status: 'available',
-    description: '',
-    amenities: '',
-    images: '',
-    agent_id: null
-  });
+  const [formData, setFormData] = useState(emptyRentalFormState());
 
   useEffect(() => {
     if (user?.role === 'admin') {
       loadUnits();
       loadAgents();
+      loadProperties();
     }
   }, [user]);
+
+  const loadProperties = async () => {
+    try {
+      const response = await propertyAPI.getAllProperties();
+      setProperties(response.data || []);
+    } catch (err) {
+      console.error('Failed to load properties:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchInternalUnits = async () => {
+      if (!formData.property_id) {
+        setInternalUnits([]);
+        return;
+      }
+      try {
+        const res = await unitAPI.getUnits({ property_id: formData.property_id });
+        setInternalUnits(res.data || []);
+      } catch (err) {
+        console.error('Failed to load internal units:', err);
+        setInternalUnits([]);
+      }
+    };
+    if (openDialog) {
+      fetchInternalUnits();
+    }
+  }, [formData.property_id, openDialog]);
 
   const loadUnits = async () => {
     setLoading(true);
@@ -122,7 +153,9 @@ const AdminUnits = () => {
         agent_name: units[0].agent_name,
         full_unit: units[0]
       } : 'No units');
-      setRentalUnits(units);
+      setRentalUnits(
+        units.map((u) => ({ ...u, status: normalizeRentalStatus(u.status) }))
+      );
       setError(null);
     } catch (err) {
       console.error('Failed to load rental units:', err);
@@ -148,44 +181,11 @@ const AdminUnits = () => {
   const handleOpenDialog = (unit = null) => {
     if (unit) {
       setEditingUnit(unit);
-      setFormData({
-        title: unit.title,
-        location: unit.location,
-        country: unit.country || 'Uganda',
-        unit_type: unit.unit_type || 'apartment',
-        floor: unit.floor || '',
-        bedrooms: unit.bedrooms,
-        bathrooms: unit.bathrooms,
-        monthly_rent: unit.monthly_rent || unit.rent_amount,
-        currency: unit.currency || 'USD',
-        inspection_fee: unit.inspection_fee || 0,
-        status: unit.status || 'available',
-        description: unit.description,
-        amenities: unit.amenities || '',
-        images: unit.images || '',
-        agent_id: unit.agent_id || ''
-      });
-      const separator = '|||IMAGE_SEPARATOR|||';
-      setSelectedImages(unit.images ? unit.images.split(separator).filter(img => img.trim()) : []);
+      setFormData(rentalFormFromUnit(unit));
+      setSelectedImages(splitListingImages(unit.images));
     } else {
       setEditingUnit(null);
-      setFormData({
-        title: '',
-        location: '',
-        country: 'Uganda',
-        unit_type: 'one_bedroom',
-        floor: null,
-        bedrooms: 1,
-        bathrooms: 1,
-        monthly_rent: 0,
-        currency: 'USD',
-        inspection_fee: 0,
-        status: 'available',
-        description: '',
-        amenities: '',
-        images: '',
-        agent_id: null
-      });
+      setFormData(emptyRentalFormState());
       setSelectedImages([]);
     }
     setActiveStep(0);
@@ -224,22 +224,7 @@ const AdminUnits = () => {
     setActiveStep(0);
     setSelectedImages([]);
     // Reset form data
-    setFormData({
-      title: '',
-      location: '',
-      unit_type: 'one_bedroom',
-      floor: null,
-      bedrooms: 1,
-      bathrooms: 1,
-      monthly_rent: 0,
-      currency: 'USD',
-      inspection_fee: 0,
-      status: 'available',
-      description: '',
-      amenities: '',
-      images: '',
-      agent_id: null
-    });
+    setFormData(emptyRentalFormState());
   };
 
   const handleSubmit = async (e) => {
@@ -268,62 +253,16 @@ const AdminUnits = () => {
         return;
       }
       
-      // Validate images - require at least 5 images for new units
-      if (!editingUnit && selectedImages.length < 5) {
+      if (!editingUnit && selectedImages.length < MIN_RENTAL_LISTING_IMAGES) {
         closeAlert();
-        showWarning('Images Required', 'Please add at least 5 images of the rental unit');
-        setError('At least 5 images are required');
+        showWarning('Images Required', `Please add at least ${MIN_RENTAL_LISTING_IMAGES} images of the rental unit`);
+        setError(`At least ${MIN_RENTAL_LISTING_IMAGES} images are required`);
         setSubmitting(false);
         return;
       }
 
-      // Convert File images to base64 strings for Firestore storage
-      const convertFileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      };
-
-      // Separate files (new uploads) from strings (existing images)
-      const newImageFiles = selectedImages.filter(img => img instanceof File || img instanceof Blob);
-      const existingImageStrings = selectedImages.filter(img => typeof img === 'string');
-
-      // Convert new image files to base64
-      let base64Images = [...existingImageStrings]; // Start with existing base64 strings
-      if (newImageFiles.length > 0) {
-        try {
-          console.log('Converting images to base64:', newImageFiles.length);
-          const base64Promises = newImageFiles.map(file => convertFileToBase64(file));
-          const convertedImages = await Promise.all(base64Promises);
-          base64Images = [...base64Images, ...convertedImages];
-          console.log('Converted images to base64 successfully');
-        } catch (convertErr) {
-          console.error('Failed to convert images to base64:', convertErr);
-          showError('Image Conversion Failed', 'Failed to process images. Please try again.');
-          setSubmitting(false);
-          closeAlert();
-          return;
-        }
-      }
-
-      // Join base64 images with separator
-      const imagesString = base64Images.length > 0 
-        ? base64Images.join('|||IMAGE_SEPARATOR|||')
-        : null;
-
-      // Create unit data WITH base64 images
-      let unitData = { 
-        ...formData,
-        bedrooms: parseInt(formData.bedrooms) || 1,
-        bathrooms: parseInt(formData.bathrooms) || 1,
-        monthly_rent: parseFloat(formData.monthly_rent),
-        floor: formData.floor ? parseInt(formData.floor) : null,
-        agent_id: formData.agent_id ? String(formData.agent_id) : null,  // Keep as string (Firestore IDs are strings)
-        images: imagesString // Send base64 images directly
-      };
+      const imagesString = await imagesPayloadFromSelection(selectedImages);
+      const unitData = buildRentalUnitPayload(formData, { images: imagesString });
 
       console.log('📤 Sending rental unit data:', {
         title: unitData.title,
@@ -331,7 +270,7 @@ const AdminUnits = () => {
         agent_id: unitData.agent_id,
         agent_id_type: typeof unitData.agent_id,
         formData_agent_id: formData.agent_id,
-        images: imagesString ? `${imagesString.length} chars (${base64Images.length} images)` : 'null'
+        images: imagesString ? `${imagesString.length} chars (${selectedImages.length} files)` : 'null'
       });
       
       let createdUnit;
@@ -444,20 +383,169 @@ const AdminUnits = () => {
 
   const handleStatusChange = async (unitId, newStatus) => {
     try {
-      console.log('Changing rental status for unit:', unitId, 'to:', newStatus);
-      // TODO: Implement status change API call
-      // Update local state immediately for better UX
-      setRentalUnits(prevUnits => 
-        prevUnits.map(unit => 
-          unit.id === unitId 
-            ? { ...unit, rental_status: newStatus }
-            : unit
+      await unitAPI.updateRentalUnit(unitId, { status: newStatus });
+      setRentalUnits((prevUnits) =>
+        prevUnits.map((unit) =>
+          unit.id === unitId ? { ...unit, status: newStatus } : unit
         )
       );
+      showSuccess('Status updated', newStatus === 'available' ? 'Listing is now available.' : 'Listing marked as taken.');
     } catch (err) {
-      setError('Failed to change rental status');
+      const errorMsg =
+        typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : 'Failed to update listing status';
+      setError(errorMsg);
+      showError('Update failed', errorMsg);
     }
   };
+
+  const handleVerifiedChange = async (unitId, verified) => {
+    try {
+      await unitAPI.setRentalUnitVerified(unitId, verified);
+      setRentalUnits((prevUnits) =>
+        prevUnits.map((unit) =>
+          unit.id === unitId ? { ...unit, is_verified: verified } : unit
+        )
+      );
+      showSuccess(
+        verified ? 'Listing verified' : 'Verification removed',
+        verified
+          ? 'This listing will show the Verified badge on the public page.'
+          : 'The Verified badge has been removed from the public page.'
+      );
+    } catch (err) {
+      const errorMsg =
+        typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : 'Failed to update listing verification';
+      setError(errorMsg);
+      showError('Update failed', errorMsg);
+    }
+  };
+
+  const unitColumns = [
+    {
+      id: 'title',
+      label: 'Title',
+      getSearchValue: (row) => `${row.title} ${row.bedrooms} ${row.bathrooms}`,
+      render: (unit) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2, bgcolor: 'success.light' }}>
+            <ApartmentIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2">{unit.title}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {isCommercialUnit(unit.unit_type) 
+                ? `${unit.square_feet || '—'} sq ft` 
+                : `${unit.bedrooms || '—'} bed, ${unit.bathrooms || '—'} bath`}
+            </Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      getSearchValue: (row) => `${row.location} ${row.country || ''}`,
+      render: (unit) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">{unit.title}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {unit.location}{unit.country ? `, ${unit.country}` : ''}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'monthly_rent',
+      label: 'Rent Amount',
+      render: (unit) => (
+        <Typography variant="body2" fontWeight="bold" color="success.main">
+          {unit.currency || 'USD'} {unit.monthly_rent?.toLocaleString() || '0'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'description',
+      label: 'Details',
+      getSearchValue: (row) => row.description || '',
+      render: (unit) => (
+        <Typography variant="body2">{unit.description}</Typography>
+      ),
+    },
+    {
+      id: 'agent_name',
+      label: 'Agent',
+      getSearchValue: (row) => row.agent_name || '',
+      render: (unit) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {unit.agent_name || 'No Agent'}
+          </Typography>
+          {unit.agent_name && (
+            <Typography variant="caption" color="text.secondary">Assigned Agent</Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (unit) => (
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <Select
+            value={unit.status || 'available'}
+            onChange={(e) => handleStatusChange(unit.id, e.target.value)}
+            sx={{ fontSize: '0.8rem' }}
+          >
+            {RENTAL_STATUS_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      ),
+    },
+    {
+      id: 'verified',
+      label: 'Public verified',
+      render: (unit) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Switch
+            size="small"
+            checked={Boolean(unit.is_verified)}
+            onChange={(e) => handleVerifiedChange(unit.id, e.target.checked)}
+            color="success"
+          />
+          {unit.is_verified && (
+            <Chip
+              icon={<VerifiedIcon sx={{ fontSize: '14px !important' }} />}
+              label="Verified"
+              size="small"
+              color="success"
+              variant="outlined"
+              sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+            />
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (unit) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleView(unit) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Unit', onClick: () => handleOpenDialog({ ...unit, isRentalUnit: true }) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Unit', onClick: () => handleDelete(unit.id, true) },
+          ]}
+        />
+      ),
+    },
+  ];
 
   if (user?.role !== 'admin') {
     return (
@@ -471,15 +559,17 @@ const AdminUnits = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <ApartmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Units for Rent Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Manage available rental units in the system. Add, edit, and control rental status of units for rent.
-      </Typography>
+    <Box>
+      <PageHeader
+        variant="admin"
+        title="Rental units"
+        subtitle={`${rentalUnits.length} total · ${rentalUnits.filter((u) => u.status === 'available').length} available`}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Add unit
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -487,169 +577,40 @@ const AdminUnits = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <ApartmentIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{rentalUnits.length}</Typography>
-                  <Typography color="text.secondary">Total Units</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <OwnerStatCard title="Total" value={rentalUnits.length} icon={<ApartmentIcon />} variantIndex={1} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {rentalUnits.filter(unit => unit.status === 'available').length}
-                  </Typography>
-                  <Typography color="text.secondary">Available for Rent</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={4}>
+          <OwnerStatCard
+            title="Available"
+            value={rentalUnits.filter((unit) => unit.status === 'available').length}
+            icon={<CheckCircleIcon />}
+            variantIndex={0}
+          />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <PersonIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {rentalUnits.filter(unit => unit.status === 'occupied').length}
-                  </Typography>
-                  <Typography color="text.secondary">Occupied Units</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={4}>
+          <OwnerStatCard
+            title="Occupied"
+            value={rentalUnits.filter((unit) => unit.status === 'occupied').length}
+            icon={<PersonIcon />}
+            variantIndex={2}
+          />
         </Grid>
       </Grid>
 
-      {/* Rental Units for Rent */}
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              Units for Rent ({rentalUnits.length})
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
-              Add Unit for Rent
-            </Button>
-          </Box>
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell>Rent Amount</TableCell>
-                  <TableCell>Details</TableCell>
-                  <TableCell>Agent</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rentalUnits.map((unit) => (
-                  <TableRow key={unit.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'success.light' }}>
-                          <ApartmentIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{unit.title}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {unit.bedrooms} bed, {unit.bathrooms} bath
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {unit.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {unit.location}{unit.country ? `, ${unit.country}` : ''}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        {unit.currency || 'USD'} {unit.monthly_rent?.toLocaleString() || '0'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          {unit.description}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {unit.agent_name || 'No Agent'}
-                        </Typography>
-                        {unit.agent_name && (
-                          <Typography variant="caption" color="text.secondary">
-                            Assigned Agent
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={unit.status} 
-                        color={unit.status === 'available' ? "success" : "warning"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton size="small" onClick={() => handleView(unit)}>
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Unit">
-                        <IconButton size="small" onClick={() => handleOpenDialog({...unit, isRentalUnit: true})}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Unit">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(unit.id, true)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={unitColumns}
+        rows={rentalUnits}
+        loading={loading}
+        title="Public listings"
+        emptyTitle="No listings"
+        emptyDescription="Add a unit to show on the public site."
+        emptyIcon={ApartmentIcon}
+        emptyActionLabel="Add unit"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by title, location, or agent…"
+      />
 
       {/* Add/Edit Unit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -663,6 +624,61 @@ const AdminUnits = () => {
               <StepLabel>Unit Information</StepLabel>
               <StepContent>
                 <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Property (Optional for Admin)</InputLabel>
+                      <Select
+                        name="property_id"
+                        value={formData.property_id || ''}
+                        label="Select Property (Optional for Admin)"
+                        onChange={(e) => {
+                          setFormData({ ...formData, property_id: e.target.value, internal_unit_id: '' });
+                        }}
+                      >
+                        <MenuItem value="">-- No Property --</MenuItem>
+                        {properties.map((p) => (
+                          <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Internal Unit</InputLabel>
+                      <Select
+                        name="internal_unit_id"
+                        value={formData.internal_unit_id || ''}
+                        label="Select Internal Unit"
+                        disabled={!formData.property_id}
+                        onChange={(e) => {
+                          const uId = e.target.value;
+                          const selected = internalUnits.find(u => u.id === uId);
+                          if (selected) {
+                            setFormData({
+                              ...formData,
+                              internal_unit_id: uId,
+                              unit_type: selected.unit_type || formData.unit_type,
+                              floor: selected.floor ?? formData.floor,
+                              bedrooms: selected.bedrooms ?? formData.bedrooms,
+                              bathrooms: selected.bathrooms ?? formData.bathrooms,
+                              square_feet: selected.square_footage ?? formData.square_feet,
+                              monthly_rent: selected.monthly_rent ?? formData.monthly_rent,
+                              currency: selected.currency || formData.currency
+                            });
+                          } else {
+                            setFormData({ ...formData, internal_unit_id: uId });
+                          }
+                        }}
+                      >
+                        <MenuItem value="">-- Select a unit (Optional) --</MenuItem>
+                        {internalUnits.map((u) => (
+                          <MenuItem key={u.id} value={u.id}>
+                            Unit {u.unit_number} {u.status === 'occupied' ? '(Occupied)' : ''}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
@@ -710,21 +726,22 @@ const AdminUnits = () => {
                     </FormControl>
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth required>
                       <InputLabel>Unit Type</InputLabel>
                       <Select
                         name="unit_type"
                         value={formData.unit_type}
-                        onChange={(e) => setFormData({...formData, unit_type: e.target.value})}
+                        label="Unit Type"
+                        onChange={(e) => setFormData({...formData, unit_type: e.target.value, bedrooms: '', bathrooms: '', square_feet: ''})}
                       >
-                        <MenuItem value="single">Single Room</MenuItem>
-                        <MenuItem value="double">Double Room</MenuItem>
-                        <MenuItem value="studio">Studio</MenuItem>
-                        <MenuItem value="semi_detached">Semi-Detached</MenuItem>
-                        <MenuItem value="one_bedroom">1 Bedroom</MenuItem>
-                        <MenuItem value="two_bedroom">2 Bedroom</MenuItem>
-                        <MenuItem value="three_bedroom">3 Bedroom</MenuItem>
-                        <MenuItem value="penthouse">Penthouse</MenuItem>
+                        {UNIT_TYPE_OPTIONS.map(({ group, options }) => [
+                          <MenuItem key={group} disabled sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary', opacity: '1 !important', letterSpacing: 1, textTransform: 'uppercase' }}>
+                            {group}
+                          </MenuItem>,
+                          ...options.map((o) => (
+                            <MenuItem key={o.value} value={o.value} sx={{ pl: 3 }}>{o.label}</MenuItem>
+                          )),
+                        ])}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -737,6 +754,18 @@ const AdminUnits = () => {
                       value={formData.floor}
                       onChange={(e) => setFormData({...formData, floor: e.target.value})}
                     />
+                  </Grid>
+                  {/* Residential / Commercial context banner */}
+                  <Grid item xs={12}>
+                    {isCommercialUnit(formData.unit_type) ? (
+                      <Alert severity="warning" icon={false} sx={{ py: 0.75 }}>
+                        <strong>Commercial space selected</strong> — enter the usable area (sq ft) below. Bedrooms &amp; bathrooms do not apply.
+                      </Alert>
+                    ) : (
+                      <Alert severity="info" icon={false} sx={{ py: 0.75 }}>
+                        <strong>Residential unit selected</strong> — enter bedrooms and bathrooms below. To list a shop, office, or warehouse, change Unit Type above.
+                      </Alert>
+                    )}
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <TextField
@@ -790,28 +819,48 @@ const AdminUnits = () => {
                       required
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Bedrooms"
-                      name="bedrooms"
-                      type="number"
-                      value={formData.bedrooms}
-                      onChange={(e) => setFormData({...formData, bedrooms: e.target.value})}
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Bathrooms"
-                      name="bathrooms"
-                      type="number"
-                      value={formData.bathrooms}
-                      onChange={(e) => setFormData({...formData, bathrooms: e.target.value})}
-                      required
-                    />
-                  </Grid>
+                  {/* Dynamic Fields based on Unit Type */}
+                  {!isCommercialUnit(formData.unit_type) && (
+                    <>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          label="Bedrooms"
+                          name="bedrooms"
+                          type="number"
+                          value={formData.bedrooms}
+                          onChange={(e) => setFormData({...formData, bedrooms: e.target.value})}
+                          required
+                          inputProps={{ min: 0 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          fullWidth
+                          label="Bathrooms"
+                          name="bathrooms"
+                          type="number"
+                          value={formData.bathrooms}
+                          onChange={(e) => setFormData({...formData, bathrooms: e.target.value})}
+                          inputProps={{ min: 0, step: 0.5 }}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                  {isCommercialUnit(formData.unit_type) && (
+                    <Grid item xs={12} sm={8}>
+                      <TextField
+                        fullWidth
+                        label="Size (sq ft)"
+                        name="square_feet"
+                        type="number"
+                        value={formData.square_feet}
+                        onChange={(e) => setFormData({...formData, square_feet: e.target.value})}
+                        inputProps={{ min: 0 }}
+                        helperText="Total usable area in square feet"
+                      />
+                    </Grid>
+                  )}
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
                       <InputLabel>Status</InputLabel>
@@ -820,9 +869,9 @@ const AdminUnits = () => {
                         value={formData.status}
                         onChange={(e) => setFormData({...formData, status: e.target.value})}
                       >
-                        <MenuItem value="available">Available</MenuItem>
-                        <MenuItem value="occupied">Occupied</MenuItem>
-                        <MenuItem value="maintenance">Under Maintenance</MenuItem>
+                        {RENTAL_STATUS_OPTIONS.map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -868,6 +917,17 @@ const AdminUnits = () => {
                       value={formData.amenities}
                       onChange={(e) => setFormData({...formData, amenities: e.target.value})}
                       placeholder="e.g., Swimming pool, Gym, Parking, Security"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(formData.is_furnished)}
+                          onChange={(e) => setFormData({ ...formData, is_furnished: e.target.checked })}
+                        />
+                      }
+                      label="Furnished home"
                     />
                   </Grid>
                 </Grid>
@@ -923,7 +983,7 @@ const AdminUnits = () => {
                         <ImageListItem key={index}>
                           <img
                             src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                            alt={`Unit image ${index + 1}`}
+                            alt={`Unit ${index + 1}`}
                             loading="lazy"
                           />
                           <ImageListItemBar
@@ -1182,7 +1242,7 @@ const AdminUnits = () => {
                           >
                             <img
                               src={imageUrl}
-                              alt={`Unit image ${index + 1}`}
+                              alt={`Unit ${index + 1}`}
                               loading="lazy"
                               style={{ 
                                 objectFit: 'cover',

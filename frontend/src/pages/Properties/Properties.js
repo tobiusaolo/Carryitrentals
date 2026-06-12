@@ -3,12 +3,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   Box,
   Typography,
-  Paper,
   Button,
   Grid,
-  Card,
-  CardContent,
-  Chip,
   IconButton,
   Dialog,
   DialogTitle,
@@ -19,11 +15,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  FormHelperText,
   Alert,
   CircularProgress,
-  Fab,
-  Tooltip,
-  Avatar,
 } from '@mui/material';
 import {
   Add,
@@ -34,8 +28,6 @@ import {
   Visibility,
 } from '@mui/icons-material';
 import {
-  DataGrid,
-  GridToolbar,
   GridActionsCellItem,
 } from '@mui/x-data-grid';
 import {
@@ -45,31 +37,18 @@ import {
   deleteProperty,
   clearError,
 } from '../../store/slices/propertySlice';
-
-const StatCard = ({ title, value, icon, color, subtitle }) => (
-  <Card sx={{ height: '100%' }}>
-    <CardContent>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Avatar sx={{ bgcolor: color, mr: 2 }}>
-          {icon}
-        </Avatar>
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h4" component="div">
-            {value}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary">
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-      </Box>
-    </CardContent>
-  </Card>
-);
+import FormSection from '../../components/Forms/FormSection';
+import {
+  PROPERTY_TYPE_OPTIONS,
+  COUNTRY_OPTIONS,
+  emptyPropertyFormState,
+} from '../../constants/property';
+import PageHeader from '../../components/UI/PageHeader';
+import { ownerPrimaryButtonSx } from '../../theme/designTokens';
+import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 
 const Properties = () => {
   const dispatch = useDispatch();
@@ -78,17 +57,7 @@ const Properties = () => {
 
   const [openDialog, setOpenDialog] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    country: 'USA',
-    property_type: 'house',
-    description: '',
-    total_units: 1,
-  });
+  const [formData, setFormData] = useState(emptyPropertyFormState());
 
   useEffect(() => {
     dispatch(fetchProperties());
@@ -112,24 +81,14 @@ const Properties = () => {
         city: property.city || '',
         state: property.state || '',
         zip_code: property.zip_code || '',
-        country: property.country || 'USA',
+        country: property.country || emptyPropertyFormState().country,
         property_type: property.property_type || 'house',
         description: property.description || '',
         total_units: property.total_units || 1,
       });
     } else {
       setEditingProperty(null);
-      setFormData({
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        zip_code: '',
-        country: 'USA',
-        property_type: 'house',
-        description: '',
-        total_units: 1,
-      });
+      setFormData(emptyPropertyFormState());
     }
     setOpenDialog(true);
   };
@@ -165,34 +124,19 @@ const Properties = () => {
     }
   };
 
-  const getPropertyTypeColor = (type) => {
-    const colors = {
-      house: 'success',
-      apartment: 'primary',
-      condo: 'secondary',
-      townhouse: 'warning',
-    };
-    return colors[type] || 'default';
-  };
-
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'name', headerName: 'Property Name', width: 200, flex: 1 },
     { field: 'address', headerName: 'Address', width: 250, flex: 1 },
     { field: 'city', headerName: 'City', width: 120 },
-    { field: 'state', headerName: 'State', width: 80 },
-    { field: 'zip_code', headerName: 'ZIP', width: 80 },
+    { field: 'state', headerName: 'Region', width: 100 },
+    { field: 'zip_code', headerName: 'Postal', width: 80 },
     {
       field: 'property_type',
       headerName: 'Type',
       width: 120,
       renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={getPropertyTypeColor(params.value)}
-          size="small"
-          sx={{ textTransform: 'capitalize' }}
-        />
+        <OwnerStatusChip status={params.value} label={params.value} />
       ),
     },
     { field: 'total_units', headerName: 'Units', width: 80 },
@@ -209,17 +153,19 @@ const Properties = () => {
       width: 120,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<Visibility />}
+          icon={<Visibility fontSize="small" />}
           label="View"
           onClick={() => handleOpenDialog(params.row)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Edit />}
+          icon={<Edit fontSize="small" />}
           label="Edit"
           onClick={() => handleOpenDialog(params.row)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Delete />}
+          icon={<Delete fontSize="small" />}
           label="Delete"
           onClick={() => handleDelete(params.id)}
           showInMenu
@@ -237,22 +183,20 @@ const Properties = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Properties Management
-        </Typography>
-        <Tooltip title="Add New Property">
-          <Fab
-            color="primary"
-            aria-label="add"
+    <OwnerPageContainer>
+      <PageHeader
+        title="Properties"
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Add />}
             onClick={() => handleOpenDialog()}
-            sx={{ boxShadow: 2 }}
+            sx={ownerPrimaryButtonSx}
           >
-            <Add />
-          </Fab>
-        </Tooltip>
-      </Box>
+            Add property
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -260,159 +204,193 @@ const Properties = () => {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Properties"
+          <OwnerStatCard
+            title="Total properties"
             value={properties.length}
             icon={<Home />}
-            color="#1976d2"
-            subtitle="Active properties"
+            variantIndex={0}
+            subtitle="In portfolio"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Units"
+          <OwnerStatCard
+            title="Total units"
             value={properties.reduce((sum, prop) => sum + (prop.total_units || 0), 0)}
             icon={<Apartment />}
-            color="#4caf50"
-            subtitle="Across all properties"
+            variantIndex={1}
+            subtitle="All sites"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Property Types"
-            value={new Set(properties.map(p => p.property_type)).size}
+          <OwnerStatCard
+            title="Property types"
+            value={new Set(properties.map((p) => p.property_type)).size}
             icon={<Home />}
-            color="#ff9800"
-            subtitle="Different types"
+            variantIndex={2}
+            subtitle="Categories"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Avg Units/Property"
-            value={properties.length > 0 ? Math.round(properties.reduce((sum, prop) => sum + (prop.total_units || 0), 0) / properties.length) : 0}
+          <OwnerStatCard
+            title="Avg units / property"
+            value={
+              properties.length > 0
+                ? Math.round(
+                    properties.reduce((sum, prop) => sum + (prop.total_units || 0), 0) /
+                      properties.length
+                  )
+                : 0
+            }
             icon={<Apartment />}
-            color="#9c27b0"
-            subtitle="Average per property"
+            variantIndex={0}
+            subtitle="Per site"
           />
         </Grid>
       </Grid>
 
-      {/* Data Grid View */}
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={properties}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          components={{ Toolbar: GridToolbar }}
-          loading={isLoading}
-          disableSelectionOnClick
-        />
-      </Paper>
+      <OwnerDataGrid
+        rows={properties}
+        columns={columns}
+        loading={isLoading}
+        emptyTitle="No properties yet"
+        emptyDescription="Add your first property to start managing units and tenants."
+        emptyIcon={Home}
+        emptyActionLabel="Add property"
+        onEmptyAction={() => handleOpenDialog()}
+      />
 
       {/* Add/Edit Property Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingProperty ? 'Edit Property' : 'Add New Property'}
+          {editingProperty ? 'Edit property' : 'Add property'}
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              A <strong>property</strong> is the building or site you manage. You add individual{' '}
+              <strong>rental units</strong> or rooms under it later.
+            </Alert>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Property Name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                />
+              <Grid item xs={12}>
+                <FormSection title="Basics" subtitle="Name and building type" first>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Property name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="e.g. Sunrise Apartments"
+                        helperText="How you identify this site internally"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth required>
+                        <InputLabel>Building type</InputLabel>
+                        <Select
+                          name="property_type"
+                          value={formData.property_type}
+                          onChange={handleInputChange}
+                          label="Building type"
+                        >
+                          {PROPERTY_TYPE_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <FormHelperText>
+                          {PROPERTY_TYPE_OPTIONS.find((o) => o.value === formData.property_type)?.hint}
+                        </FormHelperText>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Total units"
+                        name="total_units"
+                        type="number"
+                        value={formData.total_units}
+                        onChange={handleInputChange}
+                        required
+                        inputProps={{ min: 1 }}
+                        helperText="Rooms or flats in this property"
+                      />
+                    </Grid>
+                  </Grid>
+                </FormSection>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Property Type</InputLabel>
-                  <Select
-                    name="property_type"
-                    value={formData.property_type}
-                    onChange={handleInputChange}
-                    label="Property Type"
-                  >
-                    <MenuItem value="house">House</MenuItem>
-                    <MenuItem value="apartment">Apartment</MenuItem>
-                    <MenuItem value="condo">Condo</MenuItem>
-                    <MenuItem value="townhouse">Townhouse</MenuItem>
-                  </Select>
-                </FormControl>
+              <Grid item xs={12}>
+                <FormSection title="Location" subtitle="Address guests and tenants will use">
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Street / plot address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="e.g. Plot 12, Nakasero Road"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="City / town"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Region / district"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        placeholder="e.g. Central Region"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Postal code (optional)"
+                        name="zip_code"
+                        value={formData.zip_code}
+                        onChange={handleInputChange}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth required>
+                        <InputLabel>Country</InputLabel>
+                        <Select
+                          name="country"
+                          value={formData.country}
+                          onChange={handleInputChange}
+                          label="Country"
+                        >
+                          {COUNTRY_OPTIONS.map((c) => (
+                            <MenuItem key={c} value={c}>
+                              {c}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </FormSection>
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="City"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="State"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="ZIP Code"
-                  name="zip_code"
-                  value={formData.zip_code}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Country"
-                  name="country"
-                  value={formData.country}
-                  onChange={handleInputChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Total Units"
-                  name="total_units"
-                  type="number"
-                  value={formData.total_units}
-                  onChange={handleInputChange}
-                  required
-                  inputProps={{ min: 1 }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
+                  label="Notes (optional)"
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
@@ -430,7 +408,7 @@ const Properties = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </OwnerPageContainer>
   );
 };
 

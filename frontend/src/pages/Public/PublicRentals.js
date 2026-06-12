@@ -1,159 +1,174 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
   Grid,
-  Typography,
-  Fade,
   CircularProgress,
-  useMediaQuery,
-  useTheme,
-  Button,
+  Alert,
 } from '@mui/material';
-import {
-  Home as HomeIcon,
-} from '@mui/icons-material';
-import axios from 'axios';
+import { SearchOff as SearchOffIcon } from '@mui/icons-material';
+import EmptyState from '../../components/UI/EmptyState';
 import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
 import Footer from '../../components/Footer';
 import PublicHeader from '../../components/Navigation/PublicHeader';
 import CategoryBar from '../../components/Navigation/CategoryBar';
 import PropertyCard from '../../components/UI/PropertyCard';
+import TrustBanner from '../../components/Public/TrustBanner';
+import RentalFiltersBar from '../../components/Public/RentalFiltersBar';
+import RequestPropertyDialog from '../../components/Public/RequestPropertyDialog';
+import { fetchPublicRentals } from '../../services/api/marketplaceAPI';
+import { colors } from '../../theme/designTokens';
+import { normalizeRentalStatus, sortUnitsAvailableFirst } from '../../utils/rentalStatus';
+import { matchesRentalCategory } from '../../utils/rentalUnitForm';
+import { normalizePublicRentalUnit } from '../../services/api/marketplaceAPI';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
+const emptyFilters = {
+  location: '',
+  country: '',
+  min_price: '',
+  max_price: '',
+  bedrooms: '',
+};
 
 const PublicRentals = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
   const [units, setUnits] = useState([]);
   const [filteredUnits, setFilteredUnits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [activeCategory, setActiveCategory] = useState('All Units');
-  
+  const [filters, setFilters] = useState(emptyFilters);
+  const [requestOpen, setRequestOpen] = useState(false);
+
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get('search')?.toLowerCase() || '';
 
-  useEffect(() => {
-    loadRentalUnits();
-  }, []);
+  const normalizeUnits = (data) =>
+    sortUnitsAvailableFirst(
+      data.map((unit) => ({
+        ...normalizePublicRentalUnit(unit),
+        status: normalizeRentalStatus(unit.status),
+      }))
+    );
 
-  useEffect(() => {
-    applyFilters();
-  }, [activeCategory, units, searchQuery]);
-
-  const loadRentalUnits = async () => {
+  const loadRentalUnits = useCallback(async (apiFilters = {}) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/rental-units/public`);
-      
-      const unitsWithImages = response.data.map(unit => {
-        if (unit.images && typeof unit.images === 'string') {
-          unit.images = unit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim());
-        } else if (!unit.images) {
-          unit.images = [];
-        }
-        return unit;
-      });
-      
-      const availableUnits = unitsWithImages.filter(unit => unit.status === 'available');
-      setUnits(availableUnits);
-      setFilteredUnits(availableUnits);
+      setLoadError(null);
+      const params = {};
+      if (apiFilters.location) params.location = apiFilters.location;
+      if (apiFilters.country) params.country = apiFilters.country;
+      if (apiFilters.min_price) params.min_price = Number(apiFilters.min_price);
+      if (apiFilters.max_price) params.max_price = Number(apiFilters.max_price);
+      if (apiFilters.bedrooms) params.bedrooms = Number(apiFilters.bedrooms);
+
+      const response = await fetchPublicRentals(params);
+      const listings = normalizeUnits(response.data || []);
+      setUnits(listings);
+      setFilteredUnits(listings);
     } catch (err) {
       console.error('Error loading rental units:', err);
+      setUnits([]);
+      setFilteredUnits([]);
+      const detail = err.response?.data?.detail;
+      setLoadError(
+        typeof detail === 'string'
+          ? detail
+          : 'Could not load listings. Check that the backend is running and REACT_APP_API_URL points to it.'
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
+  useEffect(() => {
+    loadRentalUnits();
+  }, [loadRentalUnits]);
+
+  useEffect(() => {
     let filtered = units;
 
-    // Apply category filter
     if (activeCategory !== 'All Units') {
-      filtered = filtered.filter(unit => {
-        const type = unit.unit_type?.toLowerCase() || '';
-        const cat = activeCategory.toLowerCase();
-        
-        if (cat === 'apartments') return type.includes('apartment') || type.includes('flat');
-        if (cat === 'studios') return type.includes('studio') || type.includes('single');
-        if (cat === 'one bedroom') return (unit.bedrooms || 0) === 1;
-        if (cat === 'two bedroom') return (unit.bedrooms || 0) === 2;
-        if (cat === 'penthouses') return type.includes('penthouse');
-        if (cat === 'villas') return type.includes('villa') || type.includes('mansion');
-        if (cat === 'furnished') return unit.is_furnished === true;
-        
-        return true;
-      });
+      filtered = filtered.filter((unit) => matchesRentalCategory(unit, activeCategory));
     }
 
-    // Apply search filter
     if (searchQuery) {
-      filtered = filtered.filter(unit => 
-        unit.title?.toLowerCase().includes(searchQuery) ||
-        unit.location?.toLowerCase().includes(searchQuery) ||
-        unit.description?.toLowerCase().includes(searchQuery) ||
-        unit.unit_type?.toLowerCase().includes(searchQuery)
+      filtered = filtered.filter(
+        (unit) =>
+          unit.title?.toLowerCase().includes(searchQuery) ||
+          unit.location?.toLowerCase().includes(searchQuery) ||
+          unit.description?.toLowerCase().includes(searchQuery)
       );
     }
 
     setFilteredUnits(filtered);
+  }, [activeCategory, units, searchQuery]);
+
+  const handleApplyFilters = () => loadRentalUnits(filters);
+
+  const handleClearFilters = () => {
+    setFilters(emptyFilters);
+    loadRentalUnits();
   };
 
-  return (
-    <Box sx={{ bgcolor: 'white', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <PublicHeader />
-      <CategoryBar 
-        activeCategory={activeCategory} 
-        onCategoryChange={setActiveCategory} 
-      />
+  const activeFilterCount = [filters.location, filters.country, filters.min_price, filters.max_price, filters.bedrooms]
+    .filter((v) => v !== '' && v != null).length;
 
-      <Container maxWidth="xl" sx={{ py: 4, flex: 1 }}>
+  return (
+    <Box sx={{ bgcolor: colors.surface, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <PublicHeader onRequestProperty={() => setRequestOpen(true)} />
+      <CategoryBar activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+
+      <Container maxWidth="xl" sx={{ py: 3, flex: 1 }}>
+        <TrustBanner />
+
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {loadError}
+          </Alert>
+        )}
+
+        <RentalFiltersBar
+          filters={filters}
+          onChange={setFilters}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
+
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 20 }}>
-            <CircularProgress sx={{ color: '#ff385c' }} thickness={5} size={60} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 12 }}>
+            <CircularProgress sx={{ color: colors.brand }} size={48} />
           </Box>
         ) : filteredUnits.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 15 }}>
-            <HomeIcon sx={{ fontSize: 80, color: '#d1d5db', mb: 2 }} />
-            <Typography variant="h5" color="text.secondary" gutterBottom sx={{ fontWeight: 800 }}>
-              No rentals found
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Try adjusting your search or category filters.
-            </Typography>
-            <Button 
-              variant="contained" 
-              onClick={() => {
-                setActiveCategory('All Units');
-                navigate('/rentals');
-              }}
-              sx={{ borderRadius: '12px', px: 4, bgcolor: '#ff385c', '&:hover': { bgcolor: '#e31c5f' } }}
-            >
-              Clear filters
-            </Button>
-          </Box>
+          <EmptyState
+            icon={SearchOffIcon}
+            title={units.length === 0 ? 'No published listings yet' : 'No homes match'}
+            description={
+              units.length === 0
+                ? 'Only marketplace listings with at least 5 photos and Available/Taken status appear here. Create them under Owner → Units for rent.'
+                : activeFilterCount > 0 || activeCategory !== 'All Units' || searchQuery
+                  ? 'Try clearing filters or choosing All Units. Listings are filtered by country, price, and category — not by display currency.'
+                  : 'Change filters or tell us what you need.'
+            }
+            actionLabel="Request a home"
+            onAction={() => setRequestOpen(true)}
+            secondaryActionLabel={activeFilterCount > 0 ? 'Clear filters' : undefined}
+            onSecondaryAction={activeFilterCount > 0 ? handleClearFilters : undefined}
+          />
         ) : (
-          <Grid container spacing={3}>
-            {filteredUnits.map((unit, index) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} xl={2.4} key={unit.id}>
-                <Fade in={true} timeout={300 + (index * 50)}>
-                  <Box>
-                    <PropertyCard 
-                      property={unit} 
-                      onClick={() => navigate(`/rental/${unit.id}`)} 
-                    />
-                  </Box>
-                </Fade>
+          <Grid container spacing={2.5}>
+            {filteredUnits.map((unit) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={unit.id}>
+                <PropertyCard property={unit} onClick={() => navigate(`/rental/${unit.id}`)} />
               </Grid>
             ))}
           </Grid>
         )}
       </Container>
 
+      <RequestPropertyDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
       <Footer />
       <SocialMediaFloatButtons />
     </Box>

@@ -10,185 +10,138 @@ import {
   IconButton,
   Avatar,
   InputBase,
-  alpha,
-  useTheme,
   useMediaQuery,
+  useTheme,
   Paper,
-  Divider,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Language,
-  Menu as MenuIcon,
-  AccountCircle,
-} from '@mui/icons-material';
+import { Search as SearchIcon } from '@mui/icons-material';
 import logoImage from '../../assets/images/er13.png';
+import CurrencyCountryMenu from '../Public/CurrencyCountryMenu';
+import PublicMoreMenu from '../Public/PublicMoreMenu';
+import { useViewerCurrencyOptional } from '../../contexts/ViewerCurrencyContext';
+import { colors, layout } from '../../theme/designTokens';
 
-const PublicHeader = () => {
+const PublicHeader = ({ onRequestProperty }) => {
+  const { viewerCountry, displayCurrency } = useViewerCurrencyOptional();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [searchValue, setSearchValue] = useState('');
 
-  const handleSearch = (e) => {
-    if (e.key === 'Enter') {
-      const path = location.pathname.includes('airbnb') ? '/airbnb' : '/rentals';
-      navigate(`${path}?search=${searchValue}`);
-    }
+  const isRentals = !location.pathname.includes('airbnb');
+  const browseMode = isRentals ? 'rentals' : 'airbnb';
+
+  const runSearch = () => {
+    const path = browseMode === 'airbnb' ? '/airbnb' : '/rentals';
+    const q = searchValue.trim();
+    navigate(q ? `${path}?search=${encodeURIComponent(q)}` : path);
   };
 
-  const isAirbnb = location.pathname.includes('airbnb');
+  const handleSearchKey = (e) => {
+    if (e.key === 'Enter') runSearch();
+  };
 
   return (
     <AppBar
       position="sticky"
       elevation={0}
       sx={{
-        bgcolor: 'white',
-        borderBottom: '1px solid #f1f1f1',
-        py: 1,
+        bgcolor: colors.surface,
+        borderBottom: `1px solid ${colors.border}`,
         zIndex: 1100,
       }}
     >
-      <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ justifyContent: 'space-between', minHeight: { xs: 64, md: 80 } }}>
-          
-          {/* Logo - Extreme Left */}
-          <Box 
-            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', flex: { xs: 1, md: '0 0 auto' } }} 
-            onClick={() => navigate('/')}
+      <Container maxWidth={layout.publicMaxWidth}>
+        <Toolbar disableGutters sx={{ justifyContent: 'space-between', gap: 2, minHeight: 64, py: 0.5 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', flexShrink: 0 }}
+            onClick={() => navigate('/rentals')}
           >
-            <Avatar
-              src={logoImage}
-              alt="CarryIT Logo"
-              sx={{ width: 40, height: 40, borderRadius: '10px' }}
-              variant="rounded"
-            />
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                fontWeight: 900, 
-                color: '#ff385c', // Iconic Airbnb-like brand color for logo
-                display: { xs: 'none', lg: 'block' },
-                fontSize: '1.4rem',
-                letterSpacing: '-0.03em'
-              }}
+            <Avatar src={logoImage} alt="CarryIT" sx={{ width: 36, height: 36, borderRadius: '8px' }} variant="rounded" />
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 800, color: colors.brand, display: { xs: 'none', sm: 'block' }, letterSpacing: '-0.02em' }}
             >
               CarryIT
             </Typography>
           </Box>
 
-          {/* Search Bar - Centered Pill */}
           {!isMobile && (
-            <Paper
-              elevation={0}
+            <ToggleButtonGroup
+              exclusive
+              value={browseMode}
+              size="small"
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                width: 400,
-                borderRadius: '40px',
-                border: '1px solid #DDD',
-                px: 2,
-                py: 0.5,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05)',
-                transition: 'box-shadow 0.2s ease',
-                '&:hover': { boxShadow: '0 2px 4px rgba(0,0,0,0.18)' },
-                cursor: 'pointer'
+                flexShrink: 0,
+                '& .MuiToggleButton-root': {
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  border: `1px solid ${colors.border}`,
+                  px: 2,
+                  py: 0.5,
+                  '&.Mui-selected': { bgcolor: colors.text, color: '#fff', '&:hover': { bgcolor: '#000' } },
+                },
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 800, px: 2, borderRight: '1px solid #DDD', color: '#222' }}>
-                {isAirbnb ? 'Anywhere' : 'Uganda'}
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 800, px: 2, borderRight: '1px solid #DDD', color: '#222' }}>
-                Any week
-              </Typography>
-              <InputBase
-                placeholder="Search stays"
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                onKeyDown={handleSearch}
-                sx={{ ml: 2, flex: 1, fontSize: '0.9rem', fontWeight: 500 }}
-              />
-              <IconButton 
-                size="small" 
-                sx={{ bgcolor: '#ff385c', color: 'white', '&:hover': { bgcolor: '#e31c5f' }, p: 1 }}
-                onClick={() => navigate(`${isAirbnb ? '/airbnb' : '/rentals'}?search=${searchValue}`)}
-              >
-                <SearchIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Paper>
+              <ToggleButton value="rentals" onClick={() => navigate('/rentals')}>
+                Rentals
+              </ToggleButton>
+              <ToggleButton value="airbnb" onClick={() => navigate('/airbnb')}>
+                Short stays
+              </ToggleButton>
+            </ToggleButtonGroup>
           )}
 
-          {/* Right Side Actions */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: { xs: 0, md: '0 0 auto' }, justifyContent: 'flex-end' }}>
-            {!isMobile && (
-              <>
-                <Button 
-                  onClick={() => navigate('/rentals')}
-                  sx={{ color: '#222', fontWeight: 800, textTransform: 'none', borderRadius: '20px', px: 2, '&:hover': { bgcolor: '#F7F7F7' } }}
-                >
-                  Rentals
-                </Button>
-                <Button 
-                  onClick={() => navigate('/airbnb')}
-                  sx={{ color: '#222', fontWeight: 800, textTransform: 'none', borderRadius: '20px', px: 2, '&:hover': { bgcolor: '#F7F7F7' } }}
-                >
-                  Airbnb
-                </Button>
-                <IconButton sx={{ color: '#222' }}><Language sx={{ fontSize: 20 }} /></IconButton>
-              </>
-            )}
-
-            <Paper
-              elevation={0}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                border: '1px solid #DDD',
-                borderRadius: '30px',
-                p: '5px 5px 5px 12px',
-                cursor: 'pointer',
-                transition: 'box-shadow 0.2s ease',
-                '&:hover': { boxShadow: '0 2px 4px rgba(0,0,0,0.18)' }
-              }}
-              onClick={() => navigate('/login')}
-            >
-              <MenuIcon sx={{ fontSize: 18, color: '#222' }} />
-              <Avatar sx={{ width: 32, height: 32, bgcolor: '#717171' }}>
-                <AccountCircle sx={{ fontSize: 32 }} />
-              </Avatar>
-            </Paper>
-          </Box>
-        </Toolbar>
-        
-        {/* Mobile Search Bar */}
-        {isMobile && (
           <Paper
             elevation={0}
             sx={{
+              flex: 1,
+              maxWidth: 480,
               display: 'flex',
               alignItems: 'center',
-              borderRadius: '40px',
-              border: '1px solid #DDD',
-              mb: 2,
-              px: 2,
-              py: 1,
-              boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
+              borderRadius: '10px',
+              border: `1px solid ${colors.border}`,
+              px: 1.5,
+              py: 0.25,
             }}
           >
-            <SearchIcon sx={{ color: '#222', mr: 2 }} />
             <InputBase
-              placeholder="Search stays in Uganda"
-              fullWidth
+              placeholder={isMobile ? `Search in ${viewerCountry}` : `Search homes in ${viewerCountry} · ${displayCurrency}`}
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={handleSearch}
-              sx={{ fontWeight: 600, fontSize: '0.9rem' }}
+              onKeyDown={handleSearchKey}
+              sx={{ flex: 1, fontSize: '0.875rem', fontWeight: 500 }}
             />
+            <IconButton size="small" onClick={runSearch} sx={{ bgcolor: colors.brand, color: '#fff', '&:hover': { bgcolor: colors.brandHover } }}>
+              <SearchIcon sx={{ fontSize: 18 }} />
+            </IconButton>
           </Paper>
-        )}
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+            <CurrencyCountryMenu />
+            {!isMobile && onRequestProperty && (
+              <Button
+                variant="contained"
+                size="small"
+                onClick={onRequestProperty}
+                sx={{
+                  bgcolor: colors.brand,
+                  fontWeight: 700,
+                  borderRadius: `${layout.radius.md}px`,
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                  '&:hover': { bgcolor: colors.brandHover, boxShadow: 'none' },
+                }}
+              >
+                Request home
+              </Button>
+            )}
+            <PublicMoreMenu onRequestProperty={isMobile ? onRequestProperty : undefined} />
+          </Box>
+        </Toolbar>
       </Container>
     </AppBar>
   );

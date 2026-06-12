@@ -5,20 +5,11 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
   CircularProgress,
-  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -34,7 +25,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  LinearProgress
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -62,6 +52,9 @@ import { fetchProperties } from '../../store/slices/propertySlice';
 import { showSuccess, showError, showConfirm, showLoading, showWarning, closeAlert } from '../../utils/sweetAlert';
 import adminAPI from '../../services/api/adminAPI';
 import { propertyAPI } from '../../services/api/propertyAPI';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminPropertyOwners = () => {
   const dispatch = useDispatch();
@@ -349,13 +342,119 @@ const AdminPropertyOwners = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const ownerColumns = [
+    {
+      id: 'name',
+      label: 'Owner',
+      getSearchValue: (row) => row.name,
+      render: (owner) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2 }}>{owner.name.charAt(0)}</Avatar>
+          <Box>
+            <Typography variant="subtitle2">{owner.name}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Joined: {new Date(owner.joinDate).toLocaleDateString()}
+            </Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'contact',
+      label: 'Contact',
+      getSearchValue: (row) => `${row.email} ${row.phone}`,
+      render: (owner) => (
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+            <EmailIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="body2">{owner.email}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <PhoneIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="body2">{owner.phone}</Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      getSearchValue: (row) => row.location,
+      render: (owner) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <LocationIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
+          <Typography variant="body2">{owner.location}</Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'totalProperties',
+      label: 'Properties',
+      render: (owner) => (
+        <Typography variant="body2" fontWeight="bold">{owner.totalProperties}</Typography>
+      ),
+    },
+    {
+      id: 'units',
+      label: 'Units',
+      render: (owner) => (
+        <Box>
+          <Typography variant="body2">
+            <strong>{owner.occupiedUnits}</strong> / {owner.totalUnits}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {owner.totalUnits ? `${Math.round((owner.occupiedUnits / owner.totalUnits) * 100)}% occupied` : '—'}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'totalTenants',
+      label: 'Tenants',
+      render: (owner) => (
+        <Typography variant="body2" fontWeight="bold">{owner.totalTenants}</Typography>
+      ),
+    },
+    {
+      id: 'monthlyRevenue',
+      label: 'Monthly Revenue',
+      render: (owner) => (
+        <Typography variant="body2" fontWeight="bold" color="success.main">
+          ${owner.monthlyRevenue.toLocaleString()}
+        </Typography>
+      ),
+    },
+    {
+      id: 'growthRate',
+      label: 'Growth',
+      render: (owner) => (
+        <Chip
+          label={`+${owner.growthRate}%`}
+          color={owner.growthRate > 10 ? 'success' : 'default'}
+          size="small"
+        />
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (owner) => <OwnerStatusChip status={owner.status} />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (owner) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleViewOwner(owner) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Owner', onClick: () => handleEditOwner(owner) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Owner', onClick: () => handleDeleteOwner(owner) },
+          ]}
+        />
+      ),
+    },
+  ];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -422,146 +521,17 @@ const AdminPropertyOwners = () => {
         </Grid>
       </Grid>
 
-      {/* Property Owners Table */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Property Owners Overview
-          </Typography>
-          
-          {loading && <LinearProgress sx={{ mb: 2 }} />}
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Owner</TableCell>
-                  <TableCell>Contact</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell>Properties</TableCell>
-                  <TableCell>Units</TableCell>
-                  <TableCell>Tenants</TableCell>
-                  <TableCell>Monthly Revenue</TableCell>
-                  <TableCell>Growth</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
-                        <CircularProgress />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ) : propertyOwners.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Box sx={{ py: 3 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          No property owners found.
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ) : propertyOwners.map((owner) => (
-                  <TableRow key={owner.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2 }}>{owner.name.charAt(0)}</Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{owner.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Joined: {new Date(owner.joinDate).toLocaleDateString()}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                          <EmailIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{owner.email}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <PhoneIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{owner.phone}</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <LocationIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2">{owner.location}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold">
-                        {owner.totalProperties}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          <strong>{owner.occupiedUnits}</strong> / {owner.totalUnits}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {Math.round((owner.occupiedUnits / owner.totalUnits) * 100)}% occupied
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold">
-                        {owner.totalTenants}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        ${owner.monthlyRevenue.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={`+${owner.growthRate}%`} 
-                        color={owner.growthRate > 10 ? "success" : "default"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={owner.status} 
-                        color={owner.status === 'active' ? "success" : "default"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton size="small" onClick={() => handleViewOwner(owner)}>
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Owner">
-                          <IconButton size="small" onClick={() => handleEditOwner(owner)}>
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Owner">
-                          <IconButton size="small" color="error" onClick={() => handleDeleteOwner(owner)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={ownerColumns}
+        rows={propertyOwners}
+        loading={loading}
+        title="Property Owners Overview"
+        subtitle="Owners, properties, and revenue metrics"
+        emptyTitle="No property owners found"
+        emptyDescription="Property owners will appear here once they register and add properties."
+        emptyIcon={BusinessIcon}
+        searchPlaceholder="Search by name, email, or location…"
+      />
 
 
       {/* View Owner Dialog */}

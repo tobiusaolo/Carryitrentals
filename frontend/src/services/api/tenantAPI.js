@@ -23,14 +23,12 @@ export const tenantAPI = {
   deleteTenant: (tenantId) => 
     api.delete(`/tenants/${tenantId}`),
   
-  updateTenantPaymentStatus: (tenantId, status, paymentDate = null) => {
-    const params = new URLSearchParams();
-    params.append('status', status);
-    if (paymentDate) {
-      params.append('payment_date', paymentDate);
-    }
-    return api.patch(`/tenants/${tenantId}/payment-status?${params.toString()}`);
-  },
+  updateTenantPaymentStatus: (tenantId, status, paymentDate = null, amount = null) =>
+    api.patch(`/tenants/${tenantId}/update-payment-status`, {
+      payment_status: status,
+      last_payment_date: paymentDate,
+      amount,
+    }),
   
   moveOutTenant: (tenantId, moveOutDate) => 
     api.patch(`/tenants/${tenantId}/move-out`, { move_out_date: moveOutDate }),
@@ -60,4 +58,10 @@ export const tenantAPI = {
   
   searchTenants: (query, skip = 0, limit = 100) => 
     api.get(`/tenants/search/${query}?skip=${skip}&limit=${limit}`),
+
+  getChatMessages: (tenantId) =>
+    api.get(`/tenants/${tenantId}/chat`),
+
+  sendChatMessage: (tenantId, message) =>
+    api.post(`/tenants/${tenantId}/chat`, { message }),
 };

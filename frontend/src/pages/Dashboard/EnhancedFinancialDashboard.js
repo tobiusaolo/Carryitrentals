@@ -7,20 +7,12 @@ import {
   Paper,
   CircularProgress,
   Alert,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   LinearProgress,
   Divider,
   Container,
-  Avatar
 } from '@mui/material';
 import {
   TrendingUp,
@@ -35,25 +27,36 @@ import {
   Visibility as ViewIcon,
   Payment as PaymentIcon
 } from '@mui/icons-material';
-import api from '../../services/api/api';
+import { useCachedQuery } from '../../hooks/useCachedQuery';
 import CriticalAlerts from '../../components/UI/CriticalAlerts';
 import EnhancedStatCard from '../../components/UI/EnhancedStatCard';
 import StatusBadge from '../../components/UI/StatusBadge';
 import QuickActionButton from '../../components/UI/QuickActionButton';
+import DataTable from '../../components/UI/DataTable';
 import { DashboardSkeleton } from '../../components/UI/LoadingSkeleton';
 import { useNavigate } from 'react-router-dom';
+import { formatMoney } from '../../utils/formatMoney';
+import { colors, getOwnerStatColor } from '../../theme/designTokens';
+import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
 
 const EnhancedFinancialDashboard = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
-  const [financialData, setFinancialData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    data: financialData,
+    loading,
+    error,
+    refresh: loadFinancialData,
+  } = useCachedQuery('/analytics/owner-financial-summary');
+
   const [criticalAlerts, setCriticalAlerts] = useState([]);
 
-  useEffect(() => {
-    loadFinancialData();
-  }, []);
+  useRegisterPageMeta({
+    title: 'Dashboard',
+    subtitle: user?.first_name
+      ? `Welcome, ${user.first_name}${financialData?.current_month ? ` · ${financialData.current_month}` : ''}`
+      : "What's happening with your properties today.",
+  });
 
   useEffect(() => {
     if (financialData && financialData.overall) {
@@ -63,19 +66,31 @@ const EnhancedFinancialDashboard = () => {
 
   const generateCriticalAlerts = () => {
     const alerts = [];
-    const { overall } = financialData;
+    const { overall, income_streams: streams } = financialData;
+    const currency = streams?.display_currency || 'UGX';
+
+    if (streams?.viewing_fees?.pending_bookings > 0) {
+      alerts.push({
+        type: 'pending',
+        title: `${streams.viewing_fees.pending_bookings} Viewing request${streams.viewing_fees.pending_bookings !== 1 ? 's' : ''}`,
+        message: 'Guests booked a tour on your rental listings — review and confirm after payment.',
+        actions: [
+          { label: 'View bookings', key: 'view_viewings', icon: <ViewIcon /> },
+        ],
+      });
+    }
 
     if (overall.tenants_unpaid > 0 && overall.remaining_to_collect > 0) {
       alerts.push({
         type: 'overdue',
         title: `${overall.tenants_unpaid} Unpaid Payments`,
-        message: `${overall.tenants_unpaid} tenants haven't paid this month yet.`,
+        message: `${overall.tenants_unpaid} tenant${overall.tenants_unpaid !== 1 ? 's have' : ' has'} rent due (move-in and due dates respected).`,
         amount: overall.remaining_to_collect,
         count: overall.tenants_unpaid,
         actions: [
           { label: 'Remind All', key: 'send_reminder', icon: <SendIcon /> },
-          { label: 'Review', key: 'view_details', icon: <ViewIcon /> }
-        ]
+          { label: 'Review', key: 'view_details', icon: <ViewIcon /> },
+        ],
       });
     }
 
@@ -84,62 +99,34 @@ const EnhancedFinancialDashboard = () => {
 
   const handleAlertAction = (alertType, actionKey) => {
     switch (actionKey) {
-      case 'send_reminder': navigate('/communications'); break;
-      case 'view_details': case 'view_payments': navigate('/payments'); break;
-      case 'view_units': navigate('/units'); break;
-      default: break;
+      case 'send_reminder':
+        navigate('/owner/communications');
+        break;
+      case 'view_details':
+      case 'view_payments':
+        navigate('/owner/payments');
+        break;
+      case 'view_viewings':
+        navigate('/owner/viewings');
+        break;
+      case 'view_units':
+        navigate('/owner/units');
+        break;
+      default:
+        break;
     }
   };
 
-  const loadFinancialData = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/analytics/owner-financial-summary');
-      setFinancialData(response.data);
-      setError(null);
-    } catch (err) {
-      console.error('Error loading financial data:', err);
-      setError('Failed to load dashboard data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <Container sx={{ mt: 4 }}><DashboardSkeleton /></Container>;
+  if (loading && !financialData) return <Container sx={{ mt: 4 }}><DashboardSkeleton /></Container>;
   if (error) return <Container sx={{ mt: 4 }}><Alert severity="error">{error}</Alert></Container>;
   if (!financialData || !financialData.overall) return <Container sx={{ mt: 4 }}><Alert severity="info">No dashboard data available</Alert></Container>;
 
-  const { overall, properties, current_month } = financialData;
+  const { overall, properties, current_month, income_streams: streams } = financialData;
+  const currency = streams?.display_currency || 'UGX';
 
   return (
     <Box sx={{ pb: 8 }}>
-      {/* Premium Header */}
-      <Box sx={{ bgcolor: 'white', borderBottom: '1px solid #EEE', pt: 6, pb: 4, mb: 4 }}>
-        <Container maxWidth="xl">
-          <Grid container alignItems="center" justifyContent="space-between">
-            <Grid item>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: '#222', mb: 1 }}>
-                Welcome, {user?.first_name}!
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip label={current_month} size="small" sx={{ fontWeight: 700, bgcolor: '#F7F7F7', border: '1px solid #DDD' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Here's what's happening with your properties today.
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item>
-              <Avatar 
-                sx={{ width: 56, height: 56, bgcolor: '#667eea', fontWeight: 800, fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(102,126,234,0.3)' }}
-              >
-                {user?.first_name?.[0]}{user?.last_name?.[0]}
-              </Avatar>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
-
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ pt: 3 }}>
         {/* Critical Alerts */}
         {criticalAlerts.length > 0 && (
           <Box sx={{ mb: 4 }}>
@@ -147,37 +134,92 @@ const EnhancedFinancialDashboard = () => {
           </Box>
         )}
 
-        {/* Financial Highlights */}
-        <Typography variant="h6" sx={{ fontWeight: 800, color: '#222', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AttachMoney sx={{ color: '#667eea' }} /> Financial Highlights
+        {streams && (
+          <>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AttachMoney sx={{ color: colors.brand }} /> Income this month (all sources)
+            </Typography>
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <EnhancedStatCard
+                  title="Tenant rent collected"
+                  value={formatMoney(streams.rent?.amount, streams.rent?.currency || currency)}
+                  subtitle={streams.rent?.label}
+                  icon={<AttachMoney />}
+                  color={getOwnerStatColor(0)}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <EnhancedStatCard
+                  title="Viewing fees"
+                  value={formatMoney(streams.viewing_fees?.amount, streams.viewing_fees?.currency || currency)}
+                  subtitle={
+                    streams.viewing_fees?.pending_bookings
+                      ? `${streams.viewing_fees.pending_bookings} pending booking(s)`
+                      : 'Paid upfront (60%)'
+                  }
+                  icon={<PaymentIcon />}
+                  color={getOwnerStatColor(1)}
+                  onClick={() => navigate('/owner/viewing-payments')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <EnhancedStatCard
+                  title="Short stays"
+                  value={formatMoney(streams.airbnb?.amount, streams.airbnb?.currency || currency)}
+                  subtitle={
+                    streams.airbnb?.confirmed_count
+                      ? `${streams.airbnb.confirmed_count} confirmed booking(s)`
+                      : 'Airbnb / short stays'
+                  }
+                  icon={<Home />}
+                  color={getOwnerStatColor(2)}
+                  onClick={() => navigate('/owner/airbnb')}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <EnhancedStatCard
+                  title="Estimated total"
+                  value={formatMoney(streams.total_estimated?.amount, streams.total_estimated?.currency || currency)}
+                  subtitle={streams.total_estimated?.note || 'Combined estimate'}
+                  icon={<TrendingUp />}
+                  color={getOwnerStatColor(0)}
+                />
+              </Grid>
+            </Grid>
+          </>
+        )}
+
+        <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AttachMoney sx={{ color: colors.brand }} /> Tenant rent (properties)
         </Typography>
         <Grid container spacing={3} sx={{ mb: 6 }}>
           <Grid item xs={12} md={3}>
             <EnhancedStatCard
               title="Expected Revenue"
-              value={`$${overall.expected_monthly_revenue.toLocaleString()}`}
+              value={formatMoney(overall.expected_monthly_revenue, currency)}
               subtitle="Current billing cycle"
               icon={<AttachMoney />}
-              color="#667eea"
+              color={getOwnerStatColor(0)}
             />
           </Grid>
           <Grid item xs={12} md={3}>
             <EnhancedStatCard
               title="Collected"
-              value={`$${overall.current_month_collected.toLocaleString()}`}
+              value={formatMoney(overall.current_month_collected, currency)}
               subtitle="Payments confirmed"
               icon={<CheckCircle />}
-              color="#10b981"
+              color={getOwnerStatColor(1)}
               progress={(overall.current_month_collected / overall.expected_monthly_revenue) * 100}
             />
           </Grid>
           <Grid item xs={12} md={3}>
             <EnhancedStatCard
               title="Outstanding"
-              value={`$${overall.remaining_to_collect.toLocaleString()}`}
+              value={formatMoney(overall.remaining_to_collect, currency)}
               subtitle="Pending collection"
               icon={<TrendingUp />}
-              color="#f59e0b"
+              color={getOwnerStatColor(2)}
             />
           </Grid>
           <Grid item xs={12} md={3}>
@@ -186,7 +228,7 @@ const EnhancedFinancialDashboard = () => {
               value={`${overall.collection_rate.toFixed(1)}%`}
               subtitle="Performance target: 95%"
               icon={<TrendingUp />}
-              color="#8b5cf6"
+              color={getOwnerStatColor(0)}
               progress={overall.collection_rate}
             />
           </Grid>
@@ -275,7 +317,7 @@ const EnhancedFinancialDashboard = () => {
                 </Box>
                 <Box sx={{ textAlign: 'right', mr: 2 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#667eea' }}>
-                    ${property.current_month_collected.toLocaleString()}
+                    {formatMoney(property.current_month_collected, currency)}
                   </Typography>
                 </Box>
               </Box>
@@ -287,11 +329,15 @@ const EnhancedFinancialDashboard = () => {
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2 }}>Collection Progress</Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2" color="text.secondary">Collected</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#10b981' }}>${property.current_month_collected.toLocaleString()}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#10b981' }}>
+                        {formatMoney(property.current_month_collected, currency)}
+                      </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                       <Typography variant="body2" color="text.secondary">Remaining</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#ef4444' }}>${property.remaining_to_collect.toLocaleString()}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#ef4444' }}>
+                        {formatMoney(property.remaining_to_collect, currency)}
+                      </Typography>
                     </Box>
                     <LinearProgress 
                       variant="determinate" 
@@ -305,43 +351,49 @@ const EnhancedFinancialDashboard = () => {
                   <Grid item xs={12} md={8}>
                     <Paper elevation={0} sx={{ p: 3, borderRadius: '16px', border: '1px solid #EEE' }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 2, color: '#ef4444' }}>Unpaid Tenants</Typography>
-                      <TableContainer>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell sx={{ fontWeight: 700 }}>Tenant</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 700 }}>Remaining</TableCell>
-                              <TableCell align="center" sx={{ fontWeight: 700 }}>Actions</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {property.tenants_unpaid_list.map((tenant) => (
-                              <TableRow key={tenant.id}>
-                                <TableCell sx={{ fontWeight: 600 }}>{tenant.name}</TableCell>
-                                <TableCell align="right" sx={{ color: '#ef4444', fontWeight: 700 }}>
-                                  ${tenant.remaining.toLocaleString()}
-                                </TableCell>
-                                <TableCell align="center">
-                                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                                    <QuickActionButton 
-                                      icon={<SendIcon sx={{ fontSize: 18 }} />} 
-                                      tooltip="Remind" 
-                                      onClick={() => navigate('/communications')}
-                                      color="primary"
-                                    />
-                                    <QuickActionButton 
-                                      icon={<PaymentIcon sx={{ fontSize: 18 }} />} 
-                                      tooltip="Record" 
-                                      onClick={() => navigate('/payments')}
-                                      color="success"
-                                    />
-                                  </Box>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
+                    <DataTable
+                      title="Unpaid tenants"
+                      dense
+                      maxHeight={320}
+                      stickyHeader={false}
+                      columns={[
+                        { id: 'name', label: 'Tenant', render: (tenant) => tenant.name },
+                        {
+                          id: 'remaining',
+                          label: 'Remaining',
+                          align: 'right',
+                          render: (tenant) => (
+                            <Typography component="span" sx={{ fontWeight: 700, color: colors.text }}>
+                              {formatMoney(tenant.remaining, currency)}
+                            </Typography>
+                          ),
+                        },
+                        {
+                          id: 'actions',
+                          label: 'Actions',
+                          align: 'center',
+                          render: () => (
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                              <QuickActionButton
+                                icon={<SendIcon sx={{ fontSize: 18 }} />}
+                                tooltip="Remind"
+                                onClick={() => navigate('/owner/communications')}
+                                color="primary"
+                              />
+                              <QuickActionButton
+                                icon={<PaymentIcon sx={{ fontSize: 18 }} />}
+                                tooltip="Record"
+                                onClick={() => navigate('/owner/payments')}
+                                color="primary"
+                              />
+                            </Box>
+                          ),
+                        },
+                      ]}
+                      rows={property.tenants_unpaid_list}
+                      pageSize={5}
+                      pageSizeOptions={[5, 10]}
+                    />
                     </Paper>
                   </Grid>
                 )}

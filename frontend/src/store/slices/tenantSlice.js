@@ -1,16 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { tenantAPI } from '../../services/api/tenantAPI';
+import { shouldSkipPortalFetch } from '../../utils/reduxCache';
+
+function splitRefreshArg(arg) {
+  const payload = arg && typeof arg === 'object' ? { ...arg } : {};
+  const forceRefresh = payload.__refresh === true;
+  delete payload.__refresh;
+  return { filters: payload, forceRefresh };
+}
 
 // Tenant async thunks
 export const fetchTenants = createAsyncThunk(
   'tenants/fetchTenants',
-  async (filters = {}, { rejectWithValue }) => {
+  async (arg = {}, { rejectWithValue }) => {
+    const { filters } = splitRefreshArg(arg);
     try {
       const response = await tenantAPI.getAllTenants(filters);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch tenants');
     }
+  },
+  {
+    condition: (arg, { getState }) => {
+      const { forceRefresh } = splitRefreshArg(arg);
+      return !shouldSkipPortalFetch(getState().tenants.lastFetchedAt, forceRefresh);
+    },
   }
 );
 
@@ -64,9 +79,9 @@ export const deleteTenant = createAsyncThunk(
 
 export const updateTenantPaymentStatus = createAsyncThunk(
   'tenants/updateTenantPaymentStatus',
-  async ({ tenantId, status, paymentDate }, { rejectWithValue }) => {
+  async ({ tenantId, status, paymentDate, amount }, { rejectWithValue }) => {
     try {
-      const response = await tenantAPI.updateTenantPaymentStatus(tenantId, status, paymentDate);
+      const response = await tenantAPI.updateTenantPaymentStatus(tenantId, status, paymentDate, amount);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to update payment status');
@@ -143,6 +158,7 @@ const tenantSlice = createSlice({
     paymentStatus: [],
     isLoading: false,
     error: null,
+    lastFetchedAt: null,
   },
   reducers: {
     clearError: (state) => {
@@ -162,6 +178,7 @@ const tenantSlice = createSlice({
       .addCase(fetchTenants.fulfilled, (state, action) => {
         state.isLoading = false;
         state.tenants = action.payload;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(fetchTenants.rejected, (state, action) => {
         state.isLoading = false;

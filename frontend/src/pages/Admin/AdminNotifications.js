@@ -1,23 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Grid,
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -27,15 +18,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
   Switch,
   FormControlLabel,
-  Badge
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -62,6 +46,9 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import notificationAPI from '../../services/api/notificationAPI';
 import authService from '../../services/authService';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminNotifications = () => {
   const dispatch = useDispatch();
@@ -70,8 +57,6 @@ const AdminNotifications = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [filteredNotifications, setFilteredNotifications] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [openDialog, setOpenDialog] = useState(false);
@@ -91,9 +76,18 @@ const AdminNotifications = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    filterNotifications();
-  }, [notifications, searchTerm, typeFilter, statusFilter]);
+  const filteredNotifications = useMemo(() => {
+    let filtered = [...notifications];
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((n) => n.notification_type === typeFilter);
+    }
+    if (statusFilter === 'read') {
+      filtered = filtered.filter((n) => n.is_read === true);
+    } else if (statusFilter === 'unread') {
+      filtered = filtered.filter((n) => n.is_read === false);
+    }
+    return filtered;
+  }, [notifications, typeFilter, statusFilter]);
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -108,34 +102,6 @@ const AdminNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterNotifications = () => {
-    let filtered = [...notifications];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(notification => 
-        notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        notification.message.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Type filter
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(notification => notification.notification_type === typeFilter);
-    }
-
-    // Status filter (is_read)
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'read') {
-        filtered = filtered.filter(notification => notification.is_read === true);
-      } else if (statusFilter === 'unread') {
-        filtered = filtered.filter(notification => notification.is_read === false);
-      }
-    }
-
-    setFilteredNotifications(filtered);
   };
 
   const handleView = async (notification) => {
@@ -285,24 +251,84 @@ const AdminNotifications = () => {
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'error';
-      case 'medium': return 'warning';
-      case 'low': return 'info';
-      default: return 'default';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'sent': return 'success';
-      case 'scheduled': return 'info';
-      case 'failed': return 'error';
-      case 'draft': return 'default';
-      default: return 'default';
-    }
-  };
+  const notificationColumns = [
+    {
+      id: 'title',
+      label: 'Notification',
+      getSearchValue: (row) => `${row.title || ''} ${row.message || ''}`,
+      render: (notification) => (
+        <Box>
+          <Typography variant="subtitle2" fontWeight="bold">
+            {notification.title || 'No Title'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {notification.message && notification.message.length > 100
+              ? `${notification.message.substring(0, 100)}...`
+              : notification.message || 'No message'}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'notification_type',
+      label: 'Type',
+      render: (notification) => (
+        <Chip
+          icon={getTypeIcon(notification.notification_type)}
+          label={notification.notification_type || 'info'}
+          color={getTypeColor(notification.notification_type)}
+          size="small"
+        />
+      ),
+    },
+    {
+      id: 'is_read',
+      label: 'Read Status',
+      render: (notification) => (
+        <OwnerStatusChip
+          status={notification.is_read ? 'completed' : 'pending'}
+          label={notification.is_read ? 'Read' : 'Unread'}
+        />
+      ),
+    },
+    {
+      id: 'user_id',
+      label: 'User ID',
+      getSearchValue: (row) => String(row.user_id || ''),
+      render: (notification) => (
+        <Typography variant="body2">{notification.user_id || 'N/A'}</Typography>
+      ),
+    },
+    {
+      id: 'created_at',
+      label: 'Created',
+      render: (notification) => (
+        <Typography variant="caption" color="text.secondary">
+          {notification.created_at ? new Date(notification.created_at).toLocaleString() : 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (notification) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleView(notification) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Notification', onClick: () => handleOpenDialog(notification) },
+            {
+              icon: <MarkAsReadIcon fontSize="small" />,
+              label: 'Mark as Read',
+              onClick: () => markAsRead(notification.id),
+              hidden: notification.is_read,
+            },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Notification', onClick: () => handleDelete(notification.id) },
+          ]}
+        />
+      ),
+    },
+  ];
 
   if (user?.role !== 'admin') {
     return (
@@ -402,171 +428,47 @@ const AdminNotifications = () => {
         </Grid>
       </Grid>
 
-      {/* Filters and Actions */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={4}>
-              <TextField
-                fullWidth
-                placeholder="Search notifications..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Type</InputLabel>
-                <Select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Types</MenuItem>
-                  <MenuItem value="info">Info</MenuItem>
-                  <MenuItem value="success">Success</MenuItem>
-                  <MenuItem value="warning">Warning</MenuItem>
-                  <MenuItem value="error">Error</MenuItem>
-                  <MenuItem value="payment_due">Payment Due</MenuItem>
-                  <MenuItem value="maintenance">Maintenance</MenuItem>
-                  <MenuItem value="lease_expiry">Lease Expiry</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Status</MenuItem>
-                  <MenuItem value="read">Read</MenuItem>
-                  <MenuItem value="unread">Unread</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpenDialog()}
-                >
-                  Create Notification
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Notifications Table */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Notifications ({filteredNotifications.length} results)
-          </Typography>
-          
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : filteredNotifications.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No notifications found
-              </Typography>
-            </Box>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Notification</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Read Status</TableCell>
-                    <TableCell>User ID</TableCell>
-                    <TableCell>Created</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredNotifications.map((notification) => (
-                    <TableRow key={notification.id}>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {notification.title || 'No Title'}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {notification.message && notification.message.length > 100 
-                              ? notification.message.substring(0, 100) + '...' 
-                              : notification.message || 'No message'}
-                          </Typography>
-                          {notification.created_at && (
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                              Created: {new Date(notification.created_at).toLocaleString()}
-                            </Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          icon={getTypeIcon(notification.notification_type)}
-                          label={notification.notification_type || 'info'} 
-                          color={getTypeColor(notification.notification_type)}
-                          size="small" 
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={notification.is_read ? 'Read' : 'Unread'} 
-                          color={notification.is_read ? 'success' : 'warning'}
-                          size="small" 
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {notification.user_id || 'N/A'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {notification.created_at ? new Date(notification.created_at).toLocaleString() : 'N/A'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip title="View Details">
-                          <IconButton size="small" onClick={() => handleView(notification)}>
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Notification">
-                          <IconButton size="small" onClick={() => handleOpenDialog(notification)}>
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {!notification.is_read && (
-                          <Tooltip title="Mark as Read">
-                            <IconButton size="small" onClick={() => markAsRead(notification.id)}>
-                              <MarkAsReadIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="Delete Notification">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(notification.id)}>
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={notificationColumns}
+        rows={filteredNotifications}
+        loading={loading}
+        title="Notifications"
+        subtitle={`${filteredNotifications.length} shown · ${notifications.length} total`}
+        emptyTitle="No notifications found"
+        emptyDescription="Create a notification to alert users across the platform."
+        emptyIcon={NotificationsIcon}
+        emptyActionLabel="Create Notification"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by title or message…"
+        toolbar={
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Type</InputLabel>
+              <Select value={typeFilter} label="Type" onChange={(e) => setTypeFilter(e.target.value)}>
+                <MenuItem value="all">All Types</MenuItem>
+                <MenuItem value="info">Info</MenuItem>
+                <MenuItem value="success">Success</MenuItem>
+                <MenuItem value="warning">Warning</MenuItem>
+                <MenuItem value="error">Error</MenuItem>
+                <MenuItem value="payment_due">Payment Due</MenuItem>
+                <MenuItem value="maintenance">Maintenance</MenuItem>
+                <MenuItem value="lease_expiry">Lease Expiry</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Status</InputLabel>
+              <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
+                <MenuItem value="all">All Status</MenuItem>
+                <MenuItem value="read">Read</MenuItem>
+                <MenuItem value="unread">Unread</MenuItem>
+              </Select>
+            </FormControl>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+              Create Notification
+            </Button>
+          </Box>
+        }
+      />
 
       {/* Add/Edit Notification Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

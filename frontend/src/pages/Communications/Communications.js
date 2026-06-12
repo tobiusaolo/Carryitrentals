@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -7,8 +8,6 @@ import {
   Tab,
   Button,
   Grid,
-  Card,
-  CardContent,
   TextField,
   Select,
   MenuItem,
@@ -18,60 +17,61 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
   Alert,
-  Snackbar,
   CircularProgress,
   Radio,
   RadioGroup,
   FormControlLabel,
-  FormLabel,
   Checkbox,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  alpha,
 } from '@mui/material';
 import {
   Send as SendIcon,
   Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
-  Email as EmailIcon,
   Sms as SmsIcon,
   People as PeopleIcon,
   Message as MessageIcon,
-  ExpandMore as ExpandMoreIcon,
-  FilterList as FilterListIcon
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import communicationsAPI from '../../services/api/communicationsAPI';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import api from '../../services/api/api';
-import EmptyState from '../../components/UI/EmptyState';
-import StatusBadge from '../../components/UI/StatusBadge';
-import { TableSkeleton } from '../../components/UI/LoadingSkeleton';
+import DataTable from '../../components/UI/DataTable';
+import PageHeader from '../../components/UI/PageHeader';
+import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
+import FormSection from '../../components/Forms/FormSection';
 import NotificationSystem from '../../components/UI/NotificationSystem';
+import {
+  colors,
+  layout,
+  ownerPrimaryButtonSx,
+  adminPrimaryButtonSx,
+  portalOutlinedButtonSx,
+} from '../../theme/designTokens';
 
 const TabPanel = ({ children, value, index }) => (
-  <div hidden={value !== index}>
-    {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+  <div hidden={value !== index} role="tabpanel">
+    {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
   </div>
 );
 
 const Communications = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
+  const primaryButtonSx = isAdmin ? adminPrimaryButtonSx : ownerPrimaryButtonSx;
+  const tabIndicatorColor = isAdmin ? colors.adminAccent : colors.brand;
+
   const [selectedTab, setSelectedTab] = useState(0);
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -80,35 +80,32 @@ const Communications = () => {
   const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
   const [openBulkMessageDialog, setOpenBulkMessageDialog] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  
-  // Tenant selection state
+
   const [allTenants, setAllTenants] = useState([]);
   const [selectedTenants, setSelectedTenants] = useState([]);
   const [filterProperty, setFilterProperty] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  
+
   const { properties } = useSelector((state) => state.properties);
-  
-  // Template form state
+
   const [templateForm, setTemplateForm] = useState({
     name: '',
     type: 'both',
     category: 'rent_reminder',
     subject: '',
     body: '',
-    variables: []
+    variables: [],
   });
-  
-  // Bulk message form state
+
   const [bulkMessageForm, setBulkMessageForm] = useState({
     recipient_type: 'all',
-    method: 'sms',  // Default to SMS only since email is not configured
+    method: 'sms',
     property_id: null,
     status_filter: null,
     template_id: null,
     custom_subject: '',
     custom_message: '',
-    custom_recipients: []
+    custom_recipients: [],
   });
 
   useEffect(() => {
@@ -125,10 +122,10 @@ const Communications = () => {
       setAllTenants(response.data);
     } catch (error) {
       console.error('Error loading tenants:', error);
-      setSnackbar({ 
-        open: true, 
-        message: 'Could not load tenants list', 
-        severity: 'warning' 
+      setSnackbar({
+        open: true,
+        message: 'Could not load tenants',
+        severity: 'warning',
       });
     }
   };
@@ -163,25 +160,23 @@ const Communications = () => {
   const handleSendBulkMessage = async () => {
     setLoading(true);
     try {
-      // If custom tenants selected, use them
       const messageData = {
         ...bulkMessageForm,
-        custom_recipients: selectedTenants.length > 0 ? selectedTenants : []
+        custom_recipients: selectedTenants.length > 0 ? selectedTenants : [],
       };
-      
+
       if (selectedTenants.length > 0) {
         messageData.recipient_type = 'custom';
       }
-      
+
       const result = await communicationsAPI.sendBulkMessage(messageData);
       setSnackbar({
         open: true,
-        message: `Message sent successfully to ${result.sent} recipients!`,
-        severity: 'success'
+        message: `Sent to ${result.sent} recipient${result.sent === 1 ? '' : 's'}`,
+        severity: 'success',
       });
       setOpenBulkMessageDialog(false);
       loadLogs();
-      // Reset form and selections
       setBulkMessageForm({
         recipient_type: 'all',
         method: 'sms',
@@ -190,7 +185,7 @@ const Communications = () => {
         template_id: null,
         custom_subject: '',
         custom_message: '',
-        custom_recipients: []
+        custom_recipients: [],
       });
       setSelectedTenants([]);
       setFilterProperty('');
@@ -198,8 +193,8 @@ const Communications = () => {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: `Error sending message: ${error.response?.data?.detail || error.message}`,
-        severity: 'error'
+        message: `Send failed: ${error.response?.data?.detail || error.message}`,
+        severity: 'error',
       });
     } finally {
       setLoading(false);
@@ -207,53 +202,46 @@ const Communications = () => {
   };
 
   const handleToggleTenant = (tenantId) => {
-    setSelectedTenants(prev => {
-      if (prev.includes(tenantId)) {
-        return prev.filter(id => id !== tenantId);
-      } else {
-        return [...prev, tenantId];
-      }
-    });
+    setSelectedTenants((prev) =>
+      prev.includes(tenantId) ? prev.filter((id) => id !== tenantId) : [...prev, tenantId]
+    );
   };
 
   const handleSelectAll = () => {
-    const filtered = getFilteredTenants();
-    setSelectedTenants(filtered.map(t => t.id));
+    setSelectedTenants(getFilteredTenants().map((t) => t.id));
   };
 
   const handleDeselectAll = () => {
     setSelectedTenants([]);
   };
 
-  const getFilteredTenants = () => {
-    return allTenants.filter(tenant => {
-      const matchesProperty = !filterProperty || tenant.property_id === parseInt(filterProperty);
+  const getFilteredTenants = () =>
+    allTenants.filter((tenant) => {
+      const matchesProperty = !filterProperty || tenant.property_id === parseInt(filterProperty, 10);
       const matchesStatus = !filterStatus || tenant.rent_payment_status === filterStatus;
       return matchesProperty && matchesStatus;
     });
-  };
 
   const handleSaveTemplate = async () => {
     setLoading(true);
     try {
       await communicationsAPI.createTemplate(templateForm);
-      setSnackbar({ open: true, message: 'Template created successfully!', severity: 'success' });
+      setSnackbar({ open: true, message: 'Template created', severity: 'success' });
       setOpenTemplateDialog(false);
       loadTemplates();
-      // Reset form
       setTemplateForm({
         name: '',
         type: 'both',
         category: 'rent_reminder',
         subject: '',
         body: '',
-        variables: []
+        variables: [],
       });
     } catch (error) {
       setSnackbar({
         open: true,
-        message: `Error saving template: ${error.response?.data?.detail || error.message}`,
-        severity: 'error'
+        message: `Save failed: ${error.response?.data?.detail || error.message}`,
+        severity: 'error',
       });
     } finally {
       setLoading(false);
@@ -264,657 +252,663 @@ const Communications = () => {
     setLoading(true);
     try {
       const result = await communicationsAPI.seedDefaultTemplates();
-      setSnackbar({ open: true, message: `Created ${result.count} default templates!`, severity: 'success' });
+      setSnackbar({ open: true, message: `${result.count} templates added`, severity: 'success' });
       loadTemplates();
     } catch (error) {
-      setSnackbar({ open: true, message: 'Error seeding templates', severity: 'error' });
+      setSnackbar({ open: true, message: 'Could not seed templates', severity: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteTemplate = async (templateId) => {
-    if (window.confirm('Are you sure you want to delete this template?')) {
+    if (window.confirm('Delete this template?')) {
       try {
         await communicationsAPI.deleteTemplate(templateId);
-        setSnackbar({ open: true, message: 'Template deleted successfully!', severity: 'success' });
+        setSnackbar({ open: true, message: 'Template deleted', severity: 'success' });
         loadTemplates();
       } catch (error) {
-        setSnackbar({ open: true, message: 'Error deleting template', severity: 'error' });
+        setSnackbar({ open: true, message: 'Delete failed', severity: 'error' });
       }
     }
   };
 
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom fontWeight="bold">
-            <MessageIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Communications Center
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Send bulk SMS messages, manage templates, and track communications
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} • {allTenants.length} tenant{allTenants.length === 1 ? '' : 's'} available
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<SendIcon />}
-          onClick={() => setOpenBulkMessageDialog(true)}
-          size="large"
-          disabled={allTenants.length === 0}
-        >
-          Send Bulk Message
-        </Button>
-      </Box>
+  const recipientPreview = () => {
+    if (selectedTenants.length > 0) {
+      return `${selectedTenants.length} selected`;
+    }
+    if (bulkMessageForm.recipient_type === 'all') {
+      return `${recipientGroups.all?.count || 0} tenants`;
+    }
+    if (bulkMessageForm.recipient_type === 'status' && bulkMessageForm.status_filter) {
+      return `${recipientGroups[bulkMessageForm.status_filter]?.count || 0} tenants`;
+    }
+    return 'Choose recipients';
+  };
+
+  const dialogPaperSx = {
+    borderRadius: `${layout.radius.lg}px`,
+  };
+
+  const content = (
+    <>
+      <PageHeader
+        variant={isAdmin ? 'admin' : 'owner'}
+        title="Messages"
+        action={
+          <Button
+            variant="contained"
+            startIcon={<SendIcon />}
+            onClick={() => setOpenBulkMessageDialog(true)}
+            disabled={allTenants.length === 0}
+            sx={primaryButtonSx}
+          >
+            Send SMS
+          </Button>
+        }
+      />
 
       {allTenants.length === 0 && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          No tenants found. Please add tenants in the Tenants section before sending messages.
+        <Alert severity="info" sx={{ mb: 2, borderRadius: `${layout.radius.sm}px` }}>
+          Add tenants before sending messages.
         </Alert>
       )}
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Total Templates
-                  </Typography>
-                  <Typography variant="h4">{templates.length}</Typography>
-                </Box>
-                <MessageIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard title="Templates" value={templates.length} icon={<MessageIcon />} variantIndex={0} />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Messages Sent
-                  </Typography>
-                  <Typography variant="h4">{logs.length}</Typography>
-                </Box>
-                <SendIcon sx={{ fontSize: 40, color: 'success.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard title="Sent" value={logs.length} icon={<SendIcon />} variantIndex={1} />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    All Recipients
-                  </Typography>
-                  <Typography variant="h4">{recipientGroups.all?.count || 0}</Typography>
-                </Box>
-                <PeopleIcon sx={{ fontSize: 40, color: 'info.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard
+            title="Recipients"
+            value={recipientGroups.all?.count || 0}
+            icon={<PeopleIcon />}
+            variantIndex={2}
+          />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2">
-                    Overdue Tenants
-                  </Typography>
-                  <Typography variant="h4">{recipientGroups.overdue?.count || 0}</Typography>
-                </Box>
-                <EmailIcon sx={{ fontSize: 40, color: 'warning.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard
+            title="Overdue"
+            value={recipientGroups.overdue?.count || 0}
+            icon={<SmsIcon />}
+            variantIndex={0}
+            subtitle="Quick-send target"
+          />
         </Grid>
       </Grid>
 
-      {/* Tabs */}
-      <Paper>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)}>
-            <Tab label="Message Templates" icon={<MessageIcon />} iconPosition="start" />
-            <Tab label="Communication Logs" icon={<SendIcon />} iconPosition="start" />
-          </Tabs>
-        </Box>
+      {(recipientGroups.overdue?.count || 0) > 0 && (
+        <Alert
+          severity="warning"
+          sx={{
+            mb: 2,
+            borderRadius: `${layout.radius.sm}px`,
+            border: `1px solid ${alpha(colors.warning, 0.25)}`,
+            bgcolor: alpha(colors.warning, 0.06),
+          }}
+          action={
+            <Button
+              size="small"
+              color="inherit"
+              sx={{ fontWeight: 600, textTransform: 'none' }}
+              onClick={() => {
+                setBulkMessageForm((f) => ({
+                  ...f,
+                  recipient_type: 'status',
+                  status_filter: 'overdue',
+                }));
+                setOpenBulkMessageDialog(true);
+              }}
+            >
+              Message overdue
+            </Button>
+          }
+        >
+          {recipientGroups.overdue.count} tenant{recipientGroups.overdue.count !== 1 ? 's' : ''} overdue on rent
+        </Alert>
+      )}
 
-        {/* Message Templates Tab */}
-        <TabPanel value={selectedTab} index={0}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Message Templates</Typography>
-            <Box>
-              <Button
-                variant="outlined"
-                onClick={handleSeedTemplates}
-                sx={{ mr: 1 }}
-                disabled={loading}
-              >
-                Seed Defaults
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenTemplateDialog(true)}
-              >
-                Create Template
-              </Button>
-            </Box>
+      <Tabs
+        value={selectedTab}
+        onChange={(_, v) => setSelectedTab(v)}
+        sx={{
+          minHeight: 44,
+          mb: 2,
+          borderBottom: `1px solid ${colors.border}`,
+          '& .MuiTab-root': {
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.8125rem',
+            minHeight: 44,
+            px: { xs: 1.5, sm: 2 },
+            color: colors.textMuted,
+            gap: 0.75,
+            '&.Mui-selected': { color: colors.text },
+          },
+          '& .MuiTabs-indicator': { bgcolor: tabIndicatorColor, height: 2 },
+        }}
+      >
+        <Tab icon={<MessageIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Templates (${templates.length})`} />
+        <Tab icon={<HistoryIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Log (${logs.length})`} />
+      </Tabs>
+
+      <TabPanel value={selectedTab} index={0}>
+        {templates.length === 0 && (
+          <Box
+            sx={{
+              mb: 2,
+              px: 2,
+              py: 1.25,
+              borderRadius: `${layout.radius.sm}px`,
+              bgcolor: colors.surfaceMuted,
+              border: `1px solid ${colors.border}`,
+            }}
+          >
+            <Typography variant="caption" sx={{ color: colors.textMuted }}>
+              Reusable SMS with {'{tenant_name}'}, {'{amount}'}, {'{due_date}'}. Seed defaults to get started.
+            </Typography>
           </Box>
-          
-          <Alert severity="info" sx={{ mb: 3 }}>
-            <Typography variant="body2" fontWeight="bold" gutterBottom>
-              📝 What are Message Templates?
-            </Typography>
-            <Typography variant="body2">
-              Templates are pre-written SMS messages that you can reuse to save time. When you send a message, you can:
-            </Typography>
-            <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-              <li><Typography variant="body2">Select a template to auto-fill the message</Typography></li>
-              <li><Typography variant="body2">Use variables like {'{tenant_name}'}, {'{amount}'}, {'{due_date}'} that automatically personalize for each tenant</Typography></li>
-              <li><Typography variant="body2">Create custom templates for common scenarios (rent reminders, payment confirmations, etc.)</Typography></li>
-            </ul>
-            <Typography variant="body2">
-              <strong>Click "Seed Defaults"</strong> to create ready-to-use templates for rent reminders, payment confirmations, and more!
-            </Typography>
-          </Alert>
-          
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Subject</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {templates.map((template) => (
-                  <TableRow key={template.id}>
-                    <TableCell>{template.name}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={template.type}
-                        size="small"
-                        color={template.type === 'email' ? 'primary' : template.type === 'sms' ? 'success' : 'info'}
-                      />
-                    </TableCell>
-                    <TableCell>{template.category}</TableCell>
-                    <TableCell>{template.subject || 'N/A'}</TableCell>
-                    <TableCell>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteTemplate(template.id)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {templates.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                      <EmptyState
-                        type="messages"
-                        title="No Message Templates"
-                        message="Create templates to save time when sending messages. Click 'Seed Defaults' to get started with pre-made templates."
-                        actionText="Seed Default Templates"
-                        onAction={handleSeedTemplates}
-                      />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TabPanel>
+        )}
 
-        {/* Communication Logs Tab */}
-        <TabPanel value={selectedTab} index={1}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Communication History</Typography>
-          
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Method</TableCell>
-                  <TableCell>Subject</TableCell>
-                  <TableCell>Recipients</TableCell>
-                  <TableCell>Sent</TableCell>
-                  <TableCell>Failed</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {logs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Chip label={log.method} size="small" />
-                    </TableCell>
-                    <TableCell>{log.subject || 'N/A'}</TableCell>
-                    <TableCell>{JSON.parse(log.recipient_ids || '[]').length}</TableCell>
-                    <TableCell>{log.sent_count || 0}</TableCell>
-                    <TableCell>{log.failed_count || 0}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={log.status}
-                        size="small"
-                        color={log.status === 'sent' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
+        <DataTable
+                title="Templates"
+                columns={[
+                  { id: 'name', label: 'Name', render: (t) => <Typography variant="body2" sx={{ fontWeight: 600 }}>{t.name}</Typography> },
+                  {
+                    id: 'type',
+                    label: 'Type',
+                    render: (t) => <OwnerStatusChip status={t.type} label={t.type} />,
+                  },
+                  {
+                    id: 'category',
+                    label: 'Category',
+                    render: (t) => (
+                      <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                        {t.category?.replace(/_/g, ' ')}
+                      </Typography>
+                    ),
+                  },
+                  {
+                    id: 'body',
+                    label: 'Preview',
+                    render: (t) => (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: colors.textMuted,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          maxWidth: 280,
+                        }}
+                      >
+                        {t.body}
+                      </Typography>
+                    ),
+                  },
+                  {
+                    id: 'actions',
+                    label: '',
+                    align: 'right',
+                    width: 56,
+                    render: (t) => (
+                      <TableActions
+                        actions={[
+                          {
+                            icon: <DeleteIcon fontSize="small" />,
+                            label: 'Delete',
+                            onClick: () => handleDeleteTemplate(t.id),
+                          },
+                        ]}
                       />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {logs.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      <EmptyState
-                        type="messages"
-                        title="No Messages Sent Yet"
-                        message="Your communication history will appear here once you start sending messages to tenants."
-                        actionText="Send First Message"
-                        onAction={() => setOpenBulkMessageDialog(true)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TabPanel>
-      </Paper>
+                    ),
+                  },
+                ]}
+                rows={templates}
+                loading={loading}
+                emptyTitle="No templates"
+                emptyDescription="Seed defaults or create your own."
+                emptyIcon={MessageIcon}
+                emptyActionLabel="Seed defaults"
+                onEmptyAction={handleSeedTemplates}
+                toolbar={
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Button variant="outlined" onClick={handleSeedTemplates} disabled={loading} sx={portalOutlinedButtonSx}>
+                      Seed defaults
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => setOpenTemplateDialog(true)}
+                      sx={primaryButtonSx}
+                    >
+                      New template
+                    </Button>
+                  </Box>
+                }
+        />
+      </TabPanel>
 
-      {/* Bulk Message Dialog */}
-      <Dialog open={openBulkMessageDialog} onClose={() => setOpenBulkMessageDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Send Bulk Message</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Grid container spacing={2}>
+      <TabPanel value={selectedTab} index={1}>
+        <DataTable
+              title="Message log"
+              columns={[
+                {
+                  id: 'date',
+                  label: 'Date',
+                  render: (log) =>
+                    new Date(log.created_at).toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }),
+                },
+                {
+                  id: 'method',
+                  label: 'Channel',
+                  render: (log) => <OwnerStatusChip status={log.method} label={log.method?.toUpperCase()} />,
+                },
+                {
+                  id: 'recipients',
+                  label: 'Recipients',
+                  render: (log) => JSON.parse(log.recipient_ids || '[]').length,
+                },
+                { id: 'sent', label: 'Sent', render: (log) => log.sent_count || 0 },
+                { id: 'failed', label: 'Failed', render: (log) => log.failed_count || 0 },
+                {
+                  id: 'status',
+                  label: 'Status',
+                  render: (log) => <OwnerStatusChip status={log.status} />,
+                },
+              ]}
+              rows={logs}
+              loading={loading}
+              emptyTitle="No messages yet"
+              emptyDescription="Sent SMS history appears here."
+              emptyIcon={SendIcon}
+              emptyActionLabel="Send SMS"
+              onEmptyAction={() => setOpenBulkMessageDialog(true)}
+        />
+      </TabPanel>
+
+      {/* Send SMS dialog */}
+      <Dialog
+        open={openBulkMessageDialog}
+        onClose={() => setOpenBulkMessageDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: dialogPaperSx }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Send SMS</DialogTitle>
+        <DialogContent dividers sx={{ borderColor: colors.border }}>
+          <Grid container spacing={2} sx={{ pt: 0.5 }}>
+            <Grid item xs={12}>
+              <FormSection title="Delivery" subtitle="SMS via Twilio" first>
+                <RadioGroup
+                  row
+                  value={bulkMessageForm.method}
+                  onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, method: e.target.value })}
+                >
+                  <FormControlLabel value="sms" control={<Radio size="small" />} label="SMS" />
+                  <FormControlLabel value="email" control={<Radio size="small" />} label="Email" disabled />
+                  <FormControlLabel value="both" control={<Radio size="small" />} label="Both" disabled />
+                </RadioGroup>
+              </FormSection>
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Recipients</InputLabel>
+                <Select
+                  value={bulkMessageForm.recipient_type}
+                  label="Recipients"
+                  onChange={(e) => {
+                    setBulkMessageForm({ ...bulkMessageForm, recipient_type: e.target.value });
+                    if (e.target.value !== 'custom') setSelectedTenants([]);
+                  }}
+                >
+                  <MenuItem value="all">All tenants ({recipientGroups.all?.count || 0})</MenuItem>
+                  <MenuItem value="status">By rent status</MenuItem>
+                  <MenuItem value="property">By property</MenuItem>
+                  <MenuItem value="custom">Pick individuals</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {bulkMessageForm.recipient_type === 'status' && (
               <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <FormLabel>Message Method</FormLabel>
-                  <RadioGroup
-                    row
-                    value={bulkMessageForm.method}
-                    onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, method: e.target.value })}
-                  >
-                    <FormControlLabel value="sms" control={<Radio />} label="SMS Only (Recommended)" />
-                    <FormControlLabel value="email" control={<Radio />} label="Email Only" disabled />
-                    <FormControlLabel value="both" control={<Radio />} label="Both" disabled />
-                  </RadioGroup>
-                </FormControl>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Email is currently not configured. SMS messages will be sent via Twilio.
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Recipients</InputLabel>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Rent status</InputLabel>
                   <Select
-                    value={bulkMessageForm.recipient_type}
-                    label="Recipients"
-                    onChange={(e) => {
-                      setBulkMessageForm({ ...bulkMessageForm, recipient_type: e.target.value });
-                      if (e.target.value !== 'custom') {
-                        setSelectedTenants([]);
-                      }
-                    }}
+                    value={bulkMessageForm.status_filter || ''}
+                    label="Rent status"
+                    onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, status_filter: e.target.value })}
                   >
-                    <MenuItem value="all">All Tenants ({recipientGroups.all?.count || 0})</MenuItem>
-                    <MenuItem value="status">By Payment Status</MenuItem>
-                    <MenuItem value="property">By Property</MenuItem>
-                    <MenuItem value="custom">Select Individual Tenants</MenuItem>
+                    <MenuItem value="paid">Paid ({recipientGroups.paid?.count || 0})</MenuItem>
+                    <MenuItem value="due">Due ({recipientGroups.due?.count || 0})</MenuItem>
+                    <MenuItem value="overdue">Overdue ({recipientGroups.overdue?.count || 0})</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
+            )}
 
-              {bulkMessageForm.recipient_type === 'status' && (
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Payment Status</InputLabel>
-                    <Select
-                      value={bulkMessageForm.status_filter || ''}
-                      label="Payment Status"
-                      onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, status_filter: e.target.value })}
-                    >
-                      <MenuItem value="paid">Paid ({recipientGroups.paid?.count || 0})</MenuItem>
-                      <MenuItem value="due">Due ({recipientGroups.due?.count || 0})</MenuItem>
-                      <MenuItem value="overdue">Overdue ({recipientGroups.overdue?.count || 0})</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              )}
-
-              {bulkMessageForm.recipient_type === 'property' && (
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Select Property</InputLabel>
-                    <Select
-                      value={bulkMessageForm.property_id || ''}
-                      label="Select Property"
-                      onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, property_id: e.target.value || null })}
-                      disabled={properties.length === 0}
-                    >
-                      <MenuItem value="">-- Select Property --</MenuItem>
-                      {properties.length === 0 && (
-                        <MenuItem disabled>No properties available</MenuItem>
-                      )}
-                      {properties.map((property) => (
-                        <MenuItem key={property.id} value={property.id}>
-                          {property.name} - {property.address}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  {properties.length === 0 && (
-                    <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                      No properties found. Please add properties first.
-                    </Typography>
-                  )}
-                </Grid>
-              )}
-
-              {bulkMessageForm.recipient_type === 'custom' && (
-                <Grid item xs={12}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        Select Tenants ({selectedTenants.length} selected)
-                      </Typography>
-                      <Box>
-                        <Button size="small" onClick={handleSelectAll} sx={{ mr: 1 }}>
-                          Select Filtered ({getFilteredTenants().length})
-                        </Button>
-                        <Button size="small" onClick={handleDeselectAll} color="error">
-                          Clear All
-                        </Button>
-                      </Box>
-                    </Box>
-                    
-                    {/* Filters */}
-                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                      <Grid item xs={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Filter by Property</InputLabel>
-                          <Select
-                            value={filterProperty}
-                            label="Filter by Property"
-                            onChange={(e) => setFilterProperty(e.target.value)}
-                          >
-                            <MenuItem value="">All Properties</MenuItem>
-                            {properties.map((property) => (
-                              <MenuItem key={property.id} value={property.id}>{property.name}</MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Filter by Status</InputLabel>
-                          <Select
-                            value={filterStatus}
-                            label="Filter by Status"
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                          >
-                            <MenuItem value="">All Statuses</MenuItem>
-                            <MenuItem value="paid">Paid</MenuItem>
-                            <MenuItem value="due">Due</MenuItem>
-                            <MenuItem value="overdue">Overdue</MenuItem>
-                            <MenuItem value="pending">Pending</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                    </Grid>
-                    
-                    {/* Tenant List */}
-                    <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                      <List dense>
-                        {getFilteredTenants().map((tenant, index) => (
-                          <React.Fragment key={tenant.id}>
-                            <ListItem
-                              button
-                              onClick={() => handleToggleTenant(tenant.id)}
-                              sx={{
-                                bgcolor: selectedTenants.includes(tenant.id) ? 'primary.50' : 'transparent',
-                                '&:hover': { bgcolor: 'action.hover' }
-                              }}
-                            >
-                              <ListItemIcon>
-                                <Checkbox
-                                  edge="start"
-                                  checked={selectedTenants.includes(tenant.id)}
-                                  tabIndex={-1}
-                                  disableRipple
-                                />
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={`${tenant.first_name} ${tenant.last_name}`}
-                                secondary={
-                                  <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <span>{tenant.phone || 'No phone'}</span>
-                                    {tenant.rent_payment_status && (
-                                      <Chip
-                                        label={tenant.rent_payment_status}
-                                        size="small"
-                                        color={
-                                          tenant.rent_payment_status === 'paid' ? 'success' :
-                                          tenant.rent_payment_status === 'overdue' ? 'error' : 'warning'
-                                        }
-                                      />
-                                    )}
-                                  </Box>
-                                }
-                              />
-                            </ListItem>
-                            {index < getFilteredTenants().length - 1 && <Divider />}
-                          </React.Fragment>
-                        ))}
-                        {getFilteredTenants().length === 0 && (
-                          <ListItem>
-                            <ListItemText
-                              primary="No tenants found"
-                              secondary="Try adjusting the filters"
-                            />
-                          </ListItem>
-                        )}
-                      </List>
-                    </Box>
-                  </Paper>
-                </Grid>
-              )}
-
+            {bulkMessageForm.recipient_type === 'property' && (
               <Grid item xs={12}>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                  Message Content
-                </Typography>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2" fontWeight="bold" gutterBottom>
-                    💡 What are Templates?
-                  </Typography>
-                  <Typography variant="caption">
-                    Templates are pre-written messages you can reuse. They save time and include variables like {'{tenant_name}'}, {'{amount}'}, {'{due_date}'} that auto-fill for each tenant.
-                  </Typography>
-                </Alert>
-                <FormControl fullWidth>
-                  <InputLabel>Use Template (Optional)</InputLabel>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Property</InputLabel>
                   <Select
-                    value={bulkMessageForm.template_id || ''}
-                    label="Use Template (Optional)"
-                    onChange={(e) => {
-                      const templateId = e.target.value || null;
-                      setBulkMessageForm({ ...bulkMessageForm, template_id: templateId });
-                      
-                      // Auto-fill message from template
-                      if (templateId) {
-                        const template = templates.find(t => t.id === templateId);
-                        if (template) {
-                          setBulkMessageForm({
-                            ...bulkMessageForm,
-                            template_id: templateId,
-                            custom_message: template.body,
-                            custom_subject: template.subject || ''
-                          });
-                        }
-                      }
-                    }}
+                    value={bulkMessageForm.property_id || ''}
+                    label="Property"
+                    onChange={(e) =>
+                      setBulkMessageForm({ ...bulkMessageForm, property_id: e.target.value || null })
+                    }
+                    disabled={properties.length === 0}
                   >
-                    <MenuItem value="">Write Custom Message</MenuItem>
-                    {templates.map((template) => (
-                      <MenuItem key={template.id} value={template.id}>
-                        {template.name} - {template.category}
+                    <MenuItem value="">Select property</MenuItem>
+                    {properties.map((property) => (
+                      <MenuItem key={property.id} value={property.id}>
+                        {property.name}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </Grid>
+            )}
 
+            {bulkMessageForm.recipient_type === 'custom' && (
               <Grid item xs={12}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    borderRadius: `${layout.radius.sm}px`,
+                    borderColor: colors.border,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.25,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      bgcolor: colors.surfaceMuted,
+                      borderBottom: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      {selectedTenants.length} selected
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Button size="small" onClick={handleSelectAll} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                        All ({getFilteredTenants().length})
+                      </Button>
+                      <Button size="small" onClick={handleDeselectAll} color="inherit" sx={{ textTransform: 'none' }}>
+                        Clear
+                      </Button>
+                    </Box>
+                  </Box>
+
+                  <Grid container spacing={1.5} sx={{ p: 2, pb: 1 }}>
+                    <Grid item xs={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Property</InputLabel>
+                        <Select
+                          value={filterProperty}
+                          label="Property"
+                          onChange={(e) => setFilterProperty(e.target.value)}
+                        >
+                          <MenuItem value="">All</MenuItem>
+                          {properties.map((property) => (
+                            <MenuItem key={property.id} value={property.id}>
+                              {property.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                          value={filterStatus}
+                          label="Status"
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                          <MenuItem value="">All</MenuItem>
+                          <MenuItem value="paid">Paid</MenuItem>
+                          <MenuItem value="due">Due</MenuItem>
+                          <MenuItem value="overdue">Overdue</MenuItem>
+                          <MenuItem value="pending">Pending</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+
+                  <Box sx={{ maxHeight: 260, overflow: 'auto' }}>
+                    <List dense disablePadding>
+                      {getFilteredTenants().map((tenant, index) => (
+                        <React.Fragment key={tenant.id}>
+                          <ListItemButton
+                            onClick={() => handleToggleTenant(tenant.id)}
+                            selected={selectedTenants.includes(tenant.id)}
+                            sx={{
+                              py: 0.75,
+                              '&.Mui-selected': { bgcolor: colors.brandSoft },
+                              '&.Mui-selected:hover': { bgcolor: alpha(colors.brand, 0.12) },
+                            }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 36 }}>
+                              <Checkbox
+                                edge="start"
+                                size="small"
+                                checked={selectedTenants.includes(tenant.id)}
+                                tabIndex={-1}
+                                disableRipple
+                              />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={`${tenant.first_name} ${tenant.last_name}`}
+                              secondary={tenant.phone || 'No phone'}
+                              primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                              secondaryTypographyProps={{ variant: 'caption' }}
+                            />
+                            {tenant.rent_payment_status && (
+                              <OwnerStatusChip status={tenant.rent_payment_status} />
+                            )}
+                          </ListItemButton>
+                          {index < getFilteredTenants().length - 1 && <Divider />}
+                        </React.Fragment>
+                      ))}
+                      {getFilteredTenants().length === 0 && (
+                        <Box sx={{ py: 3, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            No tenants match filters
+                          </Typography>
+                        </Box>
+                      )}
+                    </List>
+                  </Box>
+                </Paper>
+              </Grid>
+            )}
+
+            <Grid item xs={12}>
+              <FormSection title="Message">
+                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                  <InputLabel>Template (optional)</InputLabel>
+                  <Select
+                    value={bulkMessageForm.template_id || ''}
+                    label="Template (optional)"
+                    onChange={(e) => {
+                      const templateId = e.target.value || null;
+                      if (templateId) {
+                        const template = templates.find((t) => t.id === templateId);
+                        if (template) {
+                          setBulkMessageForm({
+                            ...bulkMessageForm,
+                            template_id: templateId,
+                            custom_message: template.body,
+                            custom_subject: template.subject || '',
+                          });
+                          return;
+                        }
+                      }
+                      setBulkMessageForm({ ...bulkMessageForm, template_id: templateId });
+                    }}
+                  >
+                    <MenuItem value="">Custom message</MenuItem>
+                    {templates.map((template) => (
+                      <MenuItem key={template.id} value={template.id}>
+                        {template.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
                 <TextField
                   fullWidth
-                  label="SMS Message"
+                  label="SMS body"
                   multiline
-                  rows={5}
+                  minRows={4}
                   value={bulkMessageForm.custom_message}
                   onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, custom_message: e.target.value })}
-                  helperText={
-                    <Box component="span">
-                      Variables: <strong>{'{tenant_name}'}</strong>, <strong>{'{amount}'}</strong>, <strong>{'{due_date}'}</strong>, <strong>{'{unit_number}'}</strong>
-                      <br/>Characters: {bulkMessageForm.custom_message.length}/160 (SMS limit)
-                    </Box>
-                  }
-                  placeholder="Example: Dear {tenant_name}, your rent of ${amount} is due on {due_date}. Please pay on time. Thank you!"
+                  helperText={`${bulkMessageForm.custom_message.length}/160 · Variables: {tenant_name}, {amount}, {due_date}, {unit_number}`}
+                  placeholder="Hi {tenant_name}, your rent of {amount} is due {due_date}."
                 />
-              </Grid>
+              </FormSection>
             </Grid>
-          </Box>
+          </Grid>
         </DialogContent>
-        <DialogActions>
-          <Box sx={{ flex: 1, pl: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              {selectedTenants.length > 0 
-                ? `Will send to ${selectedTenants.length} selected tenant${selectedTenants.length > 1 ? 's' : ''}`
-                : bulkMessageForm.recipient_type === 'all' 
-                  ? `Will send to ${recipientGroups.all?.count || 0} tenants`
-                  : bulkMessageForm.recipient_type === 'status' && bulkMessageForm.status_filter
-                    ? `Will send to ${recipientGroups[bulkMessageForm.status_filter]?.count || 0} tenants`
-                    : 'Select recipients to continue'
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+          <Typography variant="caption" sx={{ color: colors.textMuted, fontWeight: 600 }}>
+            {recipientPreview()}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={() => setOpenBulkMessageDialog(false)} sx={portalOutlinedButtonSx} variant="outlined">
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSendBulkMessage}
+              disabled={
+                loading ||
+                !bulkMessageForm.custom_message ||
+                (bulkMessageForm.recipient_type === 'custom' && selectedTenants.length === 0)
               }
-            </Typography>
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
+              sx={primaryButtonSx}
+            >
+              {loading ? 'Sending…' : 'Send'}
+            </Button>
           </Box>
-          <Button onClick={() => setOpenBulkMessageDialog(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleSendBulkMessage}
-            disabled={loading || !bulkMessageForm.custom_message || 
-              (bulkMessageForm.recipient_type === 'custom' && selectedTenants.length === 0)}
-            startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
-          >
-            {loading ? 'Sending...' : 'Send SMS'}
-          </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Create Template Dialog */}
-      <Dialog open={openTemplateDialog} onClose={() => setOpenTemplateDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create Message Template</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Template Name"
-                  value={templateForm.name}
-                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Type</InputLabel>
-                  <Select
-                    value={templateForm.type}
-                    label="Type"
-                    onChange={(e) => setTemplateForm({ ...templateForm, type: e.target.value })}
-                  >
-                    <MenuItem value="email">Email</MenuItem>
-                    <MenuItem value="sms">SMS</MenuItem>
-                    <MenuItem value="both">Both</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    value={templateForm.category}
-                    label="Category"
-                    onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
-                  >
-                    <MenuItem value="rent_reminder">Rent Reminder</MenuItem>
-                    <MenuItem value="lease_expiry">Lease Expiry</MenuItem>
-                    <MenuItem value="payment_confirmation">Payment Confirmation</MenuItem>
-                    <MenuItem value="overdue_notice">Overdue Notice</MenuItem>
-                    <MenuItem value="maintenance">Maintenance</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Subject (for Email)"
-                  value={templateForm.subject}
-                  onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Message Body"
-                  multiline
-                  rows={6}
-                  value={templateForm.body}
-                  onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
-                  helperText="Available variables: {tenant_name}, {amount}, {due_date}, {unit_number}"
-                />
-              </Grid>
+      {/* Create template dialog */}
+      <Dialog
+        open={openTemplateDialog}
+        onClose={() => setOpenTemplateDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: dialogPaperSx }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>New template</DialogTitle>
+        <DialogContent dividers sx={{ borderColor: colors.border }}>
+          <Grid container spacing={2} sx={{ pt: 0.5 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Name"
+                value={templateForm.name}
+                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+              />
             </Grid>
-          </Box>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Type</InputLabel>
+                <Select
+                  value={templateForm.type}
+                  label="Type"
+                  onChange={(e) => setTemplateForm({ ...templateForm, type: e.target.value })}
+                >
+                  <MenuItem value="sms">SMS</MenuItem>
+                  <MenuItem value="email">Email</MenuItem>
+                  <MenuItem value="both">Both</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={templateForm.category}
+                  label="Category"
+                  onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
+                >
+                  <MenuItem value="rent_reminder">Rent reminder</MenuItem>
+                  <MenuItem value="lease_expiry">Lease expiry</MenuItem>
+                  <MenuItem value="payment_confirmation">Payment confirmation</MenuItem>
+                  <MenuItem value="overdue_notice">Overdue notice</MenuItem>
+                  <MenuItem value="maintenance">Maintenance</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Subject (email)"
+                value={templateForm.subject}
+                onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Body"
+                multiline
+                minRows={5}
+                value={templateForm.body}
+                onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
+                helperText="Variables: {tenant_name}, {amount}, {due_date}, {unit_number}"
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenTemplateDialog(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setOpenTemplateDialog(false)} sx={portalOutlinedButtonSx} variant="outlined">
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={handleSaveTemplate}
             disabled={loading || !templateForm.name || !templateForm.body}
+            sx={primaryButtonSx}
           >
-            Create Template
+            Create
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Professional Notification System */}
       <NotificationSystem
         open={snackbar.open}
         message={snackbar.message}
         severity={snackbar.severity}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       />
-    </Box>
+    </>
   );
+
+  if (isAdmin) {
+    return <Box>{content}</Box>;
+  }
+
+  return <OwnerPageContainer>{content}</OwnerPageContainer>;
 };
 
 export default Communications;
-

@@ -1,40 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Grid,
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
-  CircularProgress,
-  TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Pagination,
-  InputAdornment
 } from '@mui/material';
 import {
-  Search as SearchIcon,
-  FilterList as FilterIcon,
   Refresh as RefreshIcon,
   Download as DownloadIcon,
   Visibility as ViewIcon,
@@ -51,6 +31,8 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
+import DataTable from '../../components/UI/DataTable';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminActivityLogs = () => {
   const dispatch = useDispatch();
@@ -59,13 +41,9 @@ const AdminActivityLogs = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [filteredLogs, setFilteredLogs] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [logsPerPage] = useState(20);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -73,9 +51,40 @@ const AdminActivityLogs = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    filterLogs();
-  }, [logs, searchTerm, levelFilter, categoryFilter, dateFilter]);
+  const filteredLogs = useMemo(() => {
+    let filtered = [...logs];
+
+    if (levelFilter !== 'all') {
+      filtered = filtered.filter((log) => log.level === levelFilter);
+    }
+
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter((log) => log.category === categoryFilter);
+    }
+
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+
+      switch (dateFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+        default:
+          break;
+      }
+
+      filtered = filtered.filter((log) => new Date(log.timestamp) >= filterDate);
+    }
+
+    return filtered;
+  }, [logs, levelFilter, categoryFilter, dateFilter]);
 
   const loadActivityLogs = async () => {
     setLoading(true);
@@ -187,55 +196,6 @@ const AdminActivityLogs = () => {
     }
   };
 
-  const filterLogs = () => {
-    let filtered = [...logs];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(log => 
-        log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.action.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Level filter
-    if (levelFilter !== 'all') {
-      filtered = filtered.filter(log => log.level === levelFilter);
-    }
-
-    // Category filter
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(log => log.category === categoryFilter);
-    }
-
-    // Date filter
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      const filterDate = new Date();
-      
-      switch (dateFilter) {
-        case 'today':
-          filterDate.setHours(0, 0, 0, 0);
-          break;
-        case 'week':
-          filterDate.setDate(now.getDate() - 7);
-          break;
-        case 'month':
-          filterDate.setMonth(now.getMonth() - 1);
-          break;
-        default:
-          break;
-      }
-      
-      if (dateFilter !== 'all') {
-        filtered = filtered.filter(log => new Date(log.timestamp) >= filterDate);
-      }
-    }
-
-    setFilteredLogs(filtered);
-  };
-
   const getLevelColor = (level) => {
     switch (level) {
       case 'INFO': return 'success';
@@ -279,11 +239,79 @@ const AdminActivityLogs = () => {
     loadActivityLogs();
   };
 
-  // Pagination
-  const indexOfLastLog = currentPage * logsPerPage;
-  const indexOfFirstLog = indexOfLastLog - logsPerPage;
-  const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
-  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+  const logColumns = [
+    {
+      id: 'timestamp',
+      label: 'Timestamp',
+      render: (log) => (
+        <Typography variant="body2">{new Date(log.timestamp).toLocaleString()}</Typography>
+      ),
+    },
+    {
+      id: 'level',
+      label: 'Level',
+      render: (log) => (
+        <Chip icon={getLevelIcon(log.level)} label={log.level} color={getLevelColor(log.level)} size="small" />
+      ),
+    },
+    {
+      id: 'category',
+      label: 'Category',
+      getSearchValue: (row) => row.category,
+      render: (log) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 1, width: 24, height: 24, bgcolor: 'primary.light' }}>
+            {getCategoryIcon(log.category)}
+          </Avatar>
+          <Typography variant="body2">{log.category}</Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'user',
+      label: 'User',
+      getSearchValue: (row) => row.user,
+      render: (log) => (
+        <Typography variant="body2">{log.user === 'system' ? 'System' : log.user}</Typography>
+      ),
+    },
+    {
+      id: 'action',
+      label: 'Action',
+      getSearchValue: (row) => row.action,
+      render: (log) => (
+        <Typography variant="body2" fontWeight="bold">{log.action}</Typography>
+      ),
+    },
+    {
+      id: 'description',
+      label: 'Description',
+      getSearchValue: (row) => row.description,
+      render: (log) => (
+        <Typography variant="body2">{log.description}</Typography>
+      ),
+    },
+    {
+      id: 'ip_address',
+      label: 'IP Address',
+      getSearchValue: (row) => row.ip_address,
+      render: (log) => (
+        <Typography variant="body2" color="text.secondary">{log.ip_address}</Typography>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: () => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => {} },
+          ]}
+        />
+      ),
+    },
+  ];
 
   if (user?.role !== 'admin') {
     return (
@@ -383,186 +411,62 @@ const AdminActivityLogs = () => {
         </Grid>
       </Grid>
 
-      {/* Filters and Actions */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                placeholder="Search logs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Level</InputLabel>
-                <Select
-                  value={levelFilter}
-                  onChange={(e) => setLevelFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Levels</MenuItem>
-                  <MenuItem value="INFO">Info</MenuItem>
-                  <MenuItem value="WARNING">Warning</MenuItem>
-                  <MenuItem value="ERROR">Error</MenuItem>
-                  <MenuItem value="DEBUG">Debug</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Categories</MenuItem>
-                  <MenuItem value="Authentication">Authentication</MenuItem>
-                  <MenuItem value="Property">Property</MenuItem>
-                  <MenuItem value="Payment">Payment</MenuItem>
-                  <MenuItem value="Inspection">Inspection</MenuItem>
-                  <MenuItem value="API">API</MenuItem>
-                  <MenuItem value="Database">Database</MenuItem>
-                  <MenuItem value="System">System</MenuItem>
-                  <MenuItem value="Security">Security</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                >
-                  <MenuItem value="all">All Time</MenuItem>
-                  <MenuItem value="today">Today</MenuItem>
-                  <MenuItem value="week">Last Week</MenuItem>
-                  <MenuItem value="month">Last Month</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={refreshLogs}
-                >
-                  Refresh
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={exportLogs}
-                >
-                  Export
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Activity Logs Table */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Activity Logs ({filteredLogs.length} results)
-          </Typography>
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Timestamp</TableCell>
-                  <TableCell>Level</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>User</TableCell>
-                  <TableCell>Action</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>IP Address</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {currentLogs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        icon={getLevelIcon(log.level)}
-                        label={log.level} 
-                        color={getLevelColor(log.level)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 1, width: 24, height: 24, bgcolor: 'primary.light' }}>
-                          {getCategoryIcon(log.category)}
-                        </Avatar>
-                        <Typography variant="body2">{log.category}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {log.user === 'system' ? 'System' : log.user}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold">
-                        {log.action}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {log.description}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {log.ip_address}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton size="small">
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination
-                count={totalPages}
-                page={currentPage}
-                onChange={(event, value) => setCurrentPage(value)}
-                color="primary"
-              />
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={logColumns}
+        rows={filteredLogs}
+        loading={loading}
+        title="Activity Logs"
+        subtitle={`${filteredLogs.length} shown · ${logs.length} total`}
+        emptyTitle="No activity logs"
+        emptyDescription="System events and user actions will appear here once logged."
+        emptyIcon={ScheduleIcon}
+        searchPlaceholder="Search by user, action, or description…"
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+        toolbar={
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Level</InputLabel>
+              <Select value={levelFilter} label="Level" onChange={(e) => setLevelFilter(e.target.value)}>
+                <MenuItem value="all">All Levels</MenuItem>
+                <MenuItem value="INFO">Info</MenuItem>
+                <MenuItem value="WARNING">Warning</MenuItem>
+                <MenuItem value="ERROR">Error</MenuItem>
+                <MenuItem value="DEBUG">Debug</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Category</InputLabel>
+              <Select value={categoryFilter} label="Category" onChange={(e) => setCategoryFilter(e.target.value)}>
+                <MenuItem value="all">All Categories</MenuItem>
+                <MenuItem value="Authentication">Authentication</MenuItem>
+                <MenuItem value="Property">Property</MenuItem>
+                <MenuItem value="Payment">Payment</MenuItem>
+                <MenuItem value="Inspection">Inspection</MenuItem>
+                <MenuItem value="API">API</MenuItem>
+                <MenuItem value="Database">Database</MenuItem>
+                <MenuItem value="System">System</MenuItem>
+                <MenuItem value="Security">Security</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Date Range</InputLabel>
+              <Select value={dateFilter} label="Date Range" onChange={(e) => setDateFilter(e.target.value)}>
+                <MenuItem value="all">All Time</MenuItem>
+                <MenuItem value="today">Today</MenuItem>
+                <MenuItem value="week">Last Week</MenuItem>
+                <MenuItem value="month">Last Month</MenuItem>
+              </Select>
+            </FormControl>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refreshLogs} size="small">
+              Refresh
+            </Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={exportLogs} size="small">
+              Export
+            </Button>
+          </Box>
+        }
+      />
     </Box>
   );
 };

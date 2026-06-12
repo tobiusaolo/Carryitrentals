@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Grid,
@@ -59,15 +59,21 @@ import { useDispatch, useSelector } from 'react-redux';
 import { agentAPI } from '../../services/api/agentAPI';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
 import authService from '../../services/authService';
+import { useCachedQuery } from '../../hooks/useCachedQuery';
 
 const AdminAgents = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
-  const [loading, setLoading] = useState(false);
+  const {
+    data: agents = [],
+    loading,
+    refreshing,
+    error,
+    refresh: loadAgents,
+  } = useCachedQuery('/agents/', { enabled: user?.role === 'admin' });
+
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [agents, setAgents] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -86,28 +92,6 @@ const AdminAgents = () => {
     nin_front_image: null,
     nin_back_image: null
   });
-
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadAgents();
-    }
-  }, [user]);
-
-  const loadAgents = async () => {
-    setLoading(true);
-    try {
-      // Use authService for consistent authentication
-      const api = authService.createAxiosInstance();
-      const response = await api.get('/agents/');
-      setAgents(response.data || []);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to load agents:', err);
-      setError(err.response?.data?.detail || 'Failed to load agents');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleOpenDialog = (agent = null) => {
     if (agent) {
@@ -164,8 +148,7 @@ const AdminAgents = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setError(null);
-    
+
     const loadingAlert = showLoading('Saving agent...', 'Please wait');
     
     try {
@@ -197,7 +180,6 @@ const AdminAgents = () => {
       closeAlert();
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to save agent';
       showError('Save Failed', errorMsg);
-      setError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -232,7 +214,6 @@ const AdminAgents = () => {
         closeAlert();
         const errorMsg = err.response?.data?.detail || err.message || `Failed to ${action} agent`;
         showError(`${action === 'activate' ? 'Activation' : 'Deactivation'} Failed`, errorMsg);
-        setError(errorMsg);
       }
     }
   };
@@ -262,7 +243,6 @@ const AdminAgents = () => {
         closeAlert();
         const errorMsg = err.response?.data?.detail || err.message || 'Failed to delete agent';
         showError('Delete Failed', errorMsg);
-        setError(errorMsg);
       }
     }
   };
@@ -293,15 +273,6 @@ const AdminAgents = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Agents Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Manage property inspection agents. Add, edit, and assign agents to units and inspections.
-      </Typography>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -394,7 +365,7 @@ const AdminAgents = () => {
             </Button>
           </Box>
           
-          {loading && <LinearProgress sx={{ mb: 2 }} />}
+          {(loading || refreshing) && <LinearProgress sx={{ mb: 2 }} />}
           
           <TableContainer component={Paper}>
             <Table>

@@ -10,6 +10,8 @@ import {
   useMediaQuery,
   useTheme,
   Button,
+  Chip,
+  Stack,
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -18,8 +20,16 @@ import axios from 'axios';
 import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
 import Footer from '../../components/Footer';
 import PublicHeader from '../../components/Navigation/PublicHeader';
-import CategoryBar from '../../components/Navigation/CategoryBar';
 import PropertyCard from '../../components/UI/PropertyCard';
+import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
+import { colors } from '../../theme/designTokens';
+import {
+  AIRBNB_PROPERTY_TYPE_OPTIONS,
+  getAirbnbPropertyTypeLabel,
+  normalizeAirbnbPropertyType,
+} from '../../constants/airbnb';
+import EmptyState from '../../components/UI/EmptyState';
+import { SearchOff as SearchOffIcon } from '@mui/icons-material';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
 
@@ -32,25 +42,27 @@ const PublicAirbnb = () => {
   const [airbnbs, setAirbnbs] = useState([]);
   const [filteredAirbnbs, setFilteredAirbnbs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('All Units');
-
+  const { viewerCountry, displayCurrency } = useViewerCurrency();
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get('search')?.toLowerCase() || '';
+  const typeFilter = searchParams.get('type') || '';
 
   useEffect(() => {
     loadAirbnbs();
-  }, []);
+  }, [typeFilter]);
 
   useEffect(() => {
     applyFilters();
-  }, [activeCategory, airbnbs, searchQuery]);
+  }, [airbnbs, searchQuery, typeFilter]);
 
   const loadAirbnbs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/airbnb/public`);
+      const params = typeFilter ? { property_type: normalizeAirbnbPropertyType(typeFilter) } : {};
+      const response = await axios.get(`${API_BASE_URL}/airbnb/public`, { params });
       
       const airbnbsWithImages = response.data.map(airbnb => {
+        airbnb.property_type = normalizeAirbnbPropertyType(airbnb.property_type);
         if (airbnb.images && typeof airbnb.images === 'string') {
           airbnb.images = airbnb.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim());
         } else if (!airbnb.images) {
@@ -71,30 +83,18 @@ const PublicAirbnb = () => {
   const applyFilters = () => {
     let filtered = airbnbs;
 
-    // Apply category filter
-    if (activeCategory !== 'All Units') {
-      filtered = filtered.filter(airbnb => {
-        const type = (airbnb.property_type || airbnb.unit_type || '').toLowerCase();
-        const cat = activeCategory.toLowerCase();
-        
-        if (cat === 'apartments') return type.includes('apartment') || type.includes('flat');
-        if (cat === 'studios') return type.includes('studio') || type.includes('single');
-        if (cat === 'one bedroom') return (airbnb.bedrooms || 0) === 1;
-        if (cat === 'two bedroom') return (airbnb.bedrooms || 0) === 2;
-        if (cat === 'penthouses') return type.includes('penthouse');
-        if (cat === 'villas') return type.includes('villa') || type.includes('mansion');
-        
-        return true;
-      });
-    }
-
-    // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(airbnb => 
         airbnb.title?.toLowerCase().includes(searchQuery) ||
         airbnb.location?.toLowerCase().includes(searchQuery) ||
-        airbnb.description?.toLowerCase().includes(searchQuery)
+        airbnb.description?.toLowerCase().includes(searchQuery) ||
+        getAirbnbPropertyTypeLabel(airbnb.property_type).toLowerCase().includes(searchQuery)
       );
+    }
+
+    if (typeFilter) {
+      const normalized = normalizeAirbnbPropertyType(typeFilter);
+      filtered = filtered.filter((a) => a.property_type === normalized);
     }
 
     setFilteredAirbnbs(filtered);
@@ -103,36 +103,47 @@ const PublicAirbnb = () => {
   return (
     <Box sx={{ bgcolor: 'white', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <PublicHeader />
-      <CategoryBar 
-        activeCategory={activeCategory} 
-        onCategoryChange={setActiveCategory} 
-      />
 
-      <Container maxWidth="xl" sx={{ py: 4, flex: 1 }}>
+      <Container maxWidth="xl" sx={{ py: 3, flex: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: colors.text }}>
+          {loading ? 'Loading…' : `${filteredAirbnbs.length} short stay${filteredAirbnbs.length === 1 ? '' : 's'}`}
+        </Typography>
+        <Typography variant="body2" sx={{ color: colors.textMuted, mb: 2 }}>
+          {viewerCountry} · Prices in {displayCurrency}
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1, mb: 3 }}>
+          <Chip
+            label="All types"
+            onClick={() => navigate('/airbnb' + (searchQuery ? `?search=${searchParams.get('search')}` : ''))}
+            color={!typeFilter ? 'primary' : 'default'}
+            variant={!typeFilter ? 'filled' : 'outlined'}
+          />
+          {AIRBNB_PROPERTY_TYPE_OPTIONS.slice(0, 8).map((opt) => (
+            <Chip
+              key={opt.value}
+              label={opt.label}
+              onClick={() => {
+                const q = new URLSearchParams(location.search);
+                q.set('type', opt.value);
+                navigate(`/airbnb?${q.toString()}`);
+              }}
+              color={typeFilter === opt.value ? 'primary' : 'default'}
+              variant={typeFilter === opt.value ? 'filled' : 'outlined'}
+            />
+          ))}
+        </Stack>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 20 }}>
             <CircularProgress sx={{ color: '#ff385c' }} thickness={5} size={60} />
           </Box>
         ) : filteredAirbnbs.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 15 }}>
-            <HomeIcon sx={{ fontSize: 80, color: '#d1d5db', mb: 2 }} />
-            <Typography variant="h5" color="text.secondary" gutterBottom sx={{ fontWeight: 800 }}>
-              No stays found
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Try adjusting your search or category filters.
-            </Typography>
-            <Button 
-              variant="contained" 
-              onClick={() => {
-                setActiveCategory('All Units');
-                navigate('/airbnb');
-              }}
-              sx={{ borderRadius: '12px', px: 4, bgcolor: '#ff385c', '&:hover': { bgcolor: '#e31c5f' } }}
-            >
-              Clear filters
-            </Button>
-          </Box>
+          <EmptyState
+            icon={SearchOffIcon}
+            title="No stays found"
+            description="Try a different search."
+            actionLabel="View all"
+            onAction={() => navigate('/airbnb')}
+          />
         ) : (
           <Grid container spacing={3}>
             {filteredAirbnbs.map((airbnb, index) => (

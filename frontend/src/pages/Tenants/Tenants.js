@@ -17,18 +17,22 @@ import {
   DialogActions,
   TextField,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  Checkbox,
   InputLabel,
   Select,
   MenuItem,
   Alert,
   CircularProgress,
-  Fab,
   Tooltip,
   Tabs,
   Tab,
   Badge,
   Avatar,
   Divider,
+  Snackbar,
 } from '@mui/material';
 import {
   Add,
@@ -47,7 +51,11 @@ import {
   Group,
   Upload,
   Search,
+  ContentCopy,
+  PhoneAndroid,
+  Forum,
 } from '@mui/icons-material';
+import TenantChatDialog from '../../components/Tenants/TenantChatDialog';
 import {
   DataGrid,
   GridToolbar,
@@ -66,6 +74,53 @@ import {
 } from '../../store/slices/tenantSlice';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { fetchUnits } from '../../store/slices/unitSlice';
+import PageHeader from '../../components/UI/PageHeader';
+import { ownerPrimaryButtonSx } from '../../theme/designTokens';
+import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
+import { formatMoney } from '../../utils/formatMoney';
+import { colors } from '../../theme/designTokens';
+
+const TENANT_UTILITY_FIELDS = [
+  { name: 'tenant_pays_garbage', label: 'Garbage' },
+  { name: 'tenant_pays_electricity', label: 'Electricity' },
+  { name: 'tenant_pays_water', label: 'Water' },
+  { name: 'tenant_pays_security', label: 'Security' },
+  { name: 'tenant_pays_maintenance', label: 'Maintenance' },
+];
+
+const defaultTenantFormState = () => ({
+  first_name: '',
+  last_name: '',
+  email: '',
+  phone: '',
+  age: 18,
+  national_id: '',
+  previous_address: '',
+  previous_city: '',
+  previous_state: '',
+  previous_country: '',
+  occupation: '',
+  employer_name: '',
+  number_of_family_members: '',
+  family_details: '',
+  tenant_pays_garbage: false,
+  tenant_pays_electricity: false,
+  tenant_pays_water: false,
+  tenant_pays_security: false,
+  tenant_pays_maintenance: false,
+  property_id: '',
+  unit_id: '',
+  move_in_date: new Date().toISOString().split('T')[0],
+  monthly_rent: '',
+  deposit_paid: 0,
+  months_paid: 0,
+  emergency_contact_name: '',
+  emergency_contact_phone: '',
+  emergency_contact_relationship: '',
+  notes: '',
+});
 
 const Tenants = () => {
   const dispatch = useDispatch();
@@ -77,32 +132,9 @@ const Tenants = () => {
   const [editingTenant, setEditingTenant] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    age: 18,
-    national_id: '',
-    previous_address: '',
-    previous_city: '',
-    previous_state: '',
-    previous_country: '',
-    occupation: '',
-    employer_name: '',
-    monthly_income: '',
-    number_of_family_members: 1,
-    family_details: '',
-    property_id: '',
-    unit_id: '',
-    move_in_date: new Date().toISOString().split('T')[0],
-    monthly_rent: '',
-    deposit_paid: 0,
-    emergency_contact_name: '',
-    emergency_contact_phone: '',
-    emergency_contact_relationship: '',
-    notes: '',
-  });
+  const [copyNotice, setCopyNotice] = useState('');
+  const [formData, setFormData] = useState(defaultTenantFormState());
+  const [chatTenant, setChatTenant] = useState(null);
 
   useEffect(() => {
     dispatch(fetchTenants());
@@ -137,9 +169,13 @@ const Tenants = () => {
         previous_country: tenant.previous_country || '',
         occupation: tenant.occupation || '',
         employer_name: tenant.employer_name || '',
-        monthly_income: tenant.monthly_income || '',
-        number_of_family_members: tenant.number_of_family_members || 1,
+        number_of_family_members: tenant.number_of_family_members ?? '',
         family_details: tenant.family_details || '',
+        tenant_pays_garbage: Boolean(tenant.tenant_pays_garbage),
+        tenant_pays_electricity: Boolean(tenant.tenant_pays_electricity),
+        tenant_pays_water: Boolean(tenant.tenant_pays_water),
+        tenant_pays_security: Boolean(tenant.tenant_pays_security),
+        tenant_pays_maintenance: Boolean(tenant.tenant_pays_maintenance),
         property_id: tenant.property_id || '',
         unit_id: tenant.unit_id || '',
         move_in_date: tenant.move_in_date || new Date().toISOString().split('T')[0],
@@ -152,32 +188,7 @@ const Tenants = () => {
       });
     } else {
       setEditingTenant(null);
-      setFormData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        age: 18,
-        national_id: '',
-        previous_address: '',
-        previous_city: '',
-        previous_state: '',
-        previous_country: '',
-        occupation: '',
-        employer_name: '',
-        monthly_income: '',
-        number_of_family_members: 1,
-        family_details: '',
-        property_id: '',
-        unit_id: '',
-        move_in_date: new Date().toISOString().split('T')[0],
-        monthly_rent: '',
-        deposit_paid: 0,
-        emergency_contact_name: '',
-        emergency_contact_phone: '',
-        emergency_contact_relationship: '',
-        notes: '',
-      });
+      setFormData(defaultTenantFormState());
     }
     setOpenDialog(true);
   };
@@ -195,26 +206,58 @@ const Tenants = () => {
     }));
   };
 
+  const handleUtilityChange = (name) => (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: e.target.checked,
+    }));
+  };
+
+  const copyLinkingCode = async (code) => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(String(code));
+      setCopyNotice('Mobile linking code copied — share it with your tenant');
+    } catch {
+      setCopyNotice('Could not copy — select and copy the code manually');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Convert numeric fields
     const submitData = {
       ...formData,
-      age: parseInt(formData.age),
-      monthly_income: parseFloat(formData.monthly_income) || null,
-      number_of_family_members: parseInt(formData.number_of_family_members),
+      age: parseInt(formData.age, 10),
+      number_of_family_members: formData.number_of_family_members
+        ? parseInt(formData.number_of_family_members, 10)
+        : null,
+      family_details: formData.family_details?.trim() || null,
       monthly_rent: parseFloat(formData.monthly_rent),
       deposit_paid: parseFloat(formData.deposit_paid),
+      months_paid: parseInt(formData.months_paid, 10) || 0,
     };
     
     if (editingTenant) {
+      delete submitData.months_paid;
       await dispatch(updateTenant({ tenantId: editingTenant.id, tenantData: submitData }));
     } else {
-      await dispatch(createTenant(submitData));
+      const result = await dispatch(createTenant(submitData));
+      if (createTenant.fulfilled.match(result) && result.payload?.linking_code) {
+        setCopyNotice(
+          `Tenant created. Mobile app code: ${result.payload.linking_code} (copied to clipboard)`
+        );
+        try {
+          await navigator.clipboard.writeText(result.payload.linking_code);
+        } catch {
+          /* clipboard optional */
+        }
+      }
     }
     
     handleCloseDialog();
+    dispatch(fetchTenants({ __refresh: true }));
   };
 
   const handleDelete = async (tenantId) => {
@@ -223,8 +266,20 @@ const Tenants = () => {
     }
   };
 
-  const handleUpdatePaymentStatus = async (tenantId, status) => {
-    await dispatch(updateTenantPaymentStatus({ tenantId, status, paymentDate: new Date().toISOString().split('T')[0] }));
+  const handleRecordCashPayment = async (tenantId) => {
+    const tenant = tenants.find((t) => String(t.id) === String(tenantId));
+    if (!tenant) return;
+    const amount = parseFloat(tenant.balance_due) > 0
+      ? parseFloat(tenant.balance_due)
+      : parseFloat(tenant.monthly_rent);
+    await dispatch(updateTenantPaymentStatus({
+      tenantId,
+      status: 'paid',
+      paymentDate: new Date().toISOString().split('T')[0],
+      amount,
+    }));
+    dispatch(fetchTenants({ __refresh: true }));
+    dispatch(fetchOverdueTenants());
   };
 
   const handleMoveOut = async (tenantId) => {
@@ -272,6 +327,30 @@ const Tenants = () => {
     { field: 'first_name', headerName: 'First Name', width: 120 },
     { field: 'last_name', headerName: 'Last Name', width: 120 },
     { field: 'phone', headerName: 'Phone', width: 130 },
+    {
+      field: 'linking_code',
+      headerName: 'Mobile code',
+      width: 160,
+      renderCell: (params) => (
+        params.value ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Chip
+              label={params.value}
+              size="small"
+              variant="outlined"
+              sx={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.06em' }}
+            />
+            <Tooltip title="Copy code for tenant mobile app">
+              <IconButton size="small" onClick={() => copyLinkingCode(params.value)} aria-label="Copy linking code">
+                <ContentCopy fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : (
+          '—'
+        )
+      ),
+    },
     { field: 'unit_number', headerName: 'Unit', width: 100 },
     { field: 'property_name', headerName: 'Property', width: 200, flex: 1 },
     {
@@ -307,20 +386,28 @@ const Tenants = () => {
       width: 150,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<Visibility />}
-          label="View"
-          onClick={() => handleOpenDialog(params.row)}
+          icon={<Forum fontSize="small" />}
+          label="Message"
+          onClick={() => setChatTenant(params.row)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Edit />}
+          icon={<Visibility fontSize="small" />}
+          label="View"
+          onClick={() => handleOpenDialog(params.row)}
+          showInMenu
+        />,
+        <GridActionsCellItem
+          icon={<Edit fontSize="small" />}
           label="Edit"
           onClick={() => handleOpenDialog(params.row)}
+          showInMenu
         />,
-        ...(params.row.rent_payment_status === 'pending' ? [
+        ...(['pending', 'due', 'overdue', 'partial'].includes(params.row.rent_payment_status) ? [
           <GridActionsCellItem
-            icon={<CheckCircle />}
-            label="Mark as Paid"
-            onClick={() => handleUpdatePaymentStatus(params.id, 'paid')}
+            icon={<CheckCircle fontSize="small" />}
+            label="Record cash payment"
+            onClick={() => handleRecordCashPayment(params.id)}
             showInMenu
           />
         ] : []),
@@ -349,22 +436,20 @@ const Tenants = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Tenant Management
-        </Typography>
-        <Tooltip title="Add New Tenant">
-          <Fab
-            color="primary"
-            aria-label="add"
+    <OwnerPageContainer>
+      <PageHeader
+        title="Tenants"
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Add />}
             onClick={() => handleOpenDialog()}
-            sx={{ boxShadow: 2 }}
+            sx={ownerPrimaryButtonSx}
           >
-            <Add />
-          </Fab>
-        </Tooltip>
-      </Box>
+            Add tenant
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -372,141 +457,73 @@ const Tenants = () => {
         </Alert>
       )}
 
-      {/* Tenant Status Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      <Paper sx={{ mb: 3, border: `1px solid ${colors.border}`, borderRadius: 2, boxShadow: 'none' }}>
         <Tabs
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab
-            label={
-              <Badge badgeContent={tenants.length} color="primary">
-                All Tenants
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={tenants.filter(t => t.rent_payment_status === 'pending').length} color="warning">
-                Pending Payment
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={tenants.filter(t => t.rent_payment_status === 'paid').length} color="success">
-                Paid
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={tenants.filter(t => t.rent_payment_status === 'overdue').length} color="error">
-                Overdue
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={tenants.filter(t => !t.is_active).length} color="default">
-                Moved Out
-              </Badge>
-            }
-          />
+          <Tab label={<Badge badgeContent={tenants.length} color="primary">All Tenants</Badge>} />
+          <Tab label={<Badge badgeContent={tenants.filter((t) => t.rent_payment_status === 'pending').length} color="primary">Pending Payment</Badge>} />
+          <Tab label={<Badge badgeContent={tenants.filter((t) => t.rent_payment_status === 'paid').length} color="primary">Paid</Badge>} />
+          <Tab label={<Badge badgeContent={tenants.filter((t) => t.rent_payment_status === 'overdue').length} color="primary">Overdue</Badge>} />
+          <Tab label={<Badge badgeContent={tenants.filter((t) => !t.is_active).length} color="primary">Moved Out</Badge>} />
         </Tabs>
       </Paper>
 
-      {/* Payment Status Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Person color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Total Tenants
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="primary" fontWeight="bold">
-                {tenants.filter(t => t.is_active).length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active tenants
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Active tenants"
+            value={tenants.filter((t) => t.is_active).length}
+            icon={<Person />}
+            variantIndex={0}
+            subtitle="Active leases"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AttachMoney color="success" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Monthly Revenue
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="success.main" fontWeight="bold">
-                ${tenants.filter(t => t.is_active).reduce((sum, t) => sum + parseFloat(t.monthly_rent), 0).toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Expected monthly income
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Monthly revenue"
+            value={formatMoney(
+              tenants.filter((t) => t.is_active).reduce((sum, t) => sum + parseFloat(t.monthly_rent || 0), 0),
+              'UGX'
+            )}
+            icon={<AttachMoney />}
+            variantIndex={1}
+            subtitle="If all paid"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Warning color="error" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Overdue Payments
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="error.main" fontWeight="bold">
-                {overdueTenants.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Tenants with overdue rent
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Overdue payments"
+            value={overdueTenants.length}
+            icon={<Warning />}
+            variantIndex={2}
+            subtitle="Past due"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <CheckCircle color="success" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Payment Rate
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="success.main" fontWeight="bold">
-                {tenants.length > 0 ? Math.round((tenants.filter(t => t.rent_payment_status === 'paid').length / tenants.length) * 100) : 0}%
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Payment success rate
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Payment rate"
+            value={`${tenants.length > 0 ? Math.round((tenants.filter((t) => t.rent_payment_status === 'paid').length / tenants.length) * 100) : 0}%`}
+            icon={<CheckCircle />}
+            variantIndex={0}
+            subtitle="This cycle"
+          />
         </Grid>
       </Grid>
 
-
-      {/* Data Grid View */}
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={filteredTenants}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          components={{ Toolbar: GridToolbar }}
-          loading={isLoading}
-          disableSelectionOnClick
-        />
-      </Paper>
+      <OwnerDataGrid
+        rows={filteredTenants}
+        columns={columns}
+        loading={isLoading}
+        emptyTitle="No tenants yet"
+        emptyDescription="Add tenants when someone moves into one of your units."
+        emptyIcon={Person}
+        emptyActionLabel="Add tenant"
+        onEmptyAction={() => handleOpenDialog()}
+      />
 
       {/* Add/Edit Tenant Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
@@ -515,6 +532,39 @@ const Tenants = () => {
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
+            {editingTenant?.linking_code && (
+              <Alert
+                severity="info"
+                icon={<PhoneAndroid />}
+                sx={{ mb: 2 }}
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    startIcon={<ContentCopy />}
+                    onClick={() => copyLinkingCode(editingTenant.linking_code)}
+                  >
+                    Copy
+                  </Button>
+                }
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Mobile app linking code
+                </Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 800, mt: 0.5 }}>
+                  {editingTenant.linking_code}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Tenant enters this in the CarryIT mobile app to see their unit, pay rent, and more.
+                </Typography>
+              </Alert>
+            )}
+            {!editingTenant && (
+              <Alert severity="info" icon={<PhoneAndroid />} sx={{ mb: 2 }}>
+                A unique <strong>mobile linking code</strong> is generated automatically when you save.
+                Share it with the tenant so they can activate the mobile app.
+              </Alert>
+            )}
             <Grid container spacing={2}>
               {/* Personal Information */}
               <Grid item xs={12}>
@@ -582,6 +632,7 @@ const Tenants = () => {
                   value={formData.national_id}
                   onChange={handleInputChange}
                   required
+                  helperText="Same person can be on multiple units — each unit gets its own mobile linking code"
                 />
               </Grid>
 
@@ -657,22 +708,10 @@ const Tenants = () => {
                   onChange={handleInputChange}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Monthly Income"
-                  name="monthly_income"
-                  type="number"
-                  value={formData.monthly_income}
-                  onChange={handleInputChange}
-                  inputProps={{ min: 0, step: 0.01 }}
-                />
-              </Grid>
-
-              {/* Family Information */}
+              {/* Family Information (optional) */}
               <Grid item xs={12}>
                 <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', mt: 2 }}>
-                  Family Information
+                  Family Information <Typography component="span" variant="body2" color="text.secondary">(optional)</Typography>
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -683,7 +722,6 @@ const Tenants = () => {
                   type="number"
                   value={formData.number_of_family_members}
                   onChange={handleInputChange}
-                  required
                   inputProps={{ min: 1 }}
                 />
               </Grid>
@@ -696,8 +734,34 @@ const Tenants = () => {
                   onChange={handleInputChange}
                   multiline
                   rows={2}
-                  placeholder="Additional family information..."
+                  placeholder="Optional — names, ages, or other household notes"
                 />
+              </Grid>
+
+              {/* Utilities */}
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 1, color: 'primary.main', mt: 2 }}>
+                  Utilities
+                </Typography>
+                <FormHelperText sx={{ mb: 1.5, mx: 0 }}>
+                  Check each utility the tenant pays. Unchecked = landlord pays. Checked items auto-create monthly
+                  utility charges on Payments → Utilities (set costs under Utilities in the sidebar).
+                </FormHelperText>
+                <FormGroup row sx={{ gap: 1 }}>
+                  {TENANT_UTILITY_FIELDS.map(({ name, label }) => (
+                    <FormControlLabel
+                      key={name}
+                      control={
+                        <Checkbox
+                          checked={Boolean(formData[name])}
+                          onChange={handleUtilityChange(name)}
+                          name={name}
+                        />
+                      }
+                      label={label}
+                    />
+                  ))}
+                </FormGroup>
               </Grid>
 
               {/* Rental Information */}
@@ -775,6 +839,34 @@ const Tenants = () => {
                   inputProps={{ min: 0, step: 0.01 }}
                 />
               </Grid>
+              {!editingTenant && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Months paid at move-in"
+                      name="months_paid"
+                      type="number"
+                      value={formData.months_paid}
+                      onChange={handleInputChange}
+                      inputProps={{ min: 0, max: 24 }}
+                      helperText="0 = not prepaid. 3 = paid through 3 months from move-in."
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Prepaid rent total"
+                      value={
+                        (parseFloat(formData.monthly_rent) || 0) *
+                        (parseInt(formData.months_paid, 10) || 0)
+                      }
+                      InputProps={{ readOnly: true }}
+                      helperText="Monthly rent × months paid"
+                    />
+                  </Grid>
+                </>
+              )}
 
               {/* Emergency Contact */}
               <Grid item xs={12}>
@@ -838,7 +930,21 @@ const Tenants = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+
+      <Snackbar
+        open={Boolean(copyNotice)}
+        autoHideDuration={6000}
+        onClose={() => setCopyNotice('')}
+        message={copyNotice}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      <TenantChatDialog
+        open={Boolean(chatTenant)}
+        tenant={chatTenant}
+        onClose={() => setChatTenant(null)}
+      />
+    </OwnerPageContainer>
   );
 };
 

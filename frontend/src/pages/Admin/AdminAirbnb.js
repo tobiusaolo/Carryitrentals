@@ -3,12 +3,6 @@ import {
   Box,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   IconButton,
   Dialog,
@@ -59,6 +53,11 @@ import axios from 'axios';
 import authService from '../../services/authService';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert, showWarning, showInfo } from '../../utils/sweetAlert';
 import Swal from 'sweetalert2';
+import AirbnbListingFormFields from '../../components/Forms/AirbnbListingFormFields';
+import { emptyAirbnbFormState, MIN_AIRBNB_IMAGES, getAirbnbPropertyTypeLabel } from '../../constants/airbnb';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminAirbnb = () => {
   const [activeTab, setActiveTab] = useState(0); // 0=Listings, 1=Bookings, 2=Payments
@@ -76,19 +75,7 @@ const AdminAirbnb = () => {
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
   
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    location: '',
-    price_per_night: '',
-    currency: 'UGX',
-    max_guests: 2,
-    bedrooms: 1,
-    bathrooms: 1,
-    amenities: '',
-    house_rules: '',
-    is_available: 'available'
-  });
+  const [formData, setFormData] = useState(emptyAirbnbFormState());
 
   useEffect(() => {
     loadData();
@@ -263,7 +250,7 @@ const AdminAirbnb = () => {
           const targetIdStr = String(bookingId);
           if (bookingIdStr === targetIdStr || bookingIdStr === bookingId || booking.id === bookingId) {
             console.log('🔄 Updating booking status in local state:', bookingIdStr, '-> approved');
-            return { ...booking, status: 'approved' };
+            return { ...booking, status: 'confirmed' };
           }
           return booking;
         });
@@ -411,36 +398,25 @@ const AdminAirbnb = () => {
     if (airbnb) {
       setEditingAirbnb(airbnb);
       setFormData({
+        ...emptyAirbnbFormState(),
         title: airbnb.title,
-        description: airbnb.description,
+        description: airbnb.description || '',
         location: airbnb.location,
-        country: airbnb.country || 'Uganda',
+        country: airbnb.country || emptyAirbnbFormState().country,
+        property_type: airbnb.property_type || emptyAirbnbFormState().property_type,
         price_per_night: airbnb.price_per_night,
-        currency: airbnb.currency || 'UGX',
+        currency: airbnb.currency || emptyAirbnbFormState().currency,
         max_guests: airbnb.max_guests,
         bedrooms: airbnb.bedrooms,
         bathrooms: airbnb.bathrooms,
         amenities: airbnb.amenities || '',
         house_rules: airbnb.house_rules || '',
-        is_available: airbnb.is_available
+        is_available: airbnb.is_available || 'available',
       });
       setSelectedImages([]);
     } else {
       setEditingAirbnb(null);
-      setFormData({
-        title: '',
-        description: '',
-        location: '',
-        country: 'Uganda',
-        price_per_night: '',
-        currency: 'UGX',
-        max_guests: 2,
-        bedrooms: 1,
-        bathrooms: 1,
-        amenities: '',
-        house_rules: '',
-        is_available: 'available'
-      });
+      setFormData(emptyAirbnbFormState());
       setSelectedImages([]);
     }
     setOpenDialog(true);
@@ -450,20 +426,7 @@ const AdminAirbnb = () => {
     setOpenDialog(false);
     setEditingAirbnb(null);
     setSelectedImages([]);
-    // Reset form data
-    setFormData({
-      title: '',
-      description: '',
-      location: '',
-      price_per_night: '',
-      currency: 'UGX',
-      max_guests: 2,
-      bedrooms: 1,
-      bathrooms: 1,
-      amenities: '',
-      house_rules: '',
-      is_available: 'available'
-    });
+    setFormData(emptyAirbnbFormState());
   };
 
   const handleChange = (e) => {
@@ -590,6 +553,268 @@ const AdminAirbnb = () => {
     }
   };
 
+  const listingColumns = [
+    {
+      id: 'title',
+      label: 'Title',
+      getSearchValue: (row) => `${row.title} ${row.location} ${row.country}`,
+      render: (airbnb) => (
+        <Typography variant="body2" fontWeight={600}>
+          {airbnb.title}
+        </Typography>
+      ),
+    },
+    {
+      id: 'property_type',
+      label: 'Type',
+      render: (airbnb) => (
+        <Chip
+          label={getAirbnbPropertyTypeLabel(airbnb.property_type)}
+          size="small"
+          variant="outlined"
+        />
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      getSearchValue: (row) => `${row.location} ${row.country || ''}`,
+      render: (airbnb) => (
+        <Box>
+          <Typography variant="body2">{airbnb.location}</Typography>
+          {airbnb.country && (
+            <Typography variant="caption" color="text.secondary">
+              {airbnb.country}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'country',
+      label: 'Country',
+      render: (airbnb) => (
+        <Chip label={airbnb.country || 'N/A'} size="small" color="info" variant="outlined" />
+      ),
+    },
+    {
+      id: 'price_per_night',
+      label: 'Price/Night',
+      render: (airbnb) => (
+        <Chip
+          label={`${airbnb.currency} ${parseFloat(airbnb.price_per_night).toLocaleString()}`}
+          size="small"
+          color="primary"
+          variant="outlined"
+        />
+      ),
+    },
+    { id: 'max_guests', label: 'Guests' },
+    { id: 'bedrooms', label: 'Bedrooms' },
+    {
+      id: 'is_available',
+      label: 'Status',
+      render: (airbnb) => <OwnerStatusChip status={airbnb.is_available} />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (airbnb) => (
+        <TableActions
+          actions={[
+            { icon: <Visibility fontSize="small" />, label: 'View Details', onClick: () => handleView(airbnb) },
+            { icon: <Edit fontSize="small" />, label: 'Edit', onClick: () => handleOpenDialog(airbnb) },
+            { icon: <Delete fontSize="small" />, label: 'Delete', onClick: () => handleDelete(airbnb.id) },
+          ]}
+        />
+      ),
+    },
+  ];
+
+  const bookingColumns = [
+    {
+      id: 'id',
+      label: 'Booking ID',
+      render: (booking) => (
+        <Typography variant="body2" fontWeight={600}>
+          #{booking.id}
+        </Typography>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property',
+      getSearchValue: (row) => `${row.airbnb_title || ''} ${row.airbnb_location || ''} ${row.airbnb_id || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>
+            {booking.airbnb_title || booking.airbnb_id || 'N/A'}
+          </Typography>
+          {booking.airbnb_location && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {booking.airbnb_location}
+            </Typography>
+          )}
+          {booking.airbnb_id && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              ID: {booking.airbnb_id}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'guest',
+      label: 'Guest',
+      getSearchValue: (row) => `${row.guest_name || ''} ${row.guest_phone || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>
+            {booking.guest_name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {booking.guest_phone}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'check_in',
+      label: 'Check-in',
+      render: (booking) => formatDate(booking.check_in),
+    },
+    {
+      id: 'check_out',
+      label: 'Check-out',
+      render: (booking) => formatDate(booking.check_out),
+    },
+    { id: 'number_of_guests', label: 'Guests' },
+    {
+      id: 'total_amount',
+      label: 'Total Amount',
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>
+            {formatCurrency(booking.total_amount, booking.currency)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Prepaid: {formatCurrency(booking.prepayment_amount, booking.currency)}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (booking) => <OwnerStatusChip status={booking.status} />,
+    },
+    {
+      id: 'payment_status',
+      label: 'Payment',
+      render: (booking) => <OwnerStatusChip status={booking.payment_status} />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (booking) => (
+        <TableActions
+          actions={[
+            {
+              icon: <Visibility fontSize="small" />,
+              label: 'View Details',
+              onClick: () => handleViewBookingDetails(booking),
+            },
+            {
+              icon: <ApproveIcon fontSize="small" />,
+              label: 'Approve Booking',
+              hidden: !(booking.status && booking.status.toLowerCase() === 'pending'),
+              onClick: () => {
+                if (booking.id) {
+                  handleApproveBooking(booking.id);
+                } else {
+                  showError('Error', 'Booking ID is missing');
+                }
+              },
+            },
+            {
+              icon: <DeclineIcon fontSize="small" />,
+              label: 'Decline Booking',
+              hidden: !(booking.status && booking.status.toLowerCase() === 'pending'),
+              onClick: () => {
+                if (booking.id) {
+                  handleDeclineBooking(booking.id);
+                } else {
+                  showError('Error', 'Booking ID is missing');
+                }
+              },
+            },
+          ]}
+        />
+      ),
+    },
+  ];
+
+  const paymentColumns = [
+    {
+      id: 'payment_reference',
+      label: 'Transaction ID',
+      getSearchValue: (row) => row.payment_reference,
+      render: (payment) => (
+        <Typography variant="body2" fontFamily="monospace">
+          {payment.payment_reference}
+        </Typography>
+      ),
+    },
+    {
+      id: 'booking_id',
+      label: 'Booking ID',
+      render: (payment) => `#${payment.booking_id}`,
+    },
+    {
+      id: 'guest_name',
+      label: 'Guest',
+      getSearchValue: (row) => row.guest_name,
+    },
+    {
+      id: 'airbnb_title',
+      label: 'Property',
+      getSearchValue: (row) => row.airbnb_title,
+    },
+    {
+      id: 'amount',
+      label: 'Amount',
+      render: (payment) => (
+        <Typography variant="body2" fontWeight={600}>
+          {formatCurrency(payment.amount, payment.currency)}
+        </Typography>
+      ),
+    },
+    {
+      id: 'payment_method',
+      label: 'Payment Method',
+      render: (payment) => (
+        <Chip
+          label={payment.payment_method?.replace('_', ' ').toUpperCase()}
+          size="small"
+          icon={<CreditCard />}
+          variant="outlined"
+        />
+      ),
+    },
+    {
+      id: 'payment_status',
+      label: 'Status',
+      render: (payment) => <OwnerStatusChip status={payment.payment_status} />,
+    },
+    {
+      id: 'payment_date',
+      label: 'Date',
+      render: (payment) => formatDate(payment.payment_date),
+    },
+  ];
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -683,324 +908,49 @@ const AdminAirbnb = () => {
 
       {/* TAB 0: LISTINGS */}
       {activeTab === 0 && (
-        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: 'primary.main' }}>
-              <TableRow>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Title</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Location</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Country</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Price/Night</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guests</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Bedrooms</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
-                <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {airbnbs.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                    <HomeIcon sx={{ fontSize: 60, color: '#ccc', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">
-                      No Airbnb listings yet. Click "Add Airbnb Listing" to create one.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                airbnbs.map((airbnb) => (
-                  <TableRow key={airbnb.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {airbnb.title}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{airbnb.location}</Typography>
-                      {airbnb.country && (
-                        <Typography variant="caption" color="text.secondary">
-                          {airbnb.country}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={airbnb.country || 'N/A'}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={`${airbnb.currency} ${parseFloat(airbnb.price_per_night).toLocaleString()}`}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>{airbnb.max_guests}</TableCell>
-                    <TableCell>{airbnb.bedrooms}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={airbnb.is_available}
-                        size="small"
-                        color={airbnb.is_available === 'available' ? 'success' : 'default'}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="View Details">
-                        <IconButton size="small" onClick={() => handleView(airbnb)} color="info">
-                          <Visibility fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => handleOpenDialog(airbnb)} color="primary">
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" onClick={() => handleDelete(airbnb.id)} color="error">
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        </Card>
+        <DataTable
+          columns={listingColumns}
+          rows={airbnbs}
+          loading={loading}
+          title="Airbnb Listings"
+          subtitle={`${airbnbs.length} listing${airbnbs.length === 1 ? '' : 's'}`}
+          emptyTitle="No Airbnb listings yet"
+          emptyDescription='Click "Add Airbnb Listing" to create one.'
+          emptyIcon={HomeIcon}
+          emptyActionLabel="Add Airbnb Listing"
+          onEmptyAction={() => handleOpenDialog()}
+          searchPlaceholder="Search by title, location, or country…"
+        />
       )}
 
       {/* TAB 1: BOOKINGS */}
       {activeTab === 1 && (
-        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: 'primary.main' }}>
-              <TableRow>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Booking ID</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Property</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guest</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Check-in</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Check-out</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guests</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Total Amount</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Payment</TableCell>
-                <TableCell align="center" sx={{ color: 'white', fontWeight: 700 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {bookings.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                    <CalendarIcon sx={{ fontSize: 60, color: '#ccc', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">
-                      No bookings yet
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                bookings.map((booking) => (
-                  <TableRow key={booking.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        #{booking.id}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {booking.airbnb_title || booking.airbnb_id || 'N/A'}
-                      </Typography>
-                      {booking.airbnb_location && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {booking.airbnb_location}
-                        </Typography>
-                      )}
-                      {booking.airbnb_id && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          ID: {booking.airbnb_id}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {booking.guest_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {booking.guest_phone}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>{formatDate(booking.check_in)}</TableCell>
-                    <TableCell>{formatDate(booking.check_out)}</TableCell>
-                    <TableCell>{booking.number_of_guests}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatCurrency(booking.total_amount, booking.currency)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Prepaid: {formatCurrency(booking.prepayment_amount, booking.currency)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={booking.status}
-                        size="small"
-                        color={getStatusColor(booking.status)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={booking.payment_status}
-                        size="small"
-                        color={getPaymentStatusColor(booking.payment_status)}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="View Details">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleViewBookingDetails(booking)}
-                          color="primary"
-                        >
-                          <Visibility fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {booking.status && booking.status.toLowerCase() === 'pending' && (
-                        <>
-                          <Tooltip title="Approve Booking">
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('🔵 Approve button clicked for booking:', booking);
-                                if (booking.id) {
-                                  handleApproveBooking(booking.id);
-                                } else {
-                                  showError('Error', 'Booking ID is missing');
-                                }
-                              }}
-                              color="success"
-                              sx={{
-                                '&:hover': {
-                                  bgcolor: 'success.light',
-                                  color: 'white'
-                                }
-                              }}
-                            >
-                              <ApproveIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Decline Booking">
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('🔴 Decline button clicked for booking:', booking);
-                                if (booking.id) {
-                                  handleDeclineBooking(booking.id);
-                                } else {
-                                  showError('Error', 'Booking ID is missing');
-                                }
-                              }}
-                              color="error"
-                              sx={{
-                                '&:hover': {
-                                  bgcolor: 'error.light',
-                                  color: 'white'
-                                }
-                              }}
-                            >
-                              <DeclineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        </Card>
+        <DataTable
+          columns={bookingColumns}
+          rows={bookings}
+          loading={loading}
+          title="Bookings"
+          subtitle={`${bookings.length} booking${bookings.length === 1 ? '' : 's'}`}
+          emptyTitle="No bookings yet"
+          emptyDescription="Guest bookings will appear here once submitted."
+          emptyIcon={CalendarIcon}
+          searchPlaceholder="Search by guest, property, or booking ID…"
+        />
       )}
 
       {/* TAB 2: PAYMENTS */}
       {activeTab === 2 && (
-        <Card sx={{ borderRadius: 2, boxShadow: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead sx={{ bgcolor: 'primary.main' }}>
-              <TableRow>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Transaction ID</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Booking ID</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Guest</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Property</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Amount</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Payment Method</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 700 }}>Date</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {payments.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    <PaymentIcon sx={{ fontSize: 60, color: '#ccc', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">
-                      No payments yet
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                payments.map((payment) => (
-                  <TableRow key={payment.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontFamily="monospace">
-                        {payment.payment_reference}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>#{payment.booking_id}</TableCell>
-                    <TableCell>{payment.guest_name}</TableCell>
-                    <TableCell>{payment.airbnb_title}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatCurrency(payment.amount, payment.currency)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={payment.payment_method?.replace('_', ' ').toUpperCase()}
-                        size="small"
-                        icon={<CreditCard />}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={payment.payment_status}
-                        size="small"
-                        color={getPaymentStatusColor(payment.payment_status)}
-                      />
-                    </TableCell>
-                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        </Card>
+        <DataTable
+          columns={paymentColumns}
+          rows={payments}
+          loading={loading}
+          title="Payments"
+          subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'}`}
+          emptyTitle="No payments yet"
+          emptyDescription="Payment transactions will appear here once guests pay."
+          emptyIcon={PaymentIcon}
+          searchPlaceholder="Search by guest, property, or transaction ID…"
+        />
       )}
 
       {/* Booking Details Dialog */}
@@ -1217,218 +1167,20 @@ const AdminAirbnb = () => {
           {editingAirbnb ? 'Edit Airbnb Listing' : 'Add Airbnb Listing'}
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                multiline
-                rows={3}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Location"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Country</InputLabel>
-                <Select
-                  name="country"
-                  value={formData.country}
-                  label="Country"
-                  onChange={handleChange}
-                >
-                  <MenuItem value="Uganda">Uganda</MenuItem>
-                  <MenuItem value="Kenya">Kenya</MenuItem>
-                  <MenuItem value="Tanzania">Tanzania</MenuItem>
-                  <MenuItem value="Rwanda">Rwanda</MenuItem>
-                  <MenuItem value="Burundi">Burundi</MenuItem>
-                  <MenuItem value="South Sudan">South Sudan</MenuItem>
-                  <MenuItem value="Ethiopia">Ethiopia</MenuItem>
-                  <MenuItem value="Somalia">Somalia</MenuItem>
-                  <MenuItem value="Djibouti">Djibouti</MenuItem>
-                  <MenuItem value="Eritrea">Eritrea</MenuItem>
-                  <MenuItem value="Sudan">Sudan</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Price per Night"
-                name="price_per_night"
-                type="number"
-                value={formData.price_per_night}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth>
-                <InputLabel>Currency</InputLabel>
-                <Select
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  label="Currency"
-                >
-                  <MenuItem value="UGX">UGX</MenuItem>
-                  <MenuItem value="USD">USD</MenuItem>
-                  <MenuItem value="EUR">EUR</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={4}>
-              <TextField
-                fullWidth
-                label="Max Guests"
-                name="max_guests"
-                type="number"
-                value={formData.max_guests}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={4}>
-              <TextField
-                fullWidth
-                label="Bedrooms"
-                name="bedrooms"
-                type="number"
-                value={formData.bedrooms}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={4}>
-              <TextField
-                fullWidth
-                label="Bathrooms"
-                name="bathrooms"
-                type="number"
-                value={formData.bathrooms}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Amenities"
-                name="amenities"
-                value={formData.amenities}
-                onChange={handleChange}
-                placeholder="WiFi, Pool, Parking, etc."
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="House Rules"
-                name="house_rules"
-                value={formData.house_rules}
-                onChange={handleChange}
-                multiline
-                rows={2}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Availability</InputLabel>
-                <Select
-                  name="is_available"
-                  value={formData.is_available}
-                  onChange={handleChange}
-                  label="Availability"
-                >
-                  <MenuItem value="available">Available</MenuItem>
-                  <MenuItem value="unavailable">Unavailable</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <input
-                accept="image/*"
-                style={{ display: 'none' }}
-                id="image-upload"
-                multiple
-                type="file"
-                onChange={handleImageSelect}
-              />
-              <label htmlFor="image-upload">
-                <Button
-                  variant="outlined"
-                  component="span"
-                  startIcon={<UploadIcon />}
-                  fullWidth
-                >
-                  Upload Images (Max 10)
-                </Button>
-              </label>
-              <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
-                <Typography variant="body2">
-                  <strong>Image Format Tip:</strong> Accepted formats are JPEG, JPG, PNG, or GIF. Maximum file size is 10MB per image.
-                </Typography>
-              </Alert>
-              {selectedImages.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" gutterBottom>
-                    Selected Images: {selectedImages.length}
-                  </Typography>
-                  <ImageList cols={3} gap={8}>
-                    {selectedImages.map((file, index) => (
-                      <ImageListItem key={index}>
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`Preview ${index}`}
-                          style={{ height: 100, objectFit: 'cover' }}
-                        />
-                        <ImageListItemBar
-                          actionIcon={
-                            <IconButton
-                              onClick={() => handleRemoveImage(index)}
-                              sx={{ color: 'white' }}
-                            >
-                              <DeleteImageIcon />
-                            </IconButton>
-                          }
-                        />
-                      </ImageListItem>
-                    ))}
-                  </ImageList>
-                </Box>
-              )}
-            </Grid>
-          </Grid>
+          <AirbnbListingFormFields
+            formData={formData}
+            setFormData={setFormData}
+            selectedImages={selectedImages}
+            onImageSelect={handleImageSelect}
+            onRemoveImage={handleRemoveImage}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={saveLoading}
+            disabled={saveLoading || (!editingAirbnb && selectedImages.length < MIN_AIRBNB_IMAGES)}
           >
             {saveLoading ? 'Saving...' : (editingAirbnb ? 'Update' : 'Create')}
           </Button>
@@ -1486,6 +1238,12 @@ const AdminAirbnb = () => {
                     <Grid item xs={12} sm={6}>
                       <Typography variant="caption" color="text.secondary">Title:</Typography>
                       <Typography variant="body1" fontWeight={600}>{viewingAirbnb.title}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Property type:</Typography>
+                      <Typography variant="body1" fontWeight={600}>
+                        {getAirbnbPropertyTypeLabel(viewingAirbnb.property_type)}
+                      </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="caption" color="text.secondary">Location:</Typography>

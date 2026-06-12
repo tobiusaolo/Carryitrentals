@@ -4,13 +4,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Button,
   IconButton,
   Alert,
@@ -27,7 +20,6 @@ import {
   Divider,
   Badge,
   Tooltip,
-  LinearProgress,
   Accordion,
   AccordionSummary,
   AccordionDetails
@@ -50,6 +42,9 @@ import {
 } from '@mui/icons-material';
 import additionalServicesAPI from '../../services/api/additionalServicesAPI';
 import authService from '../../services/authService';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdditionalServices = () => {
   const [loading, setLoading] = useState(false);
@@ -299,13 +294,176 @@ const AdditionalServices = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    const statusLower = status?.toLowerCase() || '';
-    if (statusLower === 'confirmed' || statusLower === 'completed') return 'success';
-    if (statusLower === 'pending') return 'warning';
-    if (statusLower === 'cancelled') return 'error';
-    return 'default';
-  };
+  const embeddedBookingColumns = [
+    {
+      id: 'client',
+      label: 'Client',
+      getSearchValue: (row) => `${row.contact_name || ''} ${row.contact_email || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>
+            <PersonIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
+            {booking.contact_name || 'N/A'}
+          </Typography>
+          {booking.contact_email && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              <EmailIcon sx={{ fontSize: 12, verticalAlign: 'middle', mr: 0.5 }} />
+              {booking.contact_email}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'contact',
+      label: 'Contact',
+      getSearchValue: (row) => row.contact_phone,
+      render: (booking) => (
+        <Typography variant="body2">
+          <PhoneIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
+          {booking.contact_phone || 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property',
+      getSearchValue: (row) => `${row.rental_unit?.title || ''} ${row.rental_unit?.location || ''} ${row.rental_unit_id || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2">
+            {booking.rental_unit?.title || booking.rental_unit_id || 'N/A'}
+          </Typography>
+          {booking.rental_unit?.location && (
+            <Typography variant="caption" color="text.secondary">
+              {booking.rental_unit.location}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'booking_date',
+      label: 'Booking Date',
+      render: (booking) => (
+        <Typography variant="body2">{formatDate(booking.booking_date)}</Typography>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (booking) => <OwnerStatusChip status={booking.status || 'unknown'} />,
+    },
+    {
+      id: 'created_at',
+      label: 'Date Added',
+      render: (booking) => (
+        <Typography variant="caption" color="text.secondary">
+          {formatDate(booking.created_at)}
+        </Typography>
+      ),
+    },
+  ];
+
+  const dialogBookingColumns = [
+    {
+      id: 'client',
+      label: 'Client Name',
+      getSearchValue: (row) => `${row.contact_name || ''} ${row.contact_email || ''}`,
+      render: (booking) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          <Typography variant="body2" fontWeight={600}>
+            {booking.contact_name || 'N/A'}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'contact_info',
+      label: 'Contact Info',
+      getSearchValue: (row) => `${row.contact_phone || ''} ${row.contact_email || ''} ${row.contact_country || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2">
+            <PhoneIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
+            {booking.contact_phone || 'N/A'}
+          </Typography>
+          {booking.contact_email && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              <EmailIcon sx={{ fontSize: 12, verticalAlign: 'middle', mr: 0.5 }} />
+              {booking.contact_email}
+            </Typography>
+          )}
+          {booking.contact_country && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {booking.contact_country}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property',
+      getSearchValue: (row) => `${row.rental_unit?.title || ''} ${row.rental_unit?.location || ''} ${row.rental_unit_id || ''}`,
+      render: (booking) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>
+            <HomeIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
+            {booking.rental_unit?.title || booking.rental_unit_id || 'N/A'}
+          </Typography>
+          {booking.rental_unit?.location && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {booking.rental_unit.location}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'booking_date',
+      label: 'Booking Date',
+      render: (booking) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <CalendarIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+          <Typography variant="body2">{formatDate(booking.booking_date)}</Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (booking) => <OwnerStatusChip status={booking.status || 'unknown'} />,
+    },
+    {
+      id: 'created_at',
+      label: 'Date Added',
+      render: (booking) => (
+        <Typography variant="caption" color="text.secondary">
+          {formatDate(booking.created_at)}
+        </Typography>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (booking) => (
+        <TableActions
+          actions={[
+            {
+              icon: <ViewIcon fontSize="small" />,
+              label: 'View Inspection Details',
+              onClick: () => {
+                window.location.href = `/admin/inspections?booking_id=${booking.id || booking.booking_id}`;
+              },
+            },
+          ]}
+        />
+      ),
+    },
+  ];
 
   if (loading && services.length === 0) {
     return (
@@ -317,15 +475,7 @@ const AdditionalServices = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight={700} gutterBottom>
-            Additional Services Management
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage services and view bookings - Ordered by most used first
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -491,87 +641,17 @@ const AdditionalServices = () => {
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    {loadingBookings ? (
-                      <LinearProgress sx={{ mb: 2 }} />
-                    ) : (
-                      <TableContainer component={Paper} variant="outlined">
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell><strong>Client</strong></TableCell>
-                              <TableCell><strong>Contact</strong></TableCell>
-                              <TableCell><strong>Property</strong></TableCell>
-                              <TableCell><strong>Booking Date</strong></TableCell>
-                              <TableCell><strong>Status</strong></TableCell>
-                              <TableCell><strong>Date Added</strong></TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {(service.bookings || []).length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={6} align="center">
-                                  <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                                    No bookings found for this service
-                                  </Typography>
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              (service.bookings || []).map((booking) => (
-                                <TableRow key={booking.booking_id} hover>
-                                  <TableCell>
-                                    <Box>
-                                      <Typography variant="body2" fontWeight={600}>
-                                        <PersonIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
-                                        {booking.contact_name || 'N/A'}
-                                      </Typography>
-                                      {booking.contact_email && (
-                                        <Typography variant="caption" color="text.secondary" display="block">
-                                          <EmailIcon sx={{ fontSize: 12, verticalAlign: 'middle', mr: 0.5 }} />
-                                          {booking.contact_email}
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="body2">
-                                      <PhoneIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
-                                      {booking.contact_phone || 'N/A'}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="body2">
-                                      {booking.rental_unit?.title || booking.rental_unit_id || 'N/A'}
-                                    </Typography>
-                                    {booking.rental_unit?.location && (
-                                      <Typography variant="caption" color="text.secondary">
-                                        {booking.rental_unit.location}
-                                      </Typography>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="body2">
-                                      {formatDate(booking.booking_date)}
-                                    </Typography>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Chip
-                                      label={booking.status || 'N/A'}
-                                      size="small"
-                                      color={getStatusColor(booking.status)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {formatDate(booking.created_at)}
-                                    </Typography>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    )}
+                    <DataTable
+                      columns={embeddedBookingColumns}
+                      rows={service.bookings || []}
+                      loading={loadingBookings}
+                      dense
+                      pageSize={5}
+                      emptyTitle="No bookings for this service"
+                      emptyDescription="No bookings found for this service."
+                      searchPlaceholder="Search bookings…"
+                      getRowId={(row) => row.booking_id || row.id}
+                    />
                   </AccordionDetails>
                 </Accordion>
               )}
@@ -653,128 +733,21 @@ const AdditionalServices = () => {
                   All Bookings (Latest First)
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
-                {loadingBookings ? (
-                  <LinearProgress />
-                ) : (
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell><strong>Client Name</strong></TableCell>
-                          <TableCell><strong>Contact Info</strong></TableCell>
-                          <TableCell><strong>Property</strong></TableCell>
-                          <TableCell><strong>Booking Date</strong></TableCell>
-                          <TableCell><strong>Status</strong></TableCell>
-                          <TableCell><strong>Date Added</strong></TableCell>
-                          <TableCell><strong>Actions</strong></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {loadingBookings ? (
-                          <TableRow>
-                            <TableCell colSpan={7} align="center">
-                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
-                                <CircularProgress size={24} sx={{ mb: 1 }} />
-                                <Typography variant="body2" color="text.secondary">
-                                  Loading bookings...
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        ) : serviceBookings.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} align="center">
-                              <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                                {viewingService?.booking_count > 0 
-                                  ? `No bookings loaded yet (${viewingService.booking_count} expected). Please try again.`
-                                  : 'No bookings found for this service'}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          serviceBookings.map((booking) => (
-                            <TableRow key={booking.booking_id || booking.id} hover>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {booking.contact_name || 'N/A'}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Box>
-                                  <Typography variant="body2">
-                                    <PhoneIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
-                                    {booking.contact_phone || 'N/A'}
-                                  </Typography>
-                                  {booking.contact_email && (
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      <EmailIcon sx={{ fontSize: 12, verticalAlign: 'middle', mr: 0.5 }} />
-                                      {booking.contact_email}
-                                    </Typography>
-                                  )}
-                                  {booking.contact_country && (
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      {booking.contact_country}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Box>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    <HomeIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.5 }} />
-                                    {booking.rental_unit?.title || booking.rental_unit_id || 'N/A'}
-                                  </Typography>
-                                  {booking.rental_unit?.location && (
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      {booking.rental_unit.location}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <CalendarIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                  <Typography variant="body2">
-                                    {formatDate(booking.booking_date)}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Chip
-                                  label={booking.status || 'N/A'}
-                                  size="small"
-                                  color={getStatusColor(booking.status)}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="caption" color="text.secondary">
-                                  {formatDate(booking.created_at)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Tooltip title="View Inspection Details">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      // Navigate to inspection details
-                                      window.location.href = `/admin/inspections?booking_id=${booking.id || booking.booking_id}`;
-                                    }}
-                                    color="primary"
-                                  >
-                                    <ViewIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
+                <DataTable
+                  columns={dialogBookingColumns}
+                  rows={serviceBookings}
+                  loading={loadingBookings}
+                  title="All Bookings"
+                  subtitle="Latest bookings first"
+                  emptyTitle="No bookings found"
+                  emptyDescription={
+                    viewingService?.booking_count > 0
+                      ? `No bookings loaded yet (${viewingService.booking_count} expected). Please try again.`
+                      : 'No bookings found for this service'
+                  }
+                  searchPlaceholder="Search by client, property, or contact…"
+                  getRowId={(row) => row.booking_id || row.id}
+                />
               </Grid>
             </Grid>
           )}

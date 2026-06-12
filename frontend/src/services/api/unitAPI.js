@@ -55,6 +55,10 @@ export const unitAPI = {
   // Update rental unit
   updateRentalUnit: (id, unitData) => authService.put(`/rental-units/${id}`, unitData),
 
+  // Admin: mark rental listing as verified on the public marketplace
+  setRentalUnitVerified: (id, verified) =>
+    authService.patch(`/rental-units/${id}/verified?verified=${verified ? 'true' : 'false'}`),
+
   // Delete a unit
   deleteUnit: (id) => authService.delete(`/units/${id}`),
 

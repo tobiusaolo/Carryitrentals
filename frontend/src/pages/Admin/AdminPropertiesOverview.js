@@ -5,20 +5,11 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
   CircularProgress,
-  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -27,7 +18,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -45,6 +36,9 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminPropertiesOverview = () => {
   const dispatch = useDispatch();
@@ -70,57 +64,59 @@ const AdminPropertiesOverview = () => {
     owner_id: ''
   });
 
+  const buildPropertiesData = (source) =>
+    source.map((property) => ({
+      id: property.id,
+      name: property.name,
+      address: property.address,
+      city: property.city,
+      property_type: property.property_type,
+      total_units: property.total_units || 0,
+      occupied_units: property.units?.filter((unit) => unit.status === 'occupied').length || 0,
+      available_units: property.units?.filter((unit) => unit.status === 'available').length || 0,
+      monthly_rent: property.monthly_rent || 0,
+      total_monthly_revenue: (property.monthly_rent || 0) * (property.total_units || 0),
+      occupancy_rate: property.total_units > 0
+        ? ((property.units?.filter((unit) => unit.status === 'occupied').length || 0) / property.total_units * 100)
+        : 0,
+      owner: {
+        name: property.owner ? `${property.owner.first_name} ${property.owner.last_name}` : 'Unknown Owner',
+        email: property.owner?.email || 'N/A',
+        phone: property.owner?.phone || 'N/A',
+      },
+      tenants: property.units?.flatMap((unit) =>
+        unit.tenants?.map((tenant) => ({
+          name: `${tenant.first_name} ${tenant.last_name}`,
+          unit: unit.unit_number,
+          email: tenant.email,
+          phone: tenant.phone,
+        })) || []
+      ) || [],
+      status: property.status || 'active',
+      created_at: property.created_at,
+      last_activity: property.updated_at
+        ? new Date(property.updated_at).toLocaleDateString()
+        : 'Unknown',
+    }));
+
   useEffect(() => {
     if (user?.role === 'admin') {
-      loadPropertiesData();
+      if (!properties.length) setLoading(true);
+      dispatch(fetchProperties());
     }
-  }, [user]);
+  }, [user, dispatch]);
 
-  const loadPropertiesData = async () => {
-    setLoading(true);
-    try {
-      await dispatch(fetchProperties());
-      
-      // Mock properties data with high-level information
-      // Use real properties data from the store
-      const propertiesWithDetails = properties.map(property => ({
-        id: property.id,
-        name: property.name,
-        address: property.address,
-        city: property.city,
-        property_type: property.property_type,
-        total_units: property.total_units || 0,
-        occupied_units: property.units?.filter(unit => unit.status === 'occupied').length || 0,
-        available_units: property.units?.filter(unit => unit.status === 'available').length || 0,
-        monthly_rent: property.monthly_rent || 0,
-        total_monthly_revenue: (property.monthly_rent || 0) * (property.total_units || 0),
-        occupancy_rate: property.total_units > 0 ? 
-          ((property.units?.filter(unit => unit.status === 'occupied').length || 0) / property.total_units * 100) : 0,
-        owner: {
-          name: property.owner ? `${property.owner.first_name} ${property.owner.last_name}` : 'Unknown Owner',
-          email: property.owner?.email || 'N/A',
-          phone: property.owner?.phone || 'N/A'
-        },
-        tenants: property.units?.flatMap(unit => 
-          unit.tenants?.map(tenant => ({
-            name: `${tenant.first_name} ${tenant.last_name}`,
-            unit: unit.unit_number,
-            email: tenant.email,
-            phone: tenant.phone
-          })) || []
-        ) || [],
-        status: property.status || 'active',
-        created_at: property.created_at,
-        last_activity: property.updated_at ? 
-          new Date(property.updated_at).toLocaleDateString() : 'Unknown'
-      }));
-
-      setPropertiesData(propertiesWithDetails);
-    } catch (err) {
-      setError('Failed to load properties data');
-    } finally {
+  useEffect(() => {
+    if (properties.length > 0) {
+      setPropertiesData(buildPropertiesData(properties));
+      setError(null);
       setLoading(false);
     }
+  }, [properties]);
+
+  const loadPropertiesData = () => {
+    setLoading(true);
+    dispatch(fetchProperties({ __refresh: true }));
   };
 
   const handleViewProperty = (property) => {
@@ -235,17 +231,108 @@ const AdminPropertiesOverview = () => {
     );
   }
 
+  const propertyColumns = [
+    {
+      id: 'name',
+      label: 'Property',
+      getSearchValue: (row) => `${row.name} ${row.property_type}`,
+      render: (property) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2, bgcolor: 'primary.light' }}>
+            <HomeIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2">{property.name}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {property.property_type}
+            </Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      getSearchValue: (row) => `${row.address} ${row.city}`,
+      render: (property) => (
+        <Box>
+          <Typography variant="body2">{property.address}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {property.city}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'owner',
+      label: 'Owner',
+      getSearchValue: (row) => `${row.owner?.name || ''} ${row.owner?.email || ''}`,
+      render: (property) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {property.owner.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {property.owner.email}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'total_units',
+      label: 'Units',
+      render: (property) => (
+        <Typography variant="body2" fontWeight="bold">
+          {property.total_units}
+        </Typography>
+      ),
+    },
+    {
+      id: 'occupancy',
+      label: 'Occupancy',
+      getSearchValue: (row) => `${row.occupied_units} ${row.total_units} ${row.occupancy_rate}`,
+      render: (property) => (
+        <Box>
+          <Typography variant="body2">
+            <strong>{property.occupied_units}</strong> / {property.total_units}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {property.occupancy_rate}% occupied
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'revenue',
+      label: 'Monthly Revenue',
+      render: (property) => (
+        <Typography variant="body2" fontWeight="bold" color="success.main">
+          ${property.total_monthly_revenue.toLocaleString()}
+        </Typography>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (property) => <OwnerStatusChip status={property.status} />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (property) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleViewProperty(property) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Property', onClick: () => handleEditProperty(property) },
+          ]}
+        />
+      ),
+    },
+  ];
+
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <HomeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Properties Overview
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Comprehensive overview of all properties in the system with units, tenants, and location information.
-      </Typography>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -300,109 +387,17 @@ const AdminPropertiesOverview = () => {
         </Grid>
       </Grid>
 
-      {/* Properties Table */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            All Properties in System
-          </Typography>
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Property</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell>Owner</TableCell>
-                  <TableCell>Units</TableCell>
-                  <TableCell>Occupancy</TableCell>
-                  <TableCell>Monthly Revenue</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {propertiesData.map((property) => (
-                  <TableRow key={property.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'primary.light' }}>
-                          <HomeIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{property.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {property.property_type}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">{property.address}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {property.city}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {property.owner.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {property.owner.email}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold">
-                        {property.total_units}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          <strong>{property.occupied_units}</strong> / {property.total_units}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {property.occupancy_rate}% occupied
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        ${property.total_monthly_revenue.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={property.status} 
-                        color={property.status === 'active' ? "success" : "default"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton size="small" onClick={() => handleViewProperty(property)}>
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Property">
-                          <IconButton size="small" onClick={() => handleEditProperty(property)}>
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={propertyColumns}
+        rows={propertiesData}
+        title="All Properties in System"
+        subtitle="Properties with units, occupancy, and revenue"
+        emptyTitle="No properties found"
+        emptyDescription="There are no properties in the system yet."
+        emptyIcon={HomeIcon}
+        searchPlaceholder="Search by property, location, or owner…"
+        getRowId={(row) => row.id}
+      />
 
       {/* View Property Dialog */}
       <Dialog open={viewDialogOpen} onClose={handleCloseViewDialog} maxWidth="md" fullWidth>

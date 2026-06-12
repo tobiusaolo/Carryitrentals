@@ -1,17 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Grid,
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
   Paper,
   Chip,
   Avatar,
@@ -63,19 +56,75 @@ import { useDispatch, useSelector } from 'react-redux';
 import authService from '../../services/authService';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert, showInfo } from '../../utils/sweetAlert';
 import Swal from 'sweetalert2';
+import PageHeader from '../../components/UI/PageHeader';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import { colors } from '../../theme/designTokens';
+import { useCachedQuery } from '../../hooks/useCachedQuery';
+
+function parseInspectionsPayload(responseData) {
+  let inspectionsData = [];
+  let total = 0;
+
+  if (responseData && typeof responseData === 'object') {
+    if (Array.isArray(responseData)) {
+      inspectionsData = responseData;
+      total = responseData.length;
+    } else if (responseData.items && Array.isArray(responseData.items)) {
+      inspectionsData = responseData.items;
+      total = responseData.total || responseData.items.length;
+    } else if (responseData.bookings && Array.isArray(responseData.bookings)) {
+      inspectionsData = responseData.bookings;
+      total = responseData.total || responseData.bookings.length;
+    } else {
+      const keys = Object.keys(responseData);
+      for (const key of keys) {
+        if (Array.isArray(responseData[key])) {
+          inspectionsData = responseData[key];
+          total = responseData.total || responseData[key].length;
+          break;
+        }
+      }
+    }
+  }
+
+  return { items: inspectionsData, total };
+}
 
 const AdminInspections = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [inspections, setInspections] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [agents, setAgents] = useState([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
+  const portalEnabled = user?.role === 'admin';
+
+  const {
+    data: inspectionsResult = { items: [], total: 0 },
+    loading,
+    refreshing,
+    error,
+    refresh: loadInspections,
+  } = useCachedQuery('/admin/inspection-bookings?skip=0&limit=5000', {
+    enabled: portalEnabled,
+    select: parseInspectionsPayload,
+  });
+
+  const { data: units = [], refresh: loadUnits } = useCachedQuery('/rental-units/', {
+    enabled: portalEnabled,
+  });
+
+  const { data: agents = [], refresh: loadAgents } = useCachedQuery('/agents/', {
+    enabled: portalEnabled,
+  });
+
+  const { data: paymentMethods = [], refresh: loadPaymentMethods } = useCachedQuery('/payment-methods/', {
+    enabled: portalEnabled,
+    select: (data) => (data || []).filter((m) => m.is_active !== false),
+  });
+
+  const inspections = inspectionsResult.items;
+  const totalCount = inspectionsResult.total;
   const [openDialog, setOpenDialog] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
   const [formData, setFormData] = useState({
@@ -91,167 +140,44 @@ const AdminInspections = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [qrCodeDialogOpen, setQrCodeDialogOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [viewingInspection, setViewingInspection] = useState(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedInspectionForMenu, setSelectedInspectionForMenu] = useState(null);
-
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadInspections();
-      loadUnits();
-      loadAgents();
-      loadPaymentMethods();
-    }
-  }, [user, page, rowsPerPage]);
-
-  const loadInspections = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Use axios instance from authService which has proper interceptors
-      const api = authService.createAxiosInstance();
-      const skip = page * rowsPerPage;
-      console.log(`📥 Loading inspections: skip=${skip}, limit=${rowsPerPage}`);
-      
-      const response = await api.get(`/admin/inspection-bookings?skip=${skip}&limit=${rowsPerPage}`);
-      
-      console.log(`✅ Inspection response:`, response.data);
-      
-      // Handle paginated response
-      let inspectionsData = [];
-      let total = 0;
-      
-      if (response.data && typeof response.data === 'object') {
-        if (Array.isArray(response.data)) {
-          // Direct array response
-          inspectionsData = response.data;
-          total = response.data.length;
-        } else if (response.data.items && Array.isArray(response.data.items)) {
-          // Paginated response with items
-          inspectionsData = response.data.items;
-          total = response.data.total || response.data.items.length;
-        } else if (response.data.bookings && Array.isArray(response.data.bookings)) {
-          // Alternative paginated format
-          inspectionsData = response.data.bookings;
-          total = response.data.total || response.data.bookings.length;
-        } else {
-          // Try to find any array in the response
-          const keys = Object.keys(response.data);
-          for (const key of keys) {
-            if (Array.isArray(response.data[key])) {
-              inspectionsData = response.data[key];
-              total = response.data.total || response.data[key].length;
-              break;
-            }
-          }
-        }
-      }
-      
-      console.log(`✅ Loaded ${inspectionsData.length} inspections (page ${page + 1}, total: ${total})`);
-      setInspections(inspectionsData);
-      setTotalCount(total);
-      setError(null);
-      setLoading(false);
-    } catch (err) {
-      console.error('❌ Failed to load inspections:', err);
-      console.error('Error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        url: err.config?.url
-      });
-      setError(err.response?.data?.detail || err.message || 'Failed to load inspections');
-      setInspections([]);
-      setTotalCount(0);
-      setLoading(false);
-    }
-  };
-
-  const loadUnits = async () => {
-    try {
-      // Fetch real rental units from API
-      const api = authService.createAxiosInstance();
-      const response = await api.get('/rental-units/');
-      setUnits(response.data);
-    } catch (err) {
-      console.error('Failed to load units:', err);
-      // Fallback to empty array if API fails
-      setUnits([]);
-    }
-  };
-
-  const loadAgents = async () => {
-    try {
-      // Fetch real agents from API
-      const api = authService.createAxiosInstance();
-      const response = await api.get('/agents/');
-      setAgents(response.data);
-    } catch (err) {
-      console.error('Failed to load agents:', err);
-      // Fallback to empty array if API fails
-      setAgents([]);
-    }
-  };
-
-  const loadPaymentMethods = async () => {
-    try {
-      // Mock payment methods data
-      const mockPaymentMethods = [
-        { 
-          id: 1, 
-          name: 'MTN Mobile Money', 
-          type: 'mtn_mobile_money',
-          account_number: '256700000000',
-          account_name: 'Admin MTN',
-          is_active: true
-        },
-        { 
-          id: 2, 
-          name: 'Airtel Money', 
-          type: 'airtel_money',
-          account_number: '256700000001',
-          account_name: 'Admin Airtel',
-          is_active: true
-        },
-        { 
-          id: 3, 
-          name: 'Bank Account', 
-          type: 'bank_account',
-          account_number: '1234567890',
-          account_name: 'Admin Bank Account',
-          bank_name: 'Example Bank',
-          is_active: true
-        }
-      ];
-      setPaymentMethods(mockPaymentMethods);
-    } catch (err) {
-      console.error('Failed to load payment methods:', err);
-    }
-  };
+  const [adminTxId, setAdminTxId] = useState('');
 
   const handleGenerateQRCode = async (inspection) => {
     try {
       setSelectedInspection(inspection);
-      // Mock QR code generation
-      const mockQRData = {
-        payment_id: 1,
-        amount: 50,
-        currency: 'UGX',
-        payment_url: `${window.location.origin}/inspection-payment/1`,
-        qr_code: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        payment_methods: paymentMethods
-      };
-      setQrCodeData(mockQRData);
+      const api = authService.createAxiosInstance();
+      const response = await api.post(`/inspection-payments/booking/${inspection.id}/generate-qr`);
+      setQrCodeData(response.data);
       setQrCodeDialogOpen(true);
     } catch (err) {
-      setError('Failed to generate QR code');
+      const detail = err.response?.data?.detail;
+      showError('Payment QR', typeof detail === 'string' ? detail : 'No payment for this booking.');
+    }
+  };
+
+  const handleAdminMarkPaid = async (paymentId, transactionId) => {
+    if (!transactionId?.trim()) {
+      showError('Transaction required', 'Enter the mobile money transaction ID.');
+      return;
+    }
+    try {
+      const api = authService.createAxiosInstance();
+      await api.post(`/inspection-payments/${paymentId}/mark-paid`, { transaction_id: transactionId.trim() });
+      showSuccess('Payment confirmed', 'Marked as paid.');
+      setPaymentDialogOpen(false);
+      loadInspections();
+    } catch (err) {
+      showError('Failed', err.response?.data?.detail || 'Could not mark as paid');
     }
   };
 
   const handlePaymentManagement = (inspection) => {
     setSelectedInspection(inspection);
+    setAdminTxId('');
     setPaymentDialogOpen(true);
   };
 
@@ -339,8 +265,6 @@ const AdminInspections = () => {
       editingInspection ? 'Updating...' : 'Creating...',
       'Please wait while we save the inspection'
     );
-    setLoading(true);
-    
     try {
       const api = authService.createAxiosInstance();
       
@@ -356,7 +280,6 @@ const AdminInspections = () => {
         
         const response = await api.put(`/admin/inspection-bookings/${editingInspection.id}`, updateData);
         console.log('Inspection updated:', response.data);
-        setError(null);
       } else {
         // Create new inspection booking via public endpoint
         const createData = {
@@ -372,7 +295,6 @@ const AdminInspections = () => {
         
         const response = await api.post('/inspection-bookings/public', createData);
         console.log('Inspection created:', response.data);
-        setError(null);
       }
       
       closeAlert();
@@ -395,9 +317,7 @@ const AdminInspections = () => {
       console.error('Failed to save inspection:', err);
       closeAlert();
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to save inspection';
-      setError(errorMessage);
       showError('Save Failed', errorMessage);
-      setLoading(false);
     }
   };
 
@@ -423,16 +343,12 @@ const AdminInspections = () => {
         
         // Reload inspections to show updated data
         await loadInspections();
-        setError(null);
         showSuccess('Inspection Deleted', 'The inspection has been successfully deleted.');
       } catch (err) {
         console.error('Failed to delete inspection:', err);
         closeAlert();
         const errorMessage = err.response?.data?.detail || err.message || 'Failed to delete inspection';
-        setError(errorMessage);
         showError('Delete Failed', errorMessage);
-      } finally {
-        setLoading(false);
       }
     }
   };
@@ -474,13 +390,11 @@ const AdminInspections = () => {
     }
     
     const loadingAlert = showLoading('Approving...', 'Please wait while we approve the inspection');
-    setLoading(true);
     try {
       const api = authService.createAxiosInstance();
       await api.patch(`/admin/inspection-bookings/${bookingId}/approve`, {});
       
       closeAlert();
-      setError(null);
       
       // Wait a brief moment for the backend to process, then refresh
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -492,9 +406,7 @@ const AdminInspections = () => {
       console.error('Error approving inspection:', err);
       closeAlert();
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to approve inspection';
-      setError(errorMessage);
       showError('Approval Failed', errorMessage);
-      setLoading(false);
     }
   };
 
@@ -524,7 +436,6 @@ const AdminInspections = () => {
     }
     
     const loadingAlert = showLoading('Rejecting...', 'Please wait while we reject the inspection');
-    setLoading(true);
     try {
       const api = authService.createAxiosInstance();
       await api.patch(
@@ -536,7 +447,6 @@ const AdminInspections = () => {
       );
       
       closeAlert();
-      setError(null);
       
       // Wait a brief moment for the backend to process, then refresh
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -548,9 +458,7 @@ const AdminInspections = () => {
       console.error('Error rejecting inspection:', err);
       closeAlert();
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to reject inspection';
-      setError(errorMessage);
       showError('Rejection Failed', errorMessage);
-      setLoading(false);
     }
   };
 
@@ -565,16 +473,213 @@ const AdminInspections = () => {
     );
   }
 
+  const pendingCount = inspections.filter((i) => i.status?.toLowerCase() === 'pending').length;
+
+  const inspectionColumns = [
+    {
+      id: 'id',
+      label: 'Inspection ID',
+      getSearchValue: (row) => `#${row.id}`,
+      render: (inspection) => (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={600}>
+            #{inspection.id}
+          </Typography>
+          {inspection.is_public_booking && (
+            <Chip label="Public" size="small" color="info" sx={{ mt: 0.5 }} />
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property',
+      getSearchValue: (row) =>
+        `${row.rental_unit?.title || row.rental_unit?.name || ''} ${row.rental_unit?.location || ''} ${row.rental_unit_id || ''}`,
+      render: (inspection) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {inspection.rental_unit?.title || inspection.rental_unit?.name || inspection.rental_unit_id || `Booking ID: ${inspection.id}`}
+          </Typography>
+          {inspection.rental_unit?.location && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {inspection.rental_unit.location}
+            </Typography>
+          )}
+          {inspection.rental_unit?.unit_type && (
+            <Typography variant="caption" display="block" color="primary">
+              {inspection.rental_unit.unit_type}
+            </Typography>
+          )}
+          {inspection.rental_unit_id && !inspection.rental_unit && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              Unit ID: {inspection.rental_unit_id}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'client',
+      label: 'Client',
+      getSearchValue: (row) =>
+        `${row.contact_name || row.tenant?.name || ''} ${row.contact_email || ''}`,
+      render: (inspection) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {inspection.contact_name || inspection.tenant?.name || 'N/A'}
+          </Typography>
+          {inspection.contact_email && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {inspection.contact_email}
+            </Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'contact_phone',
+      label: 'Contact',
+      getSearchValue: (row) => row.contact_phone,
+      render: (inspection) => (
+        <Typography variant="body2">{inspection.contact_phone || 'N/A'}</Typography>
+      ),
+    },
+    {
+      id: 'booking_date',
+      label: 'Date & Time',
+      getSearchValue: (row) =>
+        `${new Date(row.booking_date).toLocaleDateString()} ${row.preferred_time_slot || ''}`,
+      render: (inspection) => (
+        <Box>
+          <Typography variant="body2">
+            {new Date(inspection.booking_date).toLocaleDateString()}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            {inspection.preferred_time_slot
+              ? inspection.preferred_time_slot.charAt(0).toUpperCase() + inspection.preferred_time_slot.slice(1)
+              : 'Not specified'}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (inspection) => <OwnerStatusChip status={inspection.status} />,
+    },
+    {
+      id: 'payment',
+      label: 'Payment',
+      render: (inspection) =>
+        inspection.payment?.payment_id ? (
+          <Chip
+            size="small"
+            label={inspection.payment_status || inspection.payment?.status || 'pending'}
+            color={
+              (inspection.payment_status || inspection.payment?.status) === 'paid'
+                ? 'success'
+                : 'warning'
+            }
+            onClick={() => handlePaymentManagement(inspection)}
+            sx={{ cursor: 'pointer' }}
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            No payment
+          </Typography>
+        ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (inspection) => (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
+          {inspection.status?.toLowerCase() === 'pending' && (
+            <>
+              <Tooltip title="Approve Inspection">
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="success"
+                  startIcon={<ApproveIcon />}
+                  onClick={() => handleApproveBooking(inspection.id)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    boxShadow: 2,
+                    px: 2,
+                    '&:hover': { boxShadow: 4, transform: 'translateY(-1px)' },
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  Approve
+                </Button>
+              </Tooltip>
+              <Tooltip title="Reject Inspection">
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  startIcon={<RejectIcon />}
+                  onClick={() => handleRejectBooking(inspection.id)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    boxShadow: 2,
+                    px: 2,
+                    '&:hover': { boxShadow: 4, transform: 'translateY(-1px)' },
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  Reject
+                </Button>
+              </Tooltip>
+            </>
+          )}
+          {inspection.status?.toLowerCase() !== 'pending' && (
+            <OwnerStatusChip status={inspection.status} />
+          )}
+          <Tooltip title="More Actions">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                setActionMenuAnchor(e.currentTarget);
+                setSelectedInspectionForMenu(inspection);
+              }}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                ml: 'auto',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                  borderColor: 'primary.main',
+                  transform: 'scale(1.05)',
+                },
+                transition: 'all 0.2s',
+              }}
+            >
+              <MoreVertIcon />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ),
+    },
+  ];
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <AssignmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Inspections Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Schedule and manage inspections for available rental units. Track inspection history and assign agents to conduct inspections.
-      </Typography>
+    <Box>
+      <PageHeader
+        variant="admin"
+        title="Inspections"
+        subtitle={`${pendingCount} pending · ${totalCount} total`}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Schedule
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -582,401 +687,119 @@ const AdminInspections = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <AssignmentIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{inspections.length}</Typography>
-                  <Typography color="text.secondary">Total Inspections</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard title="Total" value={inspections.length} icon={<AssignmentIcon />} variantIndex={1} />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <ScheduleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {inspections.filter(i => i.status?.toLowerCase() === 'pending').length}
-                  </Typography>
-                  <Typography color="text.secondary">Pending</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard
+            title="Pending"
+            value={inspections.filter((i) => i.status?.toLowerCase() === 'pending').length}
+            icon={<ScheduleIcon />}
+            variantIndex={2}
+          />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {inspections.filter(i => i.status?.toLowerCase() === 'confirmed').length}
-                  </Typography>
-                  <Typography color="text.secondary">Confirmed</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard
+            title="Confirmed"
+            value={inspections.filter((i) => i.status?.toLowerCase() === 'confirmed').length}
+            icon={<CheckCircleIcon />}
+            variantIndex={0}
+          />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {inspections.filter(i => i.status?.toLowerCase() === 'completed').length}
-                  </Typography>
-                  <Typography color="text.secondary">Completed</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
-                  <WarningIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {inspections.filter(i => i.status?.toLowerCase() === 'cancelled').length}
-                  </Typography>
-                  <Typography color="text.secondary">Cancelled</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={6} sm={3}>
+          <OwnerStatCard
+            title="Completed"
+            value={inspections.filter((i) => i.status?.toLowerCase() === 'completed').length}
+            icon={<CheckCircleIcon />}
+            variantIndex={0}
+          />
         </Grid>
       </Grid>
 
-      {/* Inspections Table */}
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              All Inspections
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
-              Schedule Inspection
-            </Button>
-          </Box>
-          
-          {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
-            </Box>
-          )}
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Inspection ID</TableCell>
-                  <TableCell>Property</TableCell>
-                  <TableCell>Client</TableCell>
-                  <TableCell>Contact</TableCell>
-                  <TableCell>Date & Time</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {!loading && inspections.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                        No inspections found
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!loading && inspections.map((inspection) => (
-                  <TableRow key={inspection.id}>
-                    {/* Inspection ID */}
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        #{inspection.id}
-                      </Typography>
-                      {inspection.is_public_booking && (
-                        <Chip 
-                          label="Public" 
-                          size="small" 
-                          color="info"
-                          sx={{ mt: 0.5 }}
-                        />
-                      )}
-                    </TableCell>
-                    
-                    {/* Property */}
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {inspection.rental_unit?.title || inspection.rental_unit?.name || inspection.rental_unit_id || `Booking ID: ${inspection.id}`}
-                        </Typography>
-                        {inspection.rental_unit?.location && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {inspection.rental_unit.location}
-                          </Typography>
-                        )}
-                        {inspection.rental_unit?.unit_type && (
-                          <Typography variant="caption" display="block" color="primary">
-                            {inspection.rental_unit.unit_type}
-                          </Typography>
-                        )}
-                        {inspection.rental_unit_id && !inspection.rental_unit && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Unit ID: {inspection.rental_unit_id}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    
-                    {/* Client */}
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {inspection.contact_name || inspection.tenant?.name || 'N/A'}
-                        </Typography>
-                        {inspection.contact_email && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {inspection.contact_email}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    
-                    {/* Contact */}
-                    <TableCell>
-                      <Typography variant="body2">
-                        {inspection.contact_phone || 'N/A'}
-                      </Typography>
-                    </TableCell>
-                    
-                    {/* Date & Time */}
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(inspection.booking_date).toLocaleDateString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {inspection.preferred_time_slot ? 
-                          inspection.preferred_time_slot.charAt(0).toUpperCase() + inspection.preferred_time_slot.slice(1) 
-                          : 'Not specified'}
-                      </Typography>
-                    </TableCell>
-                    
-                    {/* Status */}
-                    <TableCell>
-                      <Chip 
-                        label={inspection.status} 
-                        color={getStatusColor(inspection.status)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    
-                    {/* Actions */}
-                    <TableCell sx={{ minWidth: 200 }}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                        {/* Primary Actions - Status-based */}
-                        {inspection.status?.toLowerCase() === 'pending' && (
-                          <>
-                            <Tooltip title="Approve Inspection">
-                              <Button
-                                size="small"
-                                variant="contained"
-                                color="success"
-                                startIcon={<ApproveIcon />}
-                                onClick={() => handleApproveBooking(inspection.id)}
-                                sx={{
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  boxShadow: 2,
-                                  px: 2,
-                                  '&:hover': {
-                                    boxShadow: 4,
-                                    transform: 'translateY(-1px)'
-                                  },
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                Approve
-                              </Button>
-                            </Tooltip>
-                            <Tooltip title="Reject Inspection">
-                              <Button
-                                size="small"
-                                variant="contained"
-                                color="error"
-                                startIcon={<RejectIcon />}
-                                onClick={() => handleRejectBooking(inspection.id)}
-                                sx={{
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  boxShadow: 2,
-                                  px: 2,
-                                  '&:hover': {
-                                    boxShadow: 4,
-                                    transform: 'translateY(-1px)'
-                                  },
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                Reject
-                              </Button>
-                            </Tooltip>
-                          </>
-                        )}
-                        
-                        {/* Show status badge for non-pending inspections */}
-                        {inspection.status?.toLowerCase() !== 'pending' && (
-                          <Chip
-                            label={inspection.status}
-                            color={getStatusColor(inspection.status)}
-                            size="small"
-                            sx={{ fontWeight: 600 }}
-                          />
-                        )}
-                        
-                        {/* Secondary Actions Menu */}
-                        <Tooltip title="More Actions">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              setActionMenuAnchor(e.currentTarget);
-                              setSelectedInspectionForMenu(inspection);
-                            }}
-                            sx={{
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              ml: 'auto',
-                              '&:hover': {
-                                bgcolor: 'action.hover',
-                                borderColor: 'primary.main',
-                                transform: 'scale(1.05)'
-                              },
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <MoreVertIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          
-          {/* Actions Menu */}
-          <Menu
-            anchorEl={actionMenuAnchor}
-            open={Boolean(actionMenuAnchor)}
-            onClose={() => {
-              setActionMenuAnchor(null);
-              setSelectedInspectionForMenu(null);
-            }}
-            PaperProps={{
-              sx: {
-                mt: 1.5,
-                minWidth: 200,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                borderRadius: 2
-              }
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
-            <MenuItem
-              onClick={() => {
-                if (selectedInspectionForMenu) {
-                  handleView(selectedInspectionForMenu);
-                }
-                setActionMenuAnchor(null);
-                setSelectedInspectionForMenu(null);
-              }}
-              sx={{ py: 1.5 }}
-            >
-              <ViewIcon sx={{ mr: 2, fontSize: 20, color: 'primary.main' }} />
-              <Typography variant="body2">View Details</Typography>
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                if (selectedInspectionForMenu) {
-                  handleOpenDialog(selectedInspectionForMenu);
-                }
-                setActionMenuAnchor(null);
-                setSelectedInspectionForMenu(null);
-              }}
-              sx={{ py: 1.5 }}
-            >
-              <EditIcon sx={{ mr: 2, fontSize: 20, color: 'info.main' }} />
-              <Typography variant="body2">Edit Inspection</Typography>
-            </MenuItem>
-            <Divider />
-            <MenuItem
-              onClick={() => {
-                if (selectedInspectionForMenu) {
-                  handleDelete(selectedInspectionForMenu.id);
-                }
-                setActionMenuAnchor(null);
-                setSelectedInspectionForMenu(null);
-              }}
-              sx={{ 
-                py: 1.5,
-                color: 'error.main',
-                '&:hover': {
-                  bgcolor: 'error.light',
-                  color: 'error.dark'
-                }
-              }}
-            >
-              <DeleteIcon sx={{ mr: 2, fontSize: 20 }} />
-              <Typography variant="body2" fontWeight={600}>Delete Inspection</Typography>
-            </MenuItem>
-          </Menu>
-          
-          <TablePagination
-            component="div"
-            count={totalCount}
-            page={page}
-            onPageChange={(event, newPage) => {
-              setPage(newPage);
-            }}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0); // Reset to first page when changing rows per page
-            }}
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            labelRowsPerPage="Inspections per page:"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count !== -1 ? count : `more than ${to}`}`}
-          />
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={inspectionColumns}
+        rows={inspections}
+        loading={loading && !inspections.length}
+        title="All bookings"
+        emptyTitle="No inspections"
+        emptyDescription="Public and admin bookings appear here."
+        emptyIcon={AssignmentIcon}
+        emptyActionLabel="Schedule one"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by property, client, or ID…"
+        getRowId={(row) => row.id}
+      />
+
+      {/* Actions Menu */}
+      <Menu
+        anchorEl={actionMenuAnchor}
+        open={Boolean(actionMenuAnchor)}
+        onClose={() => {
+          setActionMenuAnchor(null);
+          setSelectedInspectionForMenu(null);
+        }}
+        PaperProps={{
+          sx: {
+            mt: 1.5,
+            minWidth: 200,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            borderRadius: 2,
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (selectedInspectionForMenu) {
+              handleView(selectedInspectionForMenu);
+            }
+            setActionMenuAnchor(null);
+            setSelectedInspectionForMenu(null);
+          }}
+          sx={{ py: 1.5 }}
+        >
+          <ViewIcon sx={{ mr: 2, fontSize: 20, color: 'primary.main' }} />
+          <Typography variant="body2">View Details</Typography>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (selectedInspectionForMenu) {
+              handleOpenDialog(selectedInspectionForMenu);
+            }
+            setActionMenuAnchor(null);
+            setSelectedInspectionForMenu(null);
+          }}
+          sx={{ py: 1.5 }}
+        >
+          <EditIcon sx={{ mr: 2, fontSize: 20, color: 'info.main' }} />
+          <Typography variant="body2">Edit Inspection</Typography>
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            if (selectedInspectionForMenu) {
+              handleDelete(selectedInspectionForMenu.id);
+            }
+            setActionMenuAnchor(null);
+            setSelectedInspectionForMenu(null);
+          }}
+          sx={{
+            py: 1.5,
+            color: 'error.main',
+            '&:hover': {
+              bgcolor: 'error.light',
+              color: 'error.dark',
+            },
+          }}
+        >
+          <DeleteIcon sx={{ mr: 2, fontSize: 20 }} />
+          <Typography variant="body2" fontWeight={600}>
+            Delete Inspection
+          </Typography>
+        </MenuItem>
+      </Menu>
 
       {/* Add/Edit Inspection Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -1131,7 +954,10 @@ const AdminInspections = () => {
                 Inspection Payment QR Code
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Amount: {qrCodeData.currency} {qrCodeData.amount} (60% of inspection fee)
+                Amount due now: {qrCodeData.currency} {qrCodeData.amount?.toLocaleString()}
+                {qrCodeData.total_inspection_fee && (
+                  <> (60% of {qrCodeData.currency} {qrCodeData.total_inspection_fee?.toLocaleString()})</>
+                )}
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
                 <img 
@@ -1167,51 +993,90 @@ const AdminInspections = () => {
           {selectedInspection && (
             <Box>
               <Typography variant="h6" gutterBottom>
-                Inspection #{selectedInspection.id} - Unit {selectedInspection.unit_number}
+                Booking #{selectedInspection.id}
+                {selectedInspection.rental_unit?.title ? ` — ${selectedInspection.rental_unit.title}` : ''}
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              
+
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <ReceiptIcon />
-                        Payment Details
+                        Viewing fee
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Inspection Fee: UGX 100,000
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Amount to Pay (60%): UGX 60,000
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Remaining (40%): UGX 40,000
-                      </Typography>
+                      {selectedInspection.payment ? (
+                        <>
+                          <Typography variant="body2" color="text.secondary">
+                            Due now (60%): {selectedInspection.payment.currency}{' '}
+                            {Number(selectedInspection.payment.amount).toLocaleString()}
+                          </Typography>
+                          {selectedInspection.payment.payment_url && (
+                            <Button
+                              size="small"
+                              sx={{ mt: 1 }}
+                              onClick={() => window.open(selectedInspection.payment.payment_url, '_blank')}
+                            >
+                              Open payment page
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          No payment record (booking may pre-date auto-payment).
+                        </Typography>
+                      )}
                     </CardContent>
                   </Card>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <PaymentIcon />
-                        Payment Status
+                        Payment status
                       </Typography>
-                      <Chip 
-                        label="Pending Payment" 
-                        color="warning" 
-                        size="small" 
+                      <Chip
+                        label={selectedInspection.payment_status || selectedInspection.payment?.status || 'none'}
+                        color={
+                          (selectedInspection.payment_status || selectedInspection.payment?.status) === 'paid'
+                            ? 'success'
+                            : 'warning'
+                        }
+                        size="small"
                         sx={{ mb: 1 }}
                       />
-                      <Typography variant="body2" color="text.secondary">
-                        No payment received yet
-                      </Typography>
+                      {selectedInspection.payment?.transaction_id && (
+                        <Typography variant="body2" color="text.secondary">
+                          Tx: {selectedInspection.payment.transaction_id}
+                        </Typography>
+                      )}
                     </CardContent>
                   </Card>
                 </Grid>
               </Grid>
+
+              {selectedInspection.payment?.payment_id &&
+                (selectedInspection.payment_status || selectedInspection.payment?.status) !== 'paid' && (
+                <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <TextField
+                    size="small"
+                    label="Mobile money transaction ID"
+                    value={adminTxId}
+                    onChange={(e) => setAdminTxId(e.target.value)}
+                    sx={{ minWidth: 280, flex: 1 }}
+                  />
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={() => handleAdminMarkPaid(selectedInspection.payment.payment_id, adminTxId)}
+                  >
+                    Mark paid
+                  </Button>
+                </Box>
+              )}
 
               <Box sx={{ mt: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>

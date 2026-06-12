@@ -1,130 +1,63 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
-import {
-  Inbox,
-  Person,
-  Home,
-  Payment,
-  Message,
-  Description
-} from '@mui/icons-material';
+import { colors, ownerPrimaryButtonSx } from '../../theme/designTokens';
 
-const EmptyState = ({ 
-  type = 'default', 
-  title, 
-  message, 
-  actionText, 
+const EmptyState = ({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
   onAction,
-  icon: CustomIcon 
-}) => {
-  const getDefaultConfig = () => {
-    switch (type) {
-      case 'tenants':
-        return {
-          icon: Person,
-          title: 'No Tenants Yet',
-          message: 'Get started by adding your first tenant to this property',
-          actionText: 'Add Tenant'
-        };
-      case 'properties':
-        return {
-          icon: Home,
-          title: 'No Properties Yet',
-          message: 'Create your first property to start managing rentals',
-          actionText: 'Add Property'
-        };
-      case 'payments':
-        return {
-          icon: Payment,
-          title: 'No Payments Found',
-          message: 'Payment records will appear here once tenants make payments',
-          actionText: 'Record Payment'
-        };
-      case 'messages':
-        return {
-          icon: Message,
-          title: 'No Messages Sent',
-          message: 'Send your first bulk message to communicate with tenants',
-          actionText: 'Send Message'
-        };
-      case 'reports':
-        return {
-          icon: Description,
-          title: 'No Reports Yet',
-          message: 'Generate reports to track your property performance',
-          actionText: 'Generate Report'
-        };
-      default:
-        return {
-          icon: Inbox,
-          title: 'No Data Available',
-          message: 'There is no data to display at this time',
-          actionText: null
-        };
-    }
-  };
-
-  const config = getDefaultConfig();
-  const Icon = CustomIcon || config.icon;
-  const displayTitle = title || config.title;
-  const displayMessage = message || config.message;
-  const displayActionText = actionText || config.actionText;
-
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        py: 8,
-        px: 3,
-        textAlign: 'center',
-        minHeight: 300
-      }}
-    >
+  secondaryActionLabel,
+  onSecondaryAction,
+  compact = false,
+}) => (
+  <Box sx={{ textAlign: 'center', py: compact ? 3.5 : 5, px: 2 }}>
+    {Icon && (
       <Box
         sx={{
-          width: 120,
-          height: 120,
-          borderRadius: '50%',
-          bgcolor: 'primary.50',
+          width: compact ? 48 : 56,
+          height: compact ? 48 : 56,
+          borderRadius: `${10}px`,
+          bgcolor: colors.surfaceMuted,
+          border: `1px solid ${colors.border}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          mb: 3
+          mx: 'auto',
+          mb: 1.5,
         }}
       >
-        <Icon sx={{ fontSize: 60, color: 'text.disabled' }} />
+        <Icon sx={{ fontSize: compact ? 24 : 28, color: colors.textMuted }} />
       </Box>
-      
-      <Typography variant="h5" fontWeight="bold" gutterBottom>
-        {displayTitle}
+    )}
+    <Typography
+      variant="body2"
+      sx={{ fontWeight: 600, color: colors.text, mb: description ? 0.5 : 1.5 }}
+    >
+      {title}
+    </Typography>
+    {description && (
+      <Typography
+        variant="caption"
+        sx={{ color: colors.textMuted, maxWidth: 320, mx: 'auto', display: 'block', mb: 1.5 }}
+      >
+        {description}
       </Typography>
-      
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 400 }}>
-        {displayMessage}
-      </Typography>
-      
-      {displayActionText && onAction && (
-        <Button
-          variant="contained"
-          size="large"
-          onClick={onAction}
-          sx={{
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            textTransform: 'none',
-            fontSize: '1rem'
-          }}
-        >
-          {displayActionText}
+    )}
+    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {actionLabel && onAction && (
+        <Button variant="contained" onClick={onAction} sx={ownerPrimaryButtonSx}>
+          {actionLabel}
+        </Button>
+      )}
+      {secondaryActionLabel && onSecondaryAction && (
+        <Button variant="outlined" onClick={onSecondaryAction} sx={{ textTransform: 'none', fontWeight: 600 }}>
+          {secondaryActionLabel}
         </Button>
       )}
     </Box>
-  );
-};
+  </Box>
+);
 
 export default EmptyState;
-

@@ -41,11 +41,18 @@ export const getCurrentUser = createAsyncThunk(
       const result = await authService.getCurrentUser();
       if (result.success) {
         return result.data;
-      } else {
-        return rejectWithValue(result.error);
       }
+      return rejectWithValue({
+        message: result.error,
+        status: result.status,
+        isNetworkError: result.isNetworkError,
+      });
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to get user');
+      return rejectWithValue({
+        message: error.message || 'Failed to get user',
+        status: error.response?.status,
+        isNetworkError: !error.response,
+      });
     }
   }
 );
@@ -66,11 +73,20 @@ export const refreshToken = createAsyncThunk(
   }
 );
 
+const readStoredUser = () => {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const initialState = {
-  user: null,
+  user: readStoredUser(),
   token: localStorage.getItem('token'),
   refreshTokenValue: localStorage.getItem('refresh_token'),
-  isAuthenticated: !!localStorage.getItem('token'), // Set to true if token exists
+  isAuthenticated: !!localStorage.getItem('token'),
   isLoading: false,
   error: null,
 };
@@ -87,6 +103,7 @@ const authSlice = createSlice({
       state.error = null;
       localStorage.removeItem('token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
     },
     clearError: (state) => {
       state.error = null;
@@ -112,9 +129,13 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.token = action.payload.access_token;
         state.refreshTokenValue = action.payload.refresh_token;
+        state.user = action.payload.user || state.user;
         state.isAuthenticated = true;
         localStorage.setItem('token', action.payload.access_token);
         localStorage.setItem('refresh_token', action.payload.refresh_token);
+        if (action.payload.user) {
+          localStorage.setItem('user', JSON.stringify(action.payload.user));
+        }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -140,11 +161,18 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload;
         state.isAuthenticated = true;
+        localStorage.setItem('user', JSON.stringify(action.payload));
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-        state.isAuthenticated = false;
+        const unauthorized = action.payload?.status === 401;
+        if (unauthorized) {
+          state.user = null;
+          state.token = null;
+          state.refreshTokenValue = null;
+          state.isAuthenticated = false;
+        }
       })
       // Refresh Token
       .addCase(refreshToken.pending, (state) => {

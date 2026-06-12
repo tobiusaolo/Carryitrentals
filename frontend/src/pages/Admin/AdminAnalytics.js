@@ -5,14 +5,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
   Avatar,
   List,
   ListItem,
@@ -34,6 +26,8 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 
 const AdminAnalytics = () => {
   const dispatch = useDispatch();
@@ -137,6 +131,56 @@ const AdminAnalytics = () => {
       </CardContent>
     </Card>
   );
+
+  const revenueColumns = [
+    {
+      id: 'ownerName',
+      label: 'Owner',
+      getSearchValue: (row) => row.ownerName,
+      render: (owner) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>{owner.ownerName.charAt(0)}</Avatar>
+          {owner.ownerName}
+        </Box>
+      ),
+    },
+    {
+      id: 'properties',
+      label: 'Properties',
+      render: (owner) => owner.properties,
+    },
+    {
+      id: 'revenue',
+      label: 'Monthly Revenue',
+      render: (owner) => `$${owner.revenue.toLocaleString()}`,
+    },
+    {
+      id: 'marketShare',
+      label: 'Market Share',
+      render: (owner) => {
+        const marketShare = analytics.totalRevenue
+          ? (owner.revenue / analytics.totalRevenue) * 100
+          : 0;
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <LinearProgress variant="determinate" value={marketShare} sx={{ width: 100, mr: 1 }} />
+            {marketShare.toFixed(1)}%
+          </Box>
+        );
+      },
+    },
+    {
+      id: 'performance',
+      label: 'Performance',
+      render: (owner) => {
+        const marketShare = analytics.totalRevenue
+          ? (owner.revenue / analytics.totalRevenue) * 100
+          : 0;
+        const label = marketShare > 50 ? 'High' : marketShare > 25 ? 'Medium' : 'Low';
+        return <OwnerStatusChip status={label.toLowerCase()} label={label} />;
+      },
+    },
+  ];
 
   if (user?.role !== 'admin') {
     return (
@@ -278,64 +322,17 @@ const AdminAnalytics = () => {
 
         {/* Revenue Breakdown */}
         <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                <PieChartIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Revenue Breakdown by Owner
-              </Typography>
-              
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Owner</TableCell>
-                      <TableCell>Properties</TableCell>
-                      <TableCell>Monthly Revenue</TableCell>
-                      <TableCell>Market Share</TableCell>
-                      <TableCell>Performance</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {analytics.revenueByOwner.map((owner) => {
-                      const marketShare = (owner.revenue / analytics.totalRevenue) * 100;
-                      return (
-                        <TableRow key={owner.ownerId}>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                                {owner.ownerName.charAt(0)}
-                              </Avatar>
-                              {owner.ownerName}
-                            </Box>
-                          </TableCell>
-                          <TableCell>{owner.properties}</TableCell>
-                          <TableCell>${owner.revenue.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={marketShare} 
-                                sx={{ width: 100, mr: 1 }}
-                              />
-                              {marketShare.toFixed(1)}%
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={marketShare > 50 ? "High" : marketShare > 25 ? "Medium" : "Low"} 
-                              color={marketShare > 50 ? "success" : marketShare > 25 ? "warning" : "default"}
-                              size="small"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
+          <DataTable
+            columns={revenueColumns}
+            rows={analytics.revenueByOwner}
+            getRowId={(row) => row.ownerId}
+            title="Revenue Breakdown by Owner"
+            subtitle="Monthly revenue share across property owners"
+            emptyTitle="No revenue data"
+            emptyDescription="Revenue breakdown appears once properties and owners are registered."
+            emptyIcon={PieChartIcon}
+            searchPlaceholder="Search by owner name…"
+          />
         </Grid>
       </Grid>
     </Box>

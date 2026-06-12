@@ -1,27 +1,30 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { getCurrentUser, refreshToken } from '../../store/slices/authSlice';
+import authService from '../../services/authService';
+import { getLoginPathForRoute, getHomePathForRole } from '../../utils/authRoutes';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requiredRoles = null }) => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { isAuthenticated, isLoading, token, refreshTokenValue, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // If we have a token but no user data, fetch current user
-    if (token && !user && !isLoading) {
-      dispatch(getCurrentUser());
-    }
-    
-    // If we have a refresh token but no access token, try to refresh
-    if (!token && refreshTokenValue && !isLoading) {
-      dispatch(refreshToken(refreshTokenValue));
-    }
+    const bootstrap = async () => {
+      if (!token && refreshTokenValue && !isLoading) {
+        await dispatch(refreshToken(refreshTokenValue));
+      }
+      if ((token || refreshTokenValue) && !user && !isLoading) {
+        dispatch(getCurrentUser());
+      }
+    };
+    bootstrap();
   }, [dispatch, token, refreshTokenValue, user, isLoading]);
 
-  // Show loading while checking authentication
-  if (isLoading || (token && !user)) {
+  const hasStoredUser = !!authService.getStoredUser();
+  if (isLoading || (token && !user && !hasStoredUser)) {
     return (
       <Box
         sx={{
@@ -41,22 +44,16 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated || !token) {
-    // Determine which login page to redirect to based on current path
-    const currentPath = window.location.pathname;
-    
-    if (currentPath.startsWith('/agent')) {
-      return <Navigate to="/agent-login" replace />;
-    } else if (currentPath.startsWith('/admin')) {
-      return <Navigate to="/admin-login" replace />;
-    } else {
-      return <Navigate to="/login" replace />;
-    }
+    const loginPath = getLoginPathForRoute(location.pathname);
+    return <Navigate to={loginPath} replace state={{ from: location.pathname }} />;
+  }
+
+  if (requiredRoles && user?.role && !requiredRoles.includes(user.role)) {
+    return <Navigate to={getHomePathForRole(user.role)} replace />;
   }
 
   return children;
 };
 
 export default ProtectedRoute;
-

@@ -5,13 +5,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
@@ -77,6 +70,30 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { propertyAPI } from '../../services/api/propertyAPI';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
+
+const MOCK_TENANTS = [
+  {
+    id: 1,
+    name: 'Jane Smith',
+    email: 'tenant@example.com',
+    property: 'Kiwo Estates',
+    unit: 'Unit 101',
+    rentStatus: 'paid',
+    lastPayment: '2 days ago',
+  },
+  {
+    id: 2,
+    name: 'John Doe',
+    email: 'tenant2@example.com',
+    property: 'Kiwo Estates',
+    unit: 'Unit 102',
+    rentStatus: 'overdue',
+    lastPayment: '15 days ago',
+  },
+];
 
 const EnhancedAdminDashboard = () => {
   const dispatch = useDispatch();
@@ -317,6 +334,96 @@ const EnhancedAdminDashboard = () => {
     );
   }
 
+  const ownerColumns = [
+    {
+      id: 'name',
+      label: 'Owner',
+      getSearchValue: (row) => `${row.name} ${row.properties}`,
+      render: (owner) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2 }}>{owner.name.charAt(0)}</Avatar>
+          <Box>
+            <Typography variant="subtitle2">{owner.name}</Typography>
+            <Typography variant="caption">{owner.properties} properties</Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    { id: 'properties', label: 'Properties' },
+    { id: 'units', label: 'Units' },
+    {
+      id: 'revenue',
+      label: 'Monthly Revenue',
+      render: (owner) => `$${owner.revenue.toLocaleString()}`,
+    },
+    {
+      id: 'growth',
+      label: 'Growth',
+      render: (owner) => (
+        <Chip label={`+${owner.growth}%`} color="success" size="small" />
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: () => <OwnerStatusChip status="active" label="Active" />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: () => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Owner', onClick: () => {} },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Owner', onClick: () => {} },
+          ]}
+        />
+      ),
+    },
+  ];
+
+  const tenantColumns = [
+    {
+      id: 'tenant',
+      label: 'Tenant',
+      getSearchValue: (row) => `${row.name} ${row.email}`,
+      render: (tenant) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2 }}>{tenant.name.charAt(0)}</Avatar>
+          <Box>
+            <Typography variant="subtitle2">{tenant.name}</Typography>
+            <Typography variant="caption">{tenant.email}</Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property',
+      getSearchValue: (row) => row.property,
+    },
+    { id: 'unit', label: 'Unit' },
+    {
+      id: 'rentStatus',
+      label: 'Rent Status',
+      render: (tenant) => <OwnerStatusChip status={tenant.rentStatus} />,
+    },
+    { id: 'lastPayment', label: 'Last Payment' },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: () => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Tenant', onClick: () => {} },
+          ]}
+        />
+      ),
+    },
+  ];
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -523,57 +630,17 @@ const EnhancedAdminDashboard = () => {
             </Button>
           </Box>
           
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Owner</TableCell>
-                  <TableCell>Properties</TableCell>
-                  <TableCell>Units</TableCell>
-                  <TableCell>Monthly Revenue</TableCell>
-                  <TableCell>Growth</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {topPerformers.map((owner, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2 }}>{owner.name.charAt(0)}</Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{owner.name}</Typography>
-                          <Typography variant="caption">Owner ID: {index + 1}</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>{owner.properties}</TableCell>
-                    <TableCell>{owner.units}</TableCell>
-                    <TableCell>${owner.revenue.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={`+${owner.growth}%`} 
-                        color="success" 
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip label="Active" color="success" size="small" />
-                    </TableCell>
-                    <TableCell>
-                      <IconButton size="small">
-                        <ViewIcon />
-                      </IconButton>
-                      <IconButton size="small">
-                        <EditIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DataTable
+            columns={ownerColumns}
+            rows={topPerformers}
+            title="Property Owners Management"
+            subtitle="Top performing property owners"
+            emptyTitle="No property owners"
+            emptyDescription="No owner performance data is available yet."
+            emptyIcon={PeopleIcon}
+            getRowId={(row) => row.name}
+            searchPlaceholder="Search by owner name…"
+          />
         </TabPanel>
 
         {/* All Properties Tab */}
@@ -638,66 +705,16 @@ const EnhancedAdminDashboard = () => {
             Tenant Management
           </Typography>
           
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Tenant</TableCell>
-                  <TableCell>Property</TableCell>
-                  <TableCell>Unit</TableCell>
-                  <TableCell>Rent Status</TableCell>
-                  <TableCell>Last Payment</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ mr: 2 }}>J</Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">Jane Smith</Typography>
-                        <Typography variant="caption">tenant@example.com</Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>Kiwo Estates</TableCell>
-                  <TableCell>Unit 101</TableCell>
-                  <TableCell>
-                    <Chip label="Paid" color="success" size="small" />
-                  </TableCell>
-                  <TableCell>2 days ago</TableCell>
-                  <TableCell>
-                    <IconButton size="small">
-                      <ViewIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ mr: 2 }}>J</Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">John Doe</Typography>
-                        <Typography variant="caption">tenant2@example.com</Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>Kiwo Estates</TableCell>
-                  <TableCell>Unit 102</TableCell>
-                  <TableCell>
-                    <Chip label="Overdue" color="error" size="small" />
-                  </TableCell>
-                  <TableCell>15 days ago</TableCell>
-                  <TableCell>
-                    <IconButton size="small">
-                      <ViewIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DataTable
+            columns={tenantColumns}
+            rows={MOCK_TENANTS}
+            title="Tenant Management"
+            subtitle="Active tenants and rent payment status"
+            emptyTitle="No tenants found"
+            emptyDescription="There are no tenants to display."
+            emptyIcon={PeopleIcon}
+            searchPlaceholder="Search by tenant name or property…"
+          />
         </TabPanel>
 
         {/* Financial Analytics Tab */}

@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
   Paper,
   Button,
   Grid,
-  Card,
-  CardContent,
-  CardActions,
   Chip,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -22,13 +19,11 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
-  Fab,
-  Tooltip,
   Tabs,
   Tab,
   Switch,
   FormControlLabel,
-  Divider,
+  Badge,
 } from '@mui/material';
 import {
   Add,
@@ -41,8 +36,10 @@ import {
   Wifi,
   Cable,
   Build,
-  Visibility,
   AttachMoney,
+  CheckCircle,
+  Schedule,
+  Warning,
 } from '@mui/icons-material';
 import {
   DataGrid,
@@ -62,6 +59,15 @@ import {
 } from '../../store/slices/utilitySlice';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { fetchUnits } from '../../store/slices/unitSlice';
+import { markPaymentAsPaid } from '../../store/slices/otherSlices';
+import { paymentAPI } from '../../services/api/paymentAPI';
+import PageHeader from '../../components/UI/PageHeader';
+import { ownerPrimaryButtonSx } from '../../theme/designTokens';
+import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
+import { formatMoney } from '../../utils/formatMoney';
+import { colors } from '../../theme/designTokens';
 
 const utilityTypes = [
   { value: 'water', label: 'Water', icon: <WaterDrop />, color: '#2196f3' },
@@ -71,16 +77,21 @@ const utilityTypes = [
   { value: 'sewer', label: 'Sewer', icon: <Build />, color: '#795548' },
   { value: 'internet', label: 'Internet', icon: <Wifi />, color: '#3f51b5' },
   { value: 'cable', label: 'Cable', icon: <Cable />, color: '#e91e63' },
+  { value: 'security', label: 'Security', icon: <Build />, color: '#455a64' },
+  { value: 'maintenance', label: 'Maintenance', icon: <Build />, color: '#607d8b' },
 ];
 
 const Utilities = () => {
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
   const { utilities, unitUtilities, isLoading, error, isCreating, isUpdating, isDeleting } = useSelector((state) => state.utilities);
   const { properties } = useSelector((state) => state.properties);
   const { units } = useSelector((state) => state.units);
-  const { user } = useSelector((state) => state.auth);
 
-  const [activeTab, setActiveTab] = useState(0);
+  const initialTab = searchParams.get('tab') === 'collections' ? 2 : 0;
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [utilityPayments, setUtilityPayments] = useState([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUtility, setEditingUtility] = useState(null);
   const [formData, setFormData] = useState({
@@ -94,11 +105,24 @@ const Utilities = () => {
     description: '',
   });
 
+  const loadUtilityPayments = async () => {
+    setCollectionsLoading(true);
+    try {
+      const response = await paymentAPI.getUtilityPayments();
+      setUtilityPayments(response.data);
+    } catch (loadError) {
+      console.error('Error loading utility payments:', loadError);
+    } finally {
+      setCollectionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     dispatch(fetchUtilities());
     dispatch(fetchUnitUtilities());
     dispatch(fetchProperties());
     dispatch(fetchUnits());
+    loadUtilityPayments();
   }, [dispatch]);
 
   useEffect(() => {
@@ -184,6 +208,30 @@ const Utilities = () => {
     }
   };
 
+  const handleMarkUtilityPaid = async (paymentId) => {
+    await dispatch(markPaymentAsPaid(paymentId));
+    loadUtilityPayments();
+  };
+
+  const getStatusColor = (status) => {
+    const statusColors = {
+      pending: 'warning',
+      paid: 'success',
+      overdue: 'error',
+      partial: 'info',
+    };
+    return statusColors[status] || 'default';
+  };
+
+  const getStatusIcon = (status) => {
+    const icons = {
+      pending: <Schedule />,
+      paid: <CheckCircle />,
+      overdue: <Warning />,
+    };
+    return icons[status] || <Schedule />;
+  };
+
   const handleDelete = async (utilityId, isUnitUtility = false) => {
     if (window.confirm('Are you sure you want to delete this utility?')) {
       try {
@@ -236,7 +284,7 @@ const Utilities = () => {
     { field: 'account_number', headerName: 'Account', width: 120 },
     { field: 'monthly_cost', headerName: 'Monthly Cost', width: 120, renderCell: (params) => (
       <Typography variant="body2" fontWeight="bold">
-        ${params.value}
+        {formatMoney(params.value, 'UGX')}
       </Typography>
     )},
     { field: 'is_included_in_rent', headerName: 'Included in Rent', width: 150, renderCell: (params) => (
@@ -255,14 +303,16 @@ const Utilities = () => {
       width: 100,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<Edit />}
+          icon={<Edit fontSize="small" />}
           label="Edit"
           onClick={() => handleOpenDialog(params.row, false)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Delete />}
+          icon={<Delete fontSize="small" />}
           label="Delete"
           onClick={() => handleDelete(params.row.id, false)}
+          showInMenu
         />,
       ],
     },
@@ -283,7 +333,7 @@ const Utilities = () => {
     { field: 'account_number', headerName: 'Account', width: 120 },
     { field: 'monthly_cost', headerName: 'Monthly Cost', width: 120, renderCell: (params) => (
       <Typography variant="body2" fontWeight="bold">
-        ${params.value}
+        {formatMoney(params.value, 'UGX')}
       </Typography>
     )},
     { field: 'is_included_in_rent', headerName: 'Included in Rent', width: 150, renderCell: (params) => (
@@ -302,20 +352,85 @@ const Utilities = () => {
       width: 100,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<Edit />}
+          icon={<Edit fontSize="small" />}
           label="Edit"
           onClick={() => handleOpenDialog(params.row, true)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Delete />}
+          icon={<Delete fontSize="small" />}
           label="Delete"
           onClick={() => handleDelete(params.row.id, true)}
+          showInMenu
         />,
       ],
     },
   ];
 
-  if (isLoading) {
+  const collectionColumns = [
+    { field: 'unit_number', headerName: 'Unit', width: 100 },
+    {
+      field: 'utility_name',
+      headerName: 'Utility',
+      width: 130,
+      renderCell: (params) => params.value || 'Utility',
+    },
+    { field: 'tenant_name', headerName: 'Tenant', width: 160 },
+    {
+      field: 'amount',
+      headerName: 'Amount',
+      width: 120,
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight="bold">
+          {formatMoney(params.value, 'UGX')}
+        </Typography>
+      ),
+    },
+    {
+      field: 'due_date',
+      headerName: 'Due',
+      width: 120,
+      renderCell: (params) => (params.value ? new Date(params.value).toLocaleDateString() : '—'),
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      renderCell: (params) => (
+        <Chip
+          icon={getStatusIcon(params.value)}
+          label={params.value}
+          color={getStatusColor(params.value)}
+          size="small"
+          sx={{ textTransform: 'capitalize' }}
+        />
+      ),
+    },
+    {
+      field: 'actions',
+      type: 'actions',
+      headerName: 'Actions',
+      width: 120,
+      getActions: (params) => [
+        ...(params.row.status === 'pending' || params.row.status === 'overdue'
+          ? [
+              <GridActionsCellItem
+                icon={<CheckCircle fontSize="small" />}
+                label="Mark as Paid"
+                onClick={() => handleMarkUtilityPaid(params.id)}
+                showInMenu
+              />,
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  const pendingCharges = utilityPayments.filter((p) => p.status === 'pending');
+  const paidCharges = utilityPayments.filter((p) => p.status === 'paid');
+  const overdueCharges = utilityPayments.filter((p) => p.status === 'overdue');
+
+  if (isLoading && utilities.length === 0 && unitUtilities.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
@@ -324,22 +439,22 @@ const Utilities = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Utilities Management
-        </Typography>
-        <Tooltip title="Add New Utility">
-          <Fab
-            color="primary"
-            aria-label="add"
-            onClick={() => handleOpenDialog()}
-            sx={{ boxShadow: 2 }}
-          >
-            <Add />
-          </Fab>
-        </Tooltip>
-      </Box>
+    <OwnerPageContainer>
+      <PageHeader
+        title="Utilities"
+        action={
+          activeTab !== 2 ? (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => handleOpenDialog()}
+              sx={ownerPrimaryButtonSx}
+            >
+              Add utility
+            </Button>
+          ) : null
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -347,95 +462,109 @@ const Utilities = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ElectricalServices color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Property Utilities</Typography>
-              </Box>
-              <Typography variant="h4" fontWeight="bold" color="primary">
-                {utilities.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total property-level utilities
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <WaterDrop color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Unit Utilities</Typography>
-              </Box>
-              <Typography variant="h4" fontWeight="bold" color="primary">
-                {unitUtilities.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total unit-specific utilities
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <AttachMoney color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Total Monthly Cost</Typography>
-              </Box>
-              <Typography variant="h4" fontWeight="bold" color="primary">
-                ${(utilities.reduce((sum, util) => sum + (parseFloat(util.monthly_cost) || 0), 0) + 
-                   unitUtilities.reduce((sum, util) => sum + (parseFloat(util.monthly_cost) || 0), 0)).toFixed(2)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Combined utility costs
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Build color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Utility Types</Typography>
-              </Box>
-              <Typography variant="h4" fontWeight="bold" color="primary">
-                {utilityTypes.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Available utility types
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        {activeTab === 2 ? (
+          <>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard
+                title="Pending"
+                value={formatMoney(pendingCharges.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0), 'UGX')}
+                icon={<Schedule />}
+                variantIndex={1}
+                subtitle={`${pendingCharges.length} open charge(s)`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard
+                title="Collected"
+                value={formatMoney(paidCharges.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0), 'UGX')}
+                icon={<CheckCircle />}
+                variantIndex={0}
+                subtitle={`${paidCharges.length} paid charge(s)`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard
+                title="Overdue"
+                value={formatMoney(overdueCharges.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0), 'UGX')}
+                icon={<Warning />}
+                variantIndex={2}
+                subtitle={`${overdueCharges.length} overdue charge(s)`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard
+                title="Total charges"
+                value={utilityPayments.length}
+                icon={<ElectricalServices />}
+                variantIndex={0}
+                subtitle="Auto-generated from tenant setup"
+              />
+            </Grid>
+          </>
+        ) : (
+          <>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard title="Property utilities" value={utilities.length} icon={<ElectricalServices />} variantIndex={0} subtitle="Building-level rates" />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard title="Unit utilities" value={unitUtilities.length} icon={<WaterDrop />} variantIndex={1} subtitle="Per-unit rates" />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard
+                title="Monthly rates"
+                value={formatMoney(
+                  utilities.reduce((sum, util) => sum + (parseFloat(util.monthly_cost) || 0), 0) +
+                    unitUtilities.reduce((sum, util) => sum + (parseFloat(util.monthly_cost) || 0), 0),
+                  'UGX'
+                )}
+                icon={<AttachMoney />}
+                variantIndex={2}
+                subtitle="Combined configured costs"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <OwnerStatCard title="Open charges" value={pendingCharges.length + overdueCharges.length} icon={<Build />} variantIndex={0} subtitle="Awaiting collection" />
+            </Grid>
+          </>
+        )}
       </Grid>
 
-      {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-          <Tab label="Property Utilities" />
-          <Tab label="Unit Utilities" />
+      <Paper sx={{ mb: 3, border: `1px solid ${colors.border}`, borderRadius: 2, boxShadow: 'none' }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} variant="scrollable" scrollButtons="auto">
+          <Tab label="Property rates" />
+          <Tab label="Unit rates" />
+          <Tab
+            label={
+              <Badge badgeContent={utilityPayments.length} color="primary">
+                Tenant charges
+              </Badge>
+            }
+          />
         </Tabs>
       </Paper>
 
-      {/* Data Grid */}
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
+      {activeTab === 2 ? (
+        <OwnerDataGrid
+          rows={utilityPayments}
+          columns={collectionColumns}
+          loading={collectionsLoading}
+          emptyTitle="No utility charges yet"
+          emptyDescription="Set rates on the Property/Unit tabs and assign utilities on tenant records to auto-generate charges."
+          emptyIcon={ElectricalServices}
+        />
+      ) : (
+        <OwnerDataGrid
           rows={activeTab === 0 ? utilities : unitUtilities}
           columns={activeTab === 0 ? propertyUtilityColumns : unitUtilityColumns}
-          components={{ Toolbar: GridToolbar }}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          disableSelectionOnClick
           loading={isLoading}
+          emptyTitle={activeTab === 0 ? 'No property utilities' : 'No unit utilities'}
+          emptyDescription="Add monthly rates for water, electricity, garbage, and other services."
+          emptyIcon={ElectricalServices}
+          emptyActionLabel="Add utility"
+          onEmptyAction={() => handleOpenDialog()}
         />
-      </Paper>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -531,7 +660,7 @@ const Utilities = () => {
                 <TextField
                   fullWidth
                   name="monthly_cost"
-                  label="Monthly Cost ($)"
+                  label="Monthly Cost (UGX)"
                   type="number"
                   value={formData.monthly_cost}
                   onChange={handleInputChange}
@@ -577,7 +706,7 @@ const Utilities = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </OwnerPageContainer>
   );
 };
 

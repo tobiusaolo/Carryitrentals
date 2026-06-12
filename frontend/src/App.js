@@ -5,20 +5,17 @@ import AdminLayout from './components/Layout/AdminLayout';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import AdminLoginPage from './pages/Auth/AdminLoginPage';
-import Dashboard from './pages/Dashboard/Dashboard';
 import EnhancedFinancialDashboard from './pages/Dashboard/EnhancedFinancialDashboard';
 import Properties from './pages/Properties/Properties';
 import Units from './pages/Units/Units';
 import UnitsForRent from './pages/UnitsForRent/UnitsForRent';
-import Tenants from './pages/Tenants/Tenants';
 import Payments from './pages/Payments/Payments';
 import Analytics from './pages/Analytics/Analytics';
-import Inspections from './pages/Inspections/Inspections';
+import OwnerViewings from './pages/Owner/OwnerViewings';
 import Utilities from './pages/Utilities/Utilities';
 import PropertyQR from './pages/PropertyQR/PropertyQR';
 import Communications from './pages/Communications/Communications';
 import Reports from './pages/Reports/Reports';
-import AdminDashboard from './pages/Admin/AdminDashboard';
 import ModernAdminDashboard from './pages/Admin/ModernAdminDashboard';
 import AdminPropertyOwners from './pages/Admin/AdminPropertyOwners';
 import AdminPropertiesOverview from './pages/Admin/AdminPropertiesOverview';
@@ -32,6 +29,7 @@ import AdminActivityLogs from './pages/Admin/AdminActivityLogs';
 import AdminNotifications from './pages/Admin/AdminNotifications';
 import AdminAnalytics from './pages/Admin/AdminAnalytics';
 import AdminPaymentMethods from './pages/Admin/AdminPaymentMethods';
+import AdminViewingPayments from './pages/Admin/AdminViewingPayments';
 import AdminSettings from './pages/Admin/AdminSettings';
 import AdditionalServices from './pages/Admin/AdditionalServices';
 import InspectionPayment from './pages/InspectionPayment/InspectionPayment';
@@ -47,13 +45,15 @@ import AgentInspections from './pages/Agent/AgentInspections';
 import AgentProfile from './pages/Agent/AgentProfile';
 import AgentUnitDetails from './pages/Agent/AgentUnitDetails';
 import AgentProtectedRoute from './components/Auth/AgentProtectedRoute';
-import LandingPage from './pages/Landing/LandingPage';
 import PublicRentals from './pages/Public/PublicRentals';
 import RentalUnitDetails from './pages/Public/RentalUnitDetails';
 import PublicAirbnb from './pages/Public/PublicAirbnb';
 import AirbnbDetails from './pages/Public/AirbnbDetails';
 import Guidelines from './pages/Public/Guidelines';
+import Portals from './pages/Public/Portals';
 import OwnerAirbnb from './pages/Airbnb/OwnerAirbnb';
+import OwnerPropertyHub from './pages/Owner/OwnerPropertyHub';
+import OwnerViewingPayments from './pages/Owner/OwnerViewingPayments';
 import OwnerLogin from './pages/Auth/OwnerLogin';
 import OwnerRegister from './pages/Auth/OwnerRegister';
 
@@ -69,6 +69,7 @@ function App() {
       <Route path="/airbnb" element={<PublicAirbnb />} />
       <Route path="/airbnb/:id" element={<AirbnbDetails />} />
       <Route path="/guidelines" element={<Guidelines />} />
+      <Route path="/portals" element={<Portals />} />
       
       {/* Client Auth Routes */}
       <Route path="/login" element={<Login />} />
@@ -87,21 +88,24 @@ function App() {
       {/* Property Owner Routes */}
       <Route path="/owner" element={
         <AuthGuard>
-          <ProtectedRoute>
+          <ProtectedRoute requiredRoles={['owner', 'admin']}>
             <Layout />
           </ProtectedRoute>
         </AuthGuard>
       }>
         <Route index element={<Navigate to="/owner/dashboard" replace />} />
         <Route path="dashboard" element={<EnhancedFinancialDashboard />} />
-        <Route path="properties" element={<Properties />} />
-        <Route path="units" element={<Units />} />
-        <Route path="units-for-rent" element={<UnitsForRent />} />
-        <Route path="airbnb" element={<OwnerAirbnb />} />
-        <Route path="tenants" element={<Tenants />} />
+        <Route path="property-hub" element={<OwnerPropertyHub />} />
+        <Route path="properties" element={<Navigate to="/owner/property-hub?tab=properties" replace />} />
+        <Route path="units" element={<Navigate to="/owner/property-hub?tab=units" replace />} />
+        <Route path="units-for-rent" element={<Navigate to="/owner/property-hub?tab=units-for-rent" replace />} />
+        <Route path="airbnb" element={<Navigate to="/owner/property-hub?tab=airbnb" replace />} />
+        <Route path="tenants" element={<Navigate to="/owner/property-hub?tab=tenants" replace />} />
         <Route path="payments" element={<Payments />} />
         <Route path="utilities" element={<Utilities />} />
-        <Route path="inspections" element={<Inspections />} />
+        <Route path="inspections" element={<OwnerViewings />} />
+        <Route path="viewings" element={<OwnerViewings />} />
+        <Route path="viewing-payments" element={<OwnerViewingPayments />} />
         <Route path="property-qr" element={<PropertyQR />} />
         <Route path="communications" element={<Communications />} />
         <Route path="reports" element={<Reports />} />
@@ -111,7 +115,7 @@ function App() {
       {/* Admin Routes - Separate Layout */}
       <Route path="/admin" element={
         <AuthGuard>
-          <ProtectedRoute>
+          <ProtectedRoute requiredRoles={['admin']}>
             <AdminLayout />
           </ProtectedRoute>
         </AuthGuard>
@@ -123,6 +127,7 @@ function App() {
         <Route path="inspections" element={<AdminInspections />} />
         <Route path="additional-services" element={<AdditionalServices />} />
         <Route path="payment-methods" element={<AdminPaymentMethods />} />
+        <Route path="viewing-payments" element={<AdminViewingPayments />} />
         <Route path="agents" element={<AdminAgents />} />
         <Route path="airbnb" element={<AdminAirbnb />} />
         <Route path="tenants" element={<AdminTenants />} />

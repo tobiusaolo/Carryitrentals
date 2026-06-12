@@ -5,19 +5,10 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -27,12 +18,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -51,6 +36,9 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import adminAPI from '../../services/api/adminAPI';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminTenants = () => {
   const dispatch = useDispatch();
@@ -231,23 +219,89 @@ const AdminTenants = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'success';
-      case 'inactive': return 'default';
-      case 'pending': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getPaymentStatusColor = (status) => {
-    switch (status) {
-      case 'current': return 'success';
-      case 'overdue': return 'error';
-      case 'paid_advance': return 'info';
-      default: return 'default';
-    }
-  };
+  const tenantColumns = [
+    {
+      id: 'tenant',
+      label: 'Tenant',
+      getSearchValue: (row) => `${row.name} ${row.email} ${row.phone}`,
+      render: (tenant) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2, bgcolor: 'primary.light' }}>
+            <PersonIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2">{tenant.name}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+              <EmailIcon sx={{ mr: 0.5, fontSize: 14, color: 'text.secondary' }} />
+              <Typography variant="caption" color="text.secondary">{tenant.email}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <PhoneIcon sx={{ mr: 0.5, fontSize: 14, color: 'text.secondary' }} />
+              <Typography variant="caption" color="text.secondary">{tenant.phone}</Typography>
+            </Box>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'property',
+      label: 'Property & Unit',
+      getSearchValue: (row) => `${row.property_name} ${row.unit_number}`,
+      render: (tenant) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">{tenant.property_name}</Typography>
+          <Typography variant="body2" color="text.secondary">Unit {tenant.unit_number}</Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'rent_amount',
+      label: 'Rent Amount',
+      render: (tenant) => (
+        <Typography variant="body2" fontWeight="bold" color="success.main">
+          ${tenant.rent_amount.toLocaleString()}
+        </Typography>
+      ),
+    },
+    {
+      id: 'lease',
+      label: 'Lease Period',
+      render: (tenant) => (
+        <Box>
+          <Typography variant="body2">
+            Move-in: {new Date(tenant.move_in_date).toLocaleDateString()}
+          </Typography>
+          <Typography variant="body2">
+            Lease ends: {new Date(tenant.lease_end_date).toLocaleDateString()}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'payment_status',
+      label: 'Payment Status',
+      render: (tenant) => <OwnerStatusChip status={tenant.payment_status} />,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (tenant) => <OwnerStatusChip status={tenant.status} />,
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (tenant) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleViewTenant(tenant) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Tenant', onClick: () => handleOpenDialog(tenant) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Tenant', onClick: () => handleDelete(tenant.id) },
+          ]}
+        />
+      ),
+    },
+  ];
 
   if (user?.role !== 'admin') {
     return (
@@ -262,15 +316,6 @@ const AdminTenants = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Tenant Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Manage all tenants across all properties. View tenant information, payment status, and lease details.
-      </Typography>
-
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -347,123 +392,24 @@ const AdminTenants = () => {
         </Grid>
       </Grid>
 
-      {/* Tenants Table */}
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              All Tenants
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
-              Add Tenant
-            </Button>
-          </Box>
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Tenant</TableCell>
-                  <TableCell>Property & Unit</TableCell>
-                  <TableCell>Rent Amount</TableCell>
-                  <TableCell>Lease Period</TableCell>
-                  <TableCell>Payment Status</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tenants.map((tenant) => (
-                  <TableRow key={tenant.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'primary.light' }}>
-                          <PersonIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{tenant.name}</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                            <EmailIcon sx={{ mr: 0.5, fontSize: 14, color: 'text.secondary' }} />
-                            <Typography variant="caption" color="text.secondary">
-                              {tenant.email}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <PhoneIcon sx={{ mr: 0.5, fontSize: 14, color: 'text.secondary' }} />
-                            <Typography variant="caption" color="text.secondary">
-                              {tenant.phone}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {tenant.property_name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Unit {tenant.unit_number}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        ${tenant.rent_amount.toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          Move-in: {new Date(tenant.move_in_date).toLocaleDateString()}
-                        </Typography>
-                        <Typography variant="body2">
-                          Lease ends: {new Date(tenant.lease_end_date).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={tenant.payment_status} 
-                        color={getPaymentStatusColor(tenant.payment_status)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={tenant.status} 
-                        color={getStatusColor(tenant.status)}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton size="small" onClick={() => handleViewTenant(tenant)}>
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Tenant">
-                        <IconButton size="small" onClick={() => handleOpenDialog(tenant)}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Tenant">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(tenant.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={tenantColumns}
+        rows={tenants}
+        loading={loading}
+        title="All Tenants"
+        subtitle="Manage tenants across all properties"
+        emptyTitle="No tenants yet"
+        emptyDescription="Add a tenant to track leases, rent, and payment status."
+        emptyIcon={PersonIcon}
+        emptyActionLabel="Add Tenant"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by name, email, or phone…"
+        toolbar={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+            Add Tenant
+          </Button>
+        }
+      />
 
       {/* Add/Edit Tenant Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

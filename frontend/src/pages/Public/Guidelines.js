@@ -35,32 +35,27 @@ import {
 import SocialMediaFloatButtons from '../../components/SocialMediaFloatButtons';
 import Footer from '../../components/Footer';
 import PublicHeader from '../../components/Navigation/PublicHeader';
+import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
+import { RATES_FROM_UGX, VIEWER_REGIONS, convertAmount } from '../../config/currencyLocale';
 
-const CURRENCY_RATES = {
-  'UGX': 1,
-  'KES': 0.033,
-  'TZS': 0.043,
-  'RWF': 0.036,
-  'BIF': 0.54,
-  'SSP': 0.14,
-};
+import { DEFAULT_INSPECTION_FEE_UGX as INSPECTION_FEE_UGX } from '../../constants/rentalUnit';
 
-const INSPECTION_FEE_UGX = 50000;
+const EAST_AFRICA_CURRENCIES = ['UGX', 'KES', 'TZS', 'RWF', 'BIF', 'SSP'];
 
-const getInspectionFees = () => {
-  return [
-    { country: 'Uganda', currency: 'UGX', flag: '🇺🇬', fee: INSPECTION_FEE_UGX },
-    { country: 'Kenya', currency: 'KES', flag: '🇰🇪', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.KES) },
-    { country: 'Tanzania', currency: 'TZS', flag: '🇹🇿', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.TZS) },
-    { country: 'Rwanda', currency: 'RWF', flag: '🇷🇼', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.RWF) },
-    { country: 'Burundi', currency: 'BIF', flag: '🇧🇮', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.BIF) },
-    { country: 'South Sudan', currency: 'SSP', flag: '🇸🇸', fee: Math.round(INSPECTION_FEE_UGX * CURRENCY_RATES.SSP) },
-  ];
-};
+const getInspectionFees = () =>
+  VIEWER_REGIONS.filter((r) => EAST_AFRICA_CURRENCIES.includes(r.currency)).map((r) => ({
+    country: r.country,
+    currency: r.currency,
+    flag: r.flag,
+    fee: Math.round(INSPECTION_FEE_UGX * (RATES_FROM_UGX[r.currency] || 1)),
+  }));
 
 const Guidelines = () => {
   const navigate = useNavigate();
+  const { viewerCountry, displayCurrency, formatMoney } = useViewerCurrency();
   const inspectionFees = getInspectionFees();
+  const viewerInspectionFee = convertAmount(INSPECTION_FEE_UGX, 'UGX', displayCurrency);
+  const standardFeeDisplay = formatMoney(INSPECTION_FEE_UGX, 'UGX');
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'white', display: 'flex', flexDirection: 'column' }}>
@@ -120,6 +115,34 @@ const Guidelines = () => {
 
       <Container maxWidth="lg" sx={{ py: 12, flex: 1 }}>
         <Grid container spacing={8}>
+
+          {/* Trust & Safety — market-driven (vs Jiji/Facebook scams) */}
+          <Grid item xs={12}>
+            <Box sx={{ mb: 6, textAlign: 'center' }}>
+              <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: '-0.03em', mb: 2 }}>Trust & Safety</Typography>
+              <Typography variant="body1" sx={{ color: '#717171', fontSize: '1.1rem', maxWidth: 720, mx: 'auto' }}>
+                CarryIT is built to fix what tenants hate on open classifieds: fake listings, bait prices, and pay-before-viewing scams.
+              </Typography>
+            </Box>
+            <Grid container spacing={3}>
+              {[
+                { title: 'NIN-verified agents', body: 'Every listing is tied to an agent with national ID on file — not anonymous posters.' },
+                { title: 'View before rent', body: 'You book a viewing first. Monthly rent and deposit are only discussed after you see the property.' },
+                { title: 'Transparent fees', body: 'Rent, deposit, and viewing fees are shown on every listing — no bait-and-switch at the gate.' },
+                { title: 'Report abuse', body: 'Flag fake, duplicate, or misleading ads. We review reports within 48 hours.' },
+              ].map((item) => (
+                <Grid item xs={12} sm={6} md={3} key={item.title}>
+                  <Paper elevation={0} sx={{ p: 3, height: '100%', borderRadius: '20px', border: '1px solid #EBEBEB' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>{item.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">{item.body}</Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+            <Alert severity="warning" sx={{ mt: 4, borderRadius: '16px', textAlign: 'left' }}>
+              <strong>Red flags anywhere online:</strong> price far below market, agent demands Mobile Money before viewing, stock photos, or “already taken” when you arrive. On CarryIT, report the listing immediately.
+            </Alert>
+          </Grid>
           
           {/* Inspection Fees - Dimensional Layout */}
           <Grid item xs={12}>
@@ -140,10 +163,15 @@ const Guidelines = () => {
                   }}
                 >
                   <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>Standard Viewing Fee</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 4 }}>
-                    <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff385c' }}>UGX 50k</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1 }}>
+                    <Typography variant="h2" sx={{ fontWeight: 900, color: '#ff385c' }}>
+                      {standardFeeDisplay.primary}
+                    </Typography>
                     <Typography variant="body1" sx={{ color: '#717171' }}>/ property</Typography>
                   </Box>
+                  <Typography variant="body2" sx={{ color: '#717171', mb: 3 }}>
+                    For {viewerCountry}, fees display in {displayCurrency} ({displayCurrency} {viewerInspectionFee.toLocaleString()}).
+                  </Typography>
                   <List sx={{ mb: 4 }}>
                     {['Physical showing by agent', 'Virtual video-call tours', 'Verified unit checklist', 'Instant feedback report'].map((item, i) => (
                       <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>

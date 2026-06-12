@@ -10,6 +10,9 @@ import {
   Chip,
   IconButton,
   Fab,
+  FormControl,
+  Select,
+  MenuItem,
   Grow,
   Zoom,
   Fade,
@@ -24,10 +27,11 @@ import {
   Bathtub,
   Event as CalendarIcon
 } from '@mui/icons-material';
-import StatusBadge from '../../components/UI/StatusBadge';
 import EmptyState from '../../components/UI/EmptyState';
 import { PropertyCardSkeleton } from '../../components/UI/LoadingSkeleton';
 import api from '../../services/api/api';
+import { unitAPI } from '../../services/api/unitAPI';
+import { RENTAL_STATUS_OPTIONS, normalizeRentalStatus } from '../../utils/rentalStatus';
 
 const AgentMyUnits = () => {
   const navigate = useNavigate();
@@ -38,6 +42,18 @@ const AgentMyUnits = () => {
     loadMyUnits();
   }, []);
 
+  const handleStatusChange = async (unitId, newStatus, e) => {
+    e?.stopPropagation();
+    try {
+      await unitAPI.updateRentalUnit(unitId, { status: newStatus });
+      setUnits((prev) =>
+        prev.map((u) => (String(u.id) === String(unitId) ? { ...u, status: newStatus } : u))
+      );
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  };
+
   const loadMyUnits = async () => {
     try {
       setLoading(true);
@@ -45,7 +61,8 @@ const AgentMyUnits = () => {
       const response = await api.get('/rental-units/');
       
       // Parse images from string to array for each unit
-      const unitsWithImages = response.data.map(unit => {
+      const unitsWithImages = response.data.map((unit) => {
+        unit.status = normalizeRentalStatus(unit.status);
         if (unit.images && typeof unit.images === 'string') {
           // Split images by separator and filter empty strings
           unit.images = unit.images.split('|||IMAGE_SEPARATOR|||').filter(img => img.trim());
@@ -188,8 +205,18 @@ const AgentMyUnits = () => {
                     {!unit.images?.[0] && (
                       <Home sx={{ fontSize: 60, color: 'rgba(255,255,255,0.5)' }} />
                     )}
-                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                      <StatusBadge status={unit.status} />
+                    <Box sx={{ position: 'absolute', top: 12, right: 12 }} onClick={(e) => e.stopPropagation()}>
+                      <FormControl size="small" sx={{ minWidth: 110, bgcolor: 'rgba(255,255,255,0.95)', borderRadius: 1 }}>
+                        <Select
+                          value={unit.status || 'available'}
+                          onChange={(e) => handleStatusChange(unit.id, e.target.value, e)}
+                          sx={{ fontSize: '0.75rem', height: 32 }}
+                        >
+                          {RENTAL_STATUS_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Box>
                   </Box>
 
@@ -319,8 +346,18 @@ const AgentMyUnits = () => {
                     {!unit.images?.[0] && (
                       <Home sx={{ fontSize: 60, color: 'rgba(255,255,255,0.5)' }} />
                     )}
-                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                      <StatusBadge status={unit.status} />
+                    <Box sx={{ position: 'absolute', top: 12, right: 12 }} onClick={(e) => e.stopPropagation()}>
+                      <FormControl size="small" sx={{ minWidth: 110, bgcolor: 'rgba(255,255,255,0.95)', borderRadius: 1 }}>
+                        <Select
+                          value={unit.status || 'available'}
+                          onChange={(e) => handleStatusChange(unit.id, e.target.value, e)}
+                          sx={{ fontSize: '0.75rem', height: 32 }}
+                        >
+                          {RENTAL_STATUS_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Box>
                   </Box>
 
@@ -449,8 +486,18 @@ const AgentMyUnits = () => {
                     {!unit.images?.[0] && (
                       <Home sx={{ fontSize: 60, color: 'rgba(255,255,255,0.5)' }} />
                     )}
-                    <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
-                      <StatusBadge status={unit.status} />
+                    <Box sx={{ position: 'absolute', top: 12, right: 12 }} onClick={(e) => e.stopPropagation()}>
+                      <FormControl size="small" sx={{ minWidth: 110, bgcolor: 'rgba(255,255,255,0.95)', borderRadius: 1 }}>
+                        <Select
+                          value={unit.status || 'available'}
+                          onChange={(e) => handleStatusChange(unit.id, e.target.value, e)}
+                          sx={{ fontSize: '0.75rem', height: 32 }}
+                        >
+                          {RENTAL_STATUS_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Box>
                   </Box>
 
@@ -537,24 +584,27 @@ const AgentMyUnits = () => {
       {/* Mobile FAB */}
       <Zoom in={true} timeout={1000} style={{ transitionDelay: '300ms' }}>
         <Fab
+          variant="extended"
           color="primary"
           sx={{
             position: 'fixed',
             bottom: 80,
             right: 16,
             display: { xs: 'flex', sm: 'none' },
+            textTransform: 'none',
+            fontWeight: 600,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
             '&:hover': {
               background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              transform: 'scale(1.1) rotate(90deg)',
               boxShadow: '0 8px 25px rgba(102, 126, 234, 0.5)'
             },
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           onClick={() => navigate('/agent/add-unit')}
         >
-          <Add />
+          <Add sx={{ mr: 0.5 }} />
+          Add unit
         </Fab>
       </Zoom>
     </Box>

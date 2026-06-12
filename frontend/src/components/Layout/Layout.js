@@ -1,5 +1,5 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Box,
@@ -21,15 +21,21 @@ import {
   Settings,
   Person,
 } from '@mui/icons-material';
-import Sidebar from './Sidebar';
+import Sidebar, { drawerWidth } from './Sidebar';
+import PortalNavTitle from './PortalNavTitle';
 import { logout } from '../../store/slices/authSlice';
+import { PageMetaProvider, usePageMeta } from '../../contexts/PageMetaContext';
+import { OWNER_ROUTE_META, OWNER_PROPERTY_HUB_TAB_META, colors, layout } from '../../theme/designTokens';
 
-const Layout = () => {
+const toolbarHeight = layout.headerHeight;
+
+const OwnerLayoutChrome = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  
+  const { meta } = usePageMeta();
+
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState(null);
 
@@ -51,45 +57,53 @@ const Layout = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', bgcolor: '#F7F7F7', minHeight: '100vh' }}>
-      {/* App Bar - Premium Glassmorphism */}
+    <Box sx={{ display: 'flex', bgcolor: colors.surfaceMuted, minHeight: '100vh' }}>
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${280}px)` },
-          ml: { md: `${280}px` },
-          backgroundColor: alpha('#FFF', 0.8),
-          backdropFilter: 'blur(12px)',
-          color: '#222',
-          borderBottom: '1px solid #EEE',
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+          backgroundColor: alpha(colors.surface, 0.92),
+          backdropFilter: 'blur(16px)',
+          color: colors.text,
+          borderBottom: `1px solid ${colors.border}`,
           zIndex: theme.zIndex.drawer + 1
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Toolbar
+          sx={{
+            justifyContent: 'space-between',
+            minHeight: toolbarHeight,
+            py: 0.5,
+            px: { xs: 2, md: 4 },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
             <IconButton
               color="inherit"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ mr: 2, display: { md: 'none' } }}
+              sx={{ mr: 1, display: { md: 'none' }, flexShrink: 0 }}
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.02em', display: { xs: 'none', md: 'block' } }}>
-              Owner Portal
-            </Typography>
+            <PortalNavTitle
+              title={meta?.title || 'Owner portal'}
+              subtitle={meta?.subtitle}
+              meta={meta?.meta}
+            />
           </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
             {!isMobile && (
               <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                 {user?.first_name} {user?.last_name}
               </Typography>
             )}
-            
+
             <IconButton onClick={handleProfileMenuOpen} sx={{ p: 0.5, border: '1px solid #EEE' }}>
-              <Avatar sx={{ width: 36, height: 36, bgcolor: '#667eea', fontWeight: 800, fontSize: '0.9rem' }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: colors.brand, fontWeight: 800, fontSize: '0.9rem' }}>
                 {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
               </Avatar>
             </IconButton>
@@ -97,7 +111,6 @@ const Layout = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Profile Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
@@ -131,26 +144,42 @@ const Layout = () => {
         </MenuItem>
       </Menu>
 
-      {/* Sidebar */}
-      <Sidebar 
-        mobileOpen={mobileOpen} 
+      <Sidebar
+        mobileOpen={mobileOpen}
         handleDrawerToggle={handleDrawerToggle}
         isMobile={isMobile}
       />
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          width: { md: `calc(100% - ${280}px)` },
-          mt: '64px',
-          minHeight: 'calc(100vh - 64px)',
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          mt: `${toolbarHeight}px`,
+          minHeight: `calc(100vh - ${toolbarHeight}px)`,
         }}
       >
         <Outlet />
       </Box>
     </Box>
+  );
+};
+
+const Layout = () => {
+  const location = useLocation();
+
+  const fallback = useMemo(() => {
+    if (location.pathname === '/owner/property-hub') {
+      const tab = new URLSearchParams(location.search).get('tab') || 'properties';
+      return OWNER_PROPERTY_HUB_TAB_META[tab] || OWNER_ROUTE_META['/owner/property-hub'];
+    }
+    return OWNER_ROUTE_META[location.pathname] || { title: 'Owner portal', subtitle: '' };
+  }, [location.pathname, location.search]);
+
+  return (
+    <PageMetaProvider fallback={fallback}>
+      <OwnerLayoutChrome />
+    </PageMetaProvider>
   );
 };
 

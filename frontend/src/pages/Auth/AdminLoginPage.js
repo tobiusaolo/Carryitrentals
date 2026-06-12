@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   TextField,
@@ -8,40 +8,46 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Container,
-  Paper,
-  Divider,
   Link,
-  Avatar,
-  Fade
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import {
   AdminPanelSettings as AdminIcon,
-  Security as SecurityIcon,
+  Lock as LockIcon,
+  Email as EmailIcon,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
 import { loginUser, getCurrentUser, clearError } from '../../store/slices/authSlice';
+import AuthShell from '../../components/Auth/AuthShell';
+import { colors } from '../../theme/designTokens';
+
+const ADMIN_ACCENT = '#1f2937';
+const ADMIN_ACCENT_DARK = '#111827';
+
+const inputSx = {
+  '& .MuiOutlinedInput-root': { borderRadius: '12px', bgcolor: colors.surface },
+};
 
 const AdminLoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, error } = useSelector((state) => state.auth);
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+
+  const [accessDenied, setAccessDenied] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({ email: '', password: '' });
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     dispatch(clearError());
-    
+    setAccessDenied('');
+
     const result = await dispatch(loginUser(formData));
     if (result.type === 'auth/login/fulfilled') {
       const userResult = await dispatch(getCurrentUser());
@@ -50,7 +56,7 @@ const AdminLoginPage = () => {
         if (userRole === 'admin') {
           navigate('/admin');
         } else {
-          dispatch(clearError());
+          setAccessDenied(`This account is "${userRole}", not admin. Use the correct portal from /portals.`);
           setFormData({ email: '', password: '' });
         }
       }
@@ -58,110 +64,119 @@ const AdminLoginPage = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#F7F7F7', display: 'flex', flexDirection: 'column' }}>
-      
-      <Container maxWidth="xs" sx={{ mt: 12, mb: 4 }}>
-        <Fade in={true} timeout={800}>
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 4, 
-              borderRadius: '24px', 
-              border: '1px solid #DDD',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.05)'
-            }}
-          >
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <Avatar
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
-                  mx: 'auto',
-                  mb: 2,
-                  bgcolor: '#D32F2F',
-                  color: 'white',
-                  boxShadow: '0 4px 12px rgba(211, 47, 47, 0.3)',
-                }}
-                variant="rounded"
-              >
-                <AdminIcon sx={{ fontSize: 40 }} />
-              </Avatar>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#222' }}>
-                Admin Access
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                System Administrator Login
-              </Typography>
-            </Box>
+    <AuthShell
+      accent={ADMIN_ACCENT}
+      accentDark={ADMIN_ACCENT_DARK}
+      eyebrow="CarryIT Admin"
+      panelTitle="Secure administrator console."
+      panelSubtitle="Oversee the entire platform — owners, properties, payments and system health from one place."
+      highlights={[
+        'Full oversight of owners, agents and listings',
+        'Monitor payments, inspections and analytics',
+        'Restricted, audited administrative access',
+      ]}
+      footnote="Authorized personnel only. Activity is monitored."
+      badgeIcon={<AdminIcon />}
+      formTitle="Administrator sign in"
+      formSubtitle="Restricted access. Enter your admin credentials."
+    >
+      {accessDenied && (
+        <Alert severity="warning" sx={{ mb: 3, borderRadius: '12px' }}>
+          {accessDenied}
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>
+          {error}
+        </Alert>
+      )}
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>
-                {error}
-              </Alert>
-            )}
+      <Box component="form" onSubmit={handleSubmit}>
+        <TextField
+          fullWidth
+          label="Admin email"
+          name="email"
+          type="email"
+          required
+          value={formData.email}
+          onChange={handleChange}
+          margin="normal"
+          sx={inputSx}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <EmailIcon sx={{ color: colors.textMuted, fontSize: 20 }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <TextField
+          fullWidth
+          label="Password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          required
+          value={formData.password}
+          onChange={handleChange}
+          margin="normal"
+          sx={inputSx}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <LockIcon sx={{ color: colors.textMuted, fontSize: 20 }} />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
 
-            <Box component="form" onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Admin Email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                margin="normal"
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
-              />
-              <TextField
-                fullWidth
-                label="Password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                margin="normal"
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
-              />
+        <Button
+          fullWidth
+          type="submit"
+          variant="contained"
+          disabled={isLoading}
+          sx={{
+            mt: 3,
+            py: 1.5,
+            borderRadius: '12px',
+            bgcolor: ADMIN_ACCENT,
+            fontWeight: 700,
+            fontSize: '1rem',
+            textTransform: 'none',
+            boxShadow: 'none',
+            '&:hover': { bgcolor: ADMIN_ACCENT_DARK, boxShadow: 'none' },
+          }}
+        >
+          {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Sign in to admin'}
+        </Button>
+      </Box>
 
-              <Button
-                fullWidth
-                type="submit"
-                variant="contained"
-                disabled={isLoading}
-                sx={{
-                  mt: 4,
-                  py: 1.5,
-                  borderRadius: '12px',
-                  bgcolor: '#D32F2F',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: '#B71C1C' }
-                }}
-              >
-                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Login to Admin'}
-              </Button>
-            </Box>
+      <Box
+        sx={{
+          mt: 3,
+          p: 2,
+          bgcolor: colors.surfaceMuted,
+          borderRadius: '12px',
+          border: `1px solid ${colors.border}`,
+        }}
+      >
+        <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block' }}>
+          <strong>Note:</strong> Admin credentials are restricted and access is logged.
+        </Typography>
+      </Box>
 
-            <Divider sx={{ my: 4 }} />
-
-            <Box sx={{ textAlign: 'center' }}>
-              <Link href="/login" sx={{ color: '#222', fontWeight: 600 }}>
-                Return to Owner Login
-              </Link>
-            </Box>
-
-            <Box sx={{ mt: 3, p: 2, bgcolor: '#FEE2E2', borderRadius: '12px', border: '1px solid #FECACA' }}>
-              <Typography variant="caption" color="#991B1B" display="block">
-                <strong>Development Note:</strong> Admin credentials are restricted.
-              </Typography>
-            </Box>
-          </Paper>
-        </Fade>
-      </Container>
-    </Box>
+      <Box sx={{ mt: 3, textAlign: 'center' }}>
+        <Link component={RouterLink} to="/owner-login" sx={{ color: colors.text, fontWeight: 600, fontSize: '0.85rem' }}>
+          Return to owner login
+        </Link>
+      </Box>
+    </AuthShell>
   );
 };
 

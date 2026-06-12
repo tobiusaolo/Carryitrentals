@@ -55,13 +55,28 @@ import {
   Pending
 } from '@mui/icons-material';
 import api from '../../services/api/api';
+import { propertyAPI } from '../../services/api/propertyAPI';
 import NotificationSystem from '../../components/UI/NotificationSystem';
 import { PropertyCardSkeleton } from '../../components/UI/LoadingSkeleton';
 import EmptyState from '../../components/UI/EmptyState';
 import EnhancedStatCard from '../../components/UI/EnhancedStatCard';
+import AirbnbListingFormFields from '../../components/Forms/AirbnbListingFormFields';
+import DisplayPrice from '../../components/Public/DisplayPrice';
+import {
+  emptyAirbnbFormState,
+  MIN_AIRBNB_IMAGES,
+  MAX_AIRBNB_IMAGES,
+  getBookingStatusMeta,
+  getAirbnbPropertyTypeLabel,
+} from '../../constants/airbnb';
+import OwnerDataTable from '../../components/Owner/OwnerDataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import { formatMoney } from '../../utils/formatMoney';
+import { colors, getOwnerStatColor } from '../../theme/designTokens';
 
-const OwnerAirbnb = () => {
+const OwnerAirbnb = ({ embedded = false }) => {
   const [airbnbs, setAirbnbs] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAirbnb, setEditingAirbnb] = useState(null);
@@ -80,24 +95,32 @@ const OwnerAirbnb = () => {
     bookedListings: 0
   });
   
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    location: '',
-    price_per_night: '',
-    currency: 'USD',
-    max_guests: 2,
-    bedrooms: 1,
-    bathrooms: 1,
-    amenities: '',
-    house_rules: '',
-    is_available: 'available'
-  });
+  const [formData, setFormData] = useState(emptyAirbnbFormState());
 
   useEffect(() => {
     loadAirbnbs();
     loadAllBookings();
+    loadProperties();
   }, []);
+
+  const loadProperties = async () => {
+    try {
+      const response = await propertyAPI.getAllProperties();
+      setProperties(response.data || []);
+    } catch (err) {
+      console.error('Error loading properties:', err);
+    }
+  };
+
+  const handlePropertyChange = (propertyId) => {
+    const prop = properties.find((p) => String(p.id) === String(propertyId));
+    setFormData((prev) => ({
+      ...prev,
+      property_id: propertyId,
+      location: prop ? [prop.address, prop.city].filter(Boolean).join(', ') || prev.location : prev.location,
+      country: prop?.country || prev.country,
+    }));
+  };
 
   const loadAirbnbs = async () => {
     try {
@@ -195,34 +218,26 @@ const OwnerAirbnb = () => {
     if (airbnb) {
       setEditingAirbnb(airbnb);
       setFormData({
+        ...emptyAirbnbFormState(),
         title: airbnb.title || '',
         description: airbnb.description || '',
         location: airbnb.location || '',
+        country: airbnb.country || emptyAirbnbFormState().country,
+        property_type: airbnb.property_type || emptyAirbnbFormState().property_type,
         price_per_night: airbnb.price_per_night || '',
-        currency: airbnb.currency || 'USD',
+        currency: airbnb.currency || emptyAirbnbFormState().currency,
         max_guests: airbnb.max_guests || 2,
         bedrooms: airbnb.bedrooms || 1,
         bathrooms: airbnb.bathrooms || 1,
         amenities: airbnb.amenities || '',
         house_rules: airbnb.house_rules || '',
-        is_available: airbnb.is_available || 'available'
+        is_available: airbnb.is_available || 'available',
+        property_id: airbnb.property_id || '',
       });
       setSelectedImages(airbnb.images || []);
     } else {
       setEditingAirbnb(null);
-      setFormData({
-        title: '',
-        description: '',
-        location: '',
-        price_per_night: '',
-        currency: 'USD',
-        max_guests: 2,
-        bedrooms: 1,
-        bathrooms: 1,
-        amenities: '',
-        house_rules: '',
-        is_available: 'available'
-      });
+      setFormData(emptyAirbnbFormState());
       setSelectedImages([]);
     }
     setOpenDialog(true);
@@ -236,10 +251,10 @@ const OwnerAirbnb = () => {
 
   const handleImageSelect = (event) => {
     const files = Array.from(event.target.files);
-    if (selectedImages.length + files.length > 10) {
+    if (selectedImages.length + files.length > MAX_AIRBNB_IMAGES) {
       setNotification({
         open: true,
-        message: 'Maximum 10 images allowed',
+        message: `Maximum ${MAX_AIRBNB_IMAGES} images allowed`,
         severity: 'error'
       });
       return;
@@ -252,6 +267,22 @@ const OwnerAirbnb = () => {
   };
 
   const handleSubmit = async () => {
+    if (!formData.property_id) {
+      setNotification({
+        open: true,
+        message: 'Select one of your properties before saving this listing.',
+        severity: 'warning',
+      });
+      return;
+    }
+    if (!editingAirbnb && selectedImages.length < MIN_AIRBNB_IMAGES) {
+      setNotification({
+        open: true,
+        message: `Add at least ${MIN_AIRBNB_IMAGES} photos before saving`,
+        severity: 'warning',
+      });
+      return;
+    }
     setSaveLoading(true);
     try {
       // Convert images to base64
@@ -332,11 +363,15 @@ const OwnerAirbnb = () => {
   };
 
   const handleUpdateBookingStatus = async (bookingId, newStatus) => {
+    const id = String(bookingId);
     try {
-      await api.put(`/airbnb/bookings/${bookingId}`, { status: newStatus });
+      await api.put(`/airbnb/bookings/${id}`, { status: newStatus });
+      setBookings((prev) =>
+        prev.map((b) => (String(b.id) === id ? { ...b, status: newStatus } : b))
+      );
       setNotification({
         open: true,
-        message: `Booking ${newStatus} successfully!`,
+        message: `Booking ${newStatus.replace('_', ' ')} successfully!`,
         severity: 'success'
       });
       loadAllBookings();
@@ -344,7 +379,7 @@ const OwnerAirbnb = () => {
       console.error('Error updating booking:', err);
       setNotification({
         open: true,
-        message: 'Failed to update booking status',
+        message: err.response?.data?.detail || 'Failed to update booking status',
         severity: 'error'
       });
     }
@@ -391,39 +426,62 @@ const OwnerAirbnb = () => {
   return (
     <Box>
       {/* Header */}
-      <Fade in={true} timeout={600}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" fontWeight="bold">
-              <HomeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Airbnb Management
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Manage your short-term rental listings and bookings
-            </Typography>
+      {!embedded && (
+        <Fade in={true} timeout={600}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box>
+              <Typography variant="h4" fontWeight="bold">
+                <HomeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Short stays
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Airbnb-style listings linked to your properties
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => handleOpenDialog()}
+              disabled={properties.length === 0}
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: 2,
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)'
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Add Listing
+            </Button>
           </Box>
+        </Fade>
+      )}
+
+      {embedded && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => handleOpenDialog()}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: 2,
-              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)'
-              },
-              transition: 'all 0.3s ease'
-            }}
+            disabled={properties.length === 0}
+            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: colors.brand, boxShadow: 'none' }}
           >
-            Add Listing
+            Add short stay
           </Button>
         </Box>
-      </Fade>
+      )}
+
+      {properties.length === 0 && (
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          Add a property first (Properties tab), then create a short-stay listing linked to it.
+        </Alert>
+      )}
 
       {/* Statistics - Always show */}
       <Fade in={true} timeout={800}>
@@ -433,7 +491,7 @@ const OwnerAirbnb = () => {
               title="Total Listings"
               value={stats.totalListings}
               icon={<HomeIcon />}
-              color="#667eea"
+              color={getOwnerStatColor(0)}
               subtitle={`${stats.availableListings} available, ${stats.bookedListings} booked`}
             />
           </Grid>
@@ -442,26 +500,25 @@ const OwnerAirbnb = () => {
               title="Total Bookings"
               value={stats.totalBookings}
               icon={<CalendarIcon />}
-              color="#3b82f6"
+              color={getOwnerStatColor(1)}
               subtitle="All-time bookings"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <EnhancedStatCard
               title="Monthly Income"
-              value={`$${stats.monthlyIncome.toFixed(2)}`}
+              value={formatMoney(stats.monthlyIncome, 'UGX')}
               icon={<TrendingUp />}
-              color="#10b981"
-              trend={stats.monthlyIncome > 0 ? 'up' : 'neutral'}
+              color={getOwnerStatColor(2)}
               subtitle="Current month"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <EnhancedStatCard
               title="Total Income"
-              value={`$${stats.totalIncome.toFixed(2)}`}
+              value={formatMoney(stats.totalIncome, 'UGX')}
               icon={<AttachMoney />}
-              color="#f59e0b"
+              color={getOwnerStatColor(0)}
               subtitle="All-time earnings"
             />
           </Grid>
@@ -548,6 +605,13 @@ const OwnerAirbnb = () => {
                         <Typography variant="h6" fontWeight={700} gutterBottom noWrap>
                           {airbnb.title}
                         </Typography>
+                        {(airbnb.property_name || airbnb.property_id) && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                            {airbnb.property_name ||
+                              properties.find((p) => String(p.id) === String(airbnb.property_id))?.name ||
+                              'Linked property'}
+                          </Typography>
+                        )}
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
                           <LocationOn sx={{ fontSize: 18, color: '#6b7280' }} />
@@ -558,6 +622,12 @@ const OwnerAirbnb = () => {
 
                         {/* Details */}
                         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                          <Chip
+                            label={getAirbnbPropertyTypeLabel(airbnb.property_type)}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
                           <Chip
                             icon={<GuestsIcon sx={{ fontSize: 16 }} />}
                             label={`${airbnb.max_guests} Guests`}
@@ -634,136 +704,122 @@ const OwnerAirbnb = () => {
           {/* Bookings Tab */}
           {activeTab === 1 && (
             <Fade in={true} timeout={600}>
-              <Paper sx={{ borderRadius: 3 }}>
-                {bookings.length === 0 ? (
-                  <Box sx={{ p: 8, textAlign: 'center' }}>
-                    <CalendarIcon sx={{ fontSize: 80, color: '#e5e7eb', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
-                      No Bookings Yet
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Bookings will appear here when guests book your Airbnb listings
-                    </Typography>
-                  </Box>
-                ) : (
-                  <TableContainer>
-                    <Table>
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                          <TableCell><strong>Property</strong></TableCell>
-                          <TableCell><strong>Guest</strong></TableCell>
-                          <TableCell><strong>Check-in</strong></TableCell>
-                          <TableCell><strong>Check-out</strong></TableCell>
-                          <TableCell><strong>Guests</strong></TableCell>
-                          <TableCell><strong>Total</strong></TableCell>
-                          <TableCell><strong>Status</strong></TableCell>
-                          <TableCell><strong>Actions</strong></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {bookings.map((booking) => (
-                          <TableRow key={booking.id} hover>
-                            <TableCell>
-                              <Box>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {booking.airbnb_title}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {booking.airbnb_location}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {booking.guest_name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {booking.guest_email}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {new Date(booking.check_in_date).toLocaleDateString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {new Date(booking.check_out_date).toLocaleDateString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                icon={<GuestsIcon />}
-                                label={booking.number_of_guests}
-                                size="small"
-                                variant="outlined"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight={700} color="#667eea">
-                                ${booking.total_amount?.toFixed(2) || '0.00'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                icon={getStatusIcon(booking.status)}
-                                label={booking.status}
-                                size="small"
-                                sx={{
-                                  bgcolor: `${getStatusColor(booking.status)}20`,
-                                  color: getStatusColor(booking.status),
-                                  fontWeight: 600,
-                                  textTransform: 'capitalize'
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {booking.status === 'pending' && (
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="success"
-                                    onClick={() => handleUpdateBookingStatus(booking.id, 'confirmed')}
-                                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                                  >
-                                    Confirm
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="error"
-                                    onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}
-                                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </Box>
-                              )}
-                              {booking.status === 'confirmed' && (
+              <Paper sx={{ borderRadius: 3, border: `1px solid ${colors.border}`, boxShadow: 'none' }}>
+                <Alert severity="info" sx={{ m: 2, borderRadius: 2 }}>
+                  <strong>Pending</strong> — guest requested dates; confirm or cancel.{' '}
+                  <strong>Confirmed</strong> — accepted stay. Payment is arranged after you confirm (50% prepayment may apply).
+                </Alert>
+                <Box sx={{ px: 0, pb: 0 }}>
+                  <OwnerDataTable
+                    columns={[
+                      {
+                        id: 'property',
+                        label: 'Property',
+                        render: (booking) => (
+                          <>
+                            <Typography variant="body2" fontWeight={600}>{booking.airbnb_title}</Typography>
+                            <Typography variant="caption" color="text.secondary">{booking.airbnb_location}</Typography>
+                          </>
+                        ),
+                      },
+                      {
+                        id: 'guest',
+                        label: 'Guest',
+                        render: (booking) => (
+                          <>
+                            <Typography variant="body2" fontWeight={600}>{booking.guest_name}</Typography>
+                            <Typography variant="caption" color="text.secondary">{booking.guest_email}</Typography>
+                          </>
+                        ),
+                      },
+                      {
+                        id: 'checkin',
+                        label: 'Check-in',
+                        render: (b) => new Date(b.check_in_date).toLocaleDateString(),
+                      },
+                      {
+                        id: 'checkout',
+                        label: 'Check-out',
+                        render: (b) => new Date(b.check_out_date).toLocaleDateString(),
+                      },
+                      {
+                        id: 'guests',
+                        label: 'Guests',
+                        render: (b) => b.number_of_guests,
+                      },
+                      {
+                        id: 'total',
+                        label: 'Total',
+                        render: (booking) => (
+                          <DisplayPrice
+                            amount={booking.total_amount || 0}
+                            listingCurrency={booking.currency || 'UGX'}
+                            variant="body2"
+                            showSecondary={false}
+                          />
+                        ),
+                      },
+                      {
+                        id: 'status',
+                        label: 'Status',
+                        render: (b) => (
+                          <OwnerStatusChip status={b.status} label={getBookingStatusMeta(b.status).label} />
+                        ),
+                      },
+                      {
+                        id: 'actions',
+                        label: 'Actions',
+                        render: (booking) => {
+                          const st = booking.status === 'approved' ? 'confirmed' : booking.status;
+                          if (st === 'pending') {
+                            return (
+                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => handleUpdateBookingStatus(booking.id, 'confirmed')}
+                                  sx={{ textTransform: 'none', fontSize: '0.75rem', bgcolor: colors.brand, boxShadow: 'none' }}
+                                >
+                                  Confirm
+                                </Button>
                                 <Button
                                   size="small"
                                   variant="outlined"
-                                  onClick={() => handleUpdateBookingStatus(booking.id, 'completed')}
+                                  onClick={() => handleUpdateBookingStatus(booking.id, 'cancelled')}
                                   sx={{ textTransform: 'none', fontSize: '0.75rem' }}
                                 >
-                                  Complete
+                                  Cancel
                                 </Button>
-                              )}
-                              {(booking.status === 'completed' || booking.status === 'cancelled') && (
-                                <Typography variant="caption" color="text.secondary">
-                                  No actions
-                                </Typography>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
+                              </Box>
+                            );
+                          }
+                          if (st === 'confirmed') {
+                            return (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleUpdateBookingStatus(booking.id, 'completed')}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                              >
+                                Complete
+                              </Button>
+                            );
+                          }
+                          return (
+                            <Typography variant="caption" color="text.secondary">
+                              —
+                            </Typography>
+                          );
+                        },
+                      },
+                    ]}
+                    rows={bookings}
+                    loading={false}
+                    emptyTitle="No bookings yet"
+                    emptyDescription="Bookings appear here when guests request stays on your listings."
+                    emptyIcon={CalendarIcon}
+                  />
+                </Box>
               </Paper>
             </Fade>
           )}
@@ -773,218 +829,35 @@ const OwnerAirbnb = () => {
       {/* Add/Edit Dialog - Always available */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
           <DialogTitle>
-            {editingAirbnb ? 'Edit Airbnb Listing' : 'Add New Airbnb Listing'}
+            {editingAirbnb ? 'Edit short-stay listing' : 'Add short-stay listing'}
           </DialogTitle>
           <DialogContent>
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  placeholder="e.g., Cozy Beach House"
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  required
-                  placeholder="e.g., Zanzibar, Tanzania"
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="Price per Night"
-                  type="number"
-                  value={formData.price_per_night}
-                  onChange={(e) => setFormData({ ...formData, price_per_night: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Currency</InputLabel>
-                  <Select
-                    value={formData.currency}
-                    label="Currency"
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  >
-                    <MenuItem value="USD">USD</MenuItem>
-                    <MenuItem value="UGX">UGX</MenuItem>
-                    <MenuItem value="KES">KES</MenuItem>
-                    <MenuItem value="TZS">TZS</MenuItem>
-                    <MenuItem value="EUR">EUR</MenuItem>
-                    <MenuItem value="GBP">GBP</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={formData.is_available}
-                    label="Status"
-                    onChange={(e) => setFormData({ ...formData, is_available: e.target.value })}
-                  >
-                    <MenuItem value="available">Available</MenuItem>
-                    <MenuItem value="booked">Booked</MenuItem>
-                    <MenuItem value="unavailable">Unavailable</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="Max Guests"
-                  type="number"
-                  value={formData.max_guests}
-                  onChange={(e) => setFormData({ ...formData, max_guests: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="Bedrooms"
-                  type="number"
-                  value={formData.bedrooms}
-                  onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="Bathrooms"
-                  type="number"
-                  value={formData.bathrooms}
-                  onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  multiline
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe your Airbnb property..."
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Amenities"
-                  multiline
-                  rows={2}
-                  value={formData.amenities}
-                  onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
-                  placeholder="e.g., WiFi, Pool, Kitchen, Parking, AC"
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="House Rules"
-                  multiline
-                  rows={2}
-                  value={formData.house_rules}
-                  onChange={(e) => setFormData({ ...formData, house_rules: e.target.value })}
-                  placeholder="e.g., No smoking, No pets, Check-in after 2PM"
-                />
-              </Grid>
-
-              {/* Image Upload */}
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Upload Images (5-10 required)
+            <AirbnbListingFormFields
+              formData={formData}
+              setFormData={setFormData}
+              properties={properties}
+              requireProperty
+              onPropertyChange={handlePropertyChange}
+              selectedImages={selectedImages}
+              onImageSelect={handleImageSelect}
+              onRemoveImage={handleRemoveImage}
+              showOwnerNote
+            />
+            {uploadingImages && (
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress />
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Processing images...
                 </Typography>
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="airbnb-image-upload"
-                  multiple
-                  type="file"
-                  onChange={handleImageSelect}
-                />
-                <label htmlFor="airbnb-image-upload">
-                  <Button
-                    variant="contained"
-                    component="span"
-                    startIcon={<UploadIcon />}
-                    fullWidth
-                    sx={{ mb: 2 }}
-                  >
-                    {selectedImages.length > 0 ? 'Add More Images' : 'Upload Images'}
-                  </Button>
-                </label>
-
-                {selectedImages.length > 0 && (
-                  <>
-                    <Alert severity={selectedImages.length >= 5 ? "success" : "info"} sx={{ mb: 2 }}>
-                      {selectedImages.length} / 10 images selected
-                      {selectedImages.length >= 5 && ' ✓ Ready to submit'}
-                    </Alert>
-                    <ImageList cols={3} gap={8}>
-                      {selectedImages.map((image, index) => (
-                        <ImageListItem key={index}>
-                          <img
-                            src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                            alt={`Property ${index + 1}`}
-                            loading="lazy"
-                            style={{ height: 150, objectFit: 'cover' }}
-                          />
-                          <ImageListItemBar
-                            actionIcon={
-                              <IconButton
-                                sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
-                                onClick={() => handleRemoveImage(index)}
-                              >
-                                <DeleteImageIcon />
-                              </IconButton>
-                            }
-                          />
-                        </ImageListItem>
-                      ))}
-                    </ImageList>
-                  </>
-                )}
-
-                {uploadingImages && (
-                  <Box sx={{ mt: 2 }}>
-                    <LinearProgress />
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      Processing images...
-                    </Typography>
-                  </Box>
-                )}
-              </Grid>
-            </Grid>
+              </Box>
+            )}
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
             <Button onClick={handleCloseDialog}>Cancel</Button>
             <Button
               variant="contained"
               onClick={handleSubmit}
-              disabled={saveLoading || selectedImages.length < 5}
+              disabled={saveLoading || (!editingAirbnb && selectedImages.length < MIN_AIRBNB_IMAGES)}
               sx={{
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
               }}

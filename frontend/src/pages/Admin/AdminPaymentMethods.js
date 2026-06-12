@@ -5,15 +5,7 @@ import {
   CardContent,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
-  IconButton,
   Alert,
   CircularProgress,
   Dialog,
@@ -25,7 +17,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
   Switch,
   FormControlLabel,
   Grid,
@@ -42,6 +33,9 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import TableActions from '../../components/UI/TableActions';
 
 const AdminPaymentMethods = () => {
   const dispatch = useDispatch();
@@ -255,13 +249,81 @@ const AdminPaymentMethods = () => {
     }
   };
 
-  if (loading && paymentMethods.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const paymentMethodColumns = [
+    {
+      id: 'name',
+      label: 'Payment Method',
+      getSearchValue: (row) => `${row.name} ${row.account_name}`,
+      render: (method) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ mr: 2, bgcolor: getPaymentMethodColor(method.type) }}>
+            {getPaymentMethodIcon(method.type)}
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2">{method.name}</Typography>
+            <Typography variant="caption" color="text.secondary">{method.account_name}</Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'type',
+      label: 'Type',
+      getSearchValue: (row) => getTypeLabel(row.type),
+      render: (method) => (
+        <Chip label={getTypeLabel(method.type)} color="primary" size="small" />
+      ),
+    },
+    {
+      id: 'account_number',
+      label: 'Account Details',
+      getSearchValue: (row) => `${row.account_number} ${row.bank_name || ''}`,
+      render: (method) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">{method.account_number}</Typography>
+          {method.bank_name && (
+            <Typography variant="caption" color="text.secondary">{method.bank_name}</Typography>
+          )}
+        </Box>
+      ),
+    },
+    {
+      id: 'is_active',
+      label: 'Status',
+      render: (method) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Switch
+            checked={method.is_active}
+            onChange={() => handleToggleActive(method.id)}
+            size="small"
+          />
+          <OwnerStatusChip status={method.is_active ? 'active' : 'inactive'} label={method.is_active ? 'Active' : 'Inactive'} />
+        </Box>
+      ),
+    },
+    {
+      id: 'created_at',
+      label: 'Created',
+      render: (method) => (
+        <Typography variant="body2" color="text.secondary">
+          {new Date(method.created_at).toLocaleDateString()}
+        </Typography>
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (method) => (
+        <TableActions
+          actions={[
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Payment Method', onClick: () => handleOpenDialog(method) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Payment Method', onClick: () => handleDelete(method.id) },
+          ]}
+        />
+      ),
+    },
+  ];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -286,97 +348,19 @@ const AdminPaymentMethods = () => {
             </Alert>
           )}
           
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Payment Method</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Account Details</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paymentMethods.map((method) => (
-                  <TableRow key={method.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2, bgcolor: getPaymentMethodColor(method.type) }}>
-                          {getPaymentMethodIcon(method.type)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">
-                            {method.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {method.account_name}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={getTypeLabel(method.type)} 
-                        color="primary" 
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {method.account_number}
-                        </Typography>
-                        {method.bank_name && (
-                          <Typography variant="caption" color="text.secondary">
-                            {method.bank_name}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Switch
-                          checked={method.is_active}
-                          onChange={() => handleToggleActive(method.id)}
-                          size="small"
-                        />
-                        <Chip 
-                          label={method.is_active ? 'Active' : 'Inactive'} 
-                          color={method.is_active ? 'success' : 'default'} 
-                          size="small" 
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(method.created_at).toLocaleDateString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="Edit Payment Method">
-                          <IconButton size="small" onClick={() => handleOpenDialog(method)}>
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Payment Method">
-                          <IconButton 
-                            size="small" 
-                            color="error" 
-                            onClick={() => handleDelete(method.id)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DataTable
+            columns={paymentMethodColumns}
+            rows={paymentMethods}
+            loading={loading}
+            title="Payment methods"
+            subtitle="Mobile money and bank accounts for receiving payments"
+            emptyTitle="No payment methods"
+            emptyDescription="Add a payment method so tenants can pay rent and fees."
+            emptyIcon={PaymentIcon}
+            emptyActionLabel="Add Payment Method"
+            onEmptyAction={() => handleOpenDialog()}
+            searchPlaceholder="Search by name, account, or bank…"
+          />
         </CardContent>
       </Card>
 

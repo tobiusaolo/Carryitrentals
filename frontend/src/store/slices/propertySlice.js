@@ -1,16 +1,23 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { propertyAPI } from '../../services/api/propertyAPI';
+import { shouldSkipPortalFetch } from '../../utils/reduxCache';
 
 // Async thunks
 export const fetchProperties = createAsyncThunk(
   'properties/fetchProperties',
-  async (_, { rejectWithValue }) => {
+  async (arg = {}, { rejectWithValue }) => {
     try {
       const response = await propertyAPI.getAllProperties();
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch properties');
     }
+  },
+  {
+    condition: (arg, { getState }) => {
+      const forceRefresh = arg?.__refresh === true;
+      return !shouldSkipPortalFetch(getState().properties.lastFetchedAt, forceRefresh);
+    },
   }
 );
 
@@ -67,6 +74,7 @@ const initialState = {
   currentProperty: null,
   isLoading: false,
   error: null,
+  lastFetchedAt: null,
 };
 
 const propertySlice = createSlice({
@@ -90,6 +98,7 @@ const propertySlice = createSlice({
       .addCase(fetchProperties.fulfilled, (state, action) => {
         state.isLoading = false;
         state.properties = action.payload;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(fetchProperties.rejected, (state, action) => {
         state.isLoading = false;

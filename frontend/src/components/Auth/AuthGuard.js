@@ -1,42 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import { getCurrentUser, logout } from '../../store/slices/authSlice';
+import { getCurrentUser } from '../../store/slices/authSlice';
 import authService from '../../services/authService';
+import { getLoginPathForRoute } from '../../utils/authRoutes';
 
 const AuthGuard = ({ children }) => {
   const dispatch = useDispatch();
-  const { user, isLoading } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const { user, isLoading, token } = useSelector((state) => state.auth);
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Check if user has valid token
         if (!authService.isAuthenticated()) {
-          console.log('No authentication token found, redirecting to login');
-          authService.logout();
           return;
         }
-
-        // If user is not loaded, get current user
+        await authService.ensureValidSession();
         if (!user) {
-          console.log('Getting current user...');
-          await dispatch(getCurrentUser());
+          const result = await dispatch(getCurrentUser());
+          if (result.type === 'auth/getCurrentUser/rejected') {
+            const payload = result.payload;
+            if (payload?.status === 401) {
+              authService.logout();
+            }
+          }
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        authService.logout();
       } finally {
         setIsChecking(false);
       }
     };
 
     checkAuth();
-  }, [dispatch, user]);
+  }, [dispatch, user, token]);
 
-  // Show loading while checking authentication
-  if (isChecking || isLoading) {
+  const hasStoredUser = !!authService.getStoredUser();
+  if (isChecking || isLoading || (token && !user && !hasStoredUser)) {
     return (
       <Box
         sx={{
@@ -56,11 +59,9 @@ const AuthGuard = ({ children }) => {
     );
   }
 
-  // If no user after checking, redirect to login
-  if (!user) {
-    console.log('No user found, redirecting to login');
-    authService.logout();
-    return null;
+  if (!user || !token) {
+    const loginPath = getLoginPathForRoute(location.pathname);
+    return <Navigate to={loginPath} replace state={{ from: location.pathname }} />;
   }
 
   return children;

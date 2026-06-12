@@ -458,7 +458,8 @@ const AgentUnitDetails = () => {
                   }}
                 >
                   <Typography variant="h6" fontWeight={700} sx={{ mb: 1, color: '#0284c7' }}>
-                    {unit.currency || 'UGX'} {unit.inspection_fee ? parseFloat(unit.inspection_fee).toLocaleString() : '30,000'}
+                    {unit.currency || 'UGX'}{' '}
+                    {(unit.inspection_fee ? parseFloat(unit.inspection_fee) : 50000).toLocaleString()}
                   </Typography>
                 </Alert>
               </Box>

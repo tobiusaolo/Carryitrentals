@@ -49,6 +49,7 @@ import {
 } from '@mui/icons-material';
 import { Avatar } from '@mui/material';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config/api';
 import logoImage from '../../assets/images/er13.png';
 
 const LandingPage = () => {
@@ -69,7 +70,7 @@ const LandingPage = () => {
     const fetchRentalUnits = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('https://carryit-backend-su8h.onrender.com/api/v1/rental-units/public');
+        const response = await axios.get(`${API_BASE_URL}/rental-units/public`);
         
         // Parse images for each unit
         const unitsWithImages = response.data.map(unit => {

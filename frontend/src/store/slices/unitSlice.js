@@ -1,16 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { unitAPI } from '../../services/api/unitAPI';
+import { shouldSkipPortalFetch } from '../../utils/reduxCache';
+
+function splitRefreshArg(arg) {
+  const payload = arg && typeof arg === 'object' ? { ...arg } : {};
+  const forceRefresh = payload.__refresh === true;
+  delete payload.__refresh;
+  return { filters: payload, forceRefresh };
+}
 
 // Async thunks
 export const fetchUnits = createAsyncThunk(
   'units/fetchUnits',
-  async (filters = {}, { rejectWithValue }) => {
+  async (arg = {}, { rejectWithValue }) => {
+    const { filters } = splitRefreshArg(arg);
     try {
       const response = await unitAPI.getAllUnits(filters);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch units');
     }
+  },
+  {
+    condition: (arg, { getState }) => {
+      const { forceRefresh } = splitRefreshArg(arg);
+      return !shouldSkipPortalFetch(getState().units.lastFetchedAt, forceRefresh);
+    },
   }
 );
 
@@ -91,6 +106,7 @@ const initialState = {
   currentUnit: null,
   isLoading: false,
   error: null,
+  lastFetchedAt: null,
 };
 
 const unitSlice = createSlice({
@@ -114,6 +130,7 @@ const unitSlice = createSlice({
       .addCase(fetchUnits.fulfilled, (state, action) => {
         state.isLoading = false;
         state.units = action.payload;
+        state.lastFetchedAt = Date.now();
       })
       .addCase(fetchUnits.rejected, (state, action) => {
         state.isLoading = false;

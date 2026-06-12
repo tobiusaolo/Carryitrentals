@@ -22,8 +22,6 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
-  Fab,
-  Tooltip,
   Tabs,
   Tab,
   Badge,
@@ -39,7 +37,6 @@ import {
   Warning,
   Visibility,
   FilterList,
-  ElectricalServices,
 } from '@mui/icons-material';
 import {
   DataGrid,
@@ -55,8 +52,13 @@ import {
   clearPaymentError,
 } from '../../store/slices/otherSlices';
 import { fetchUnits } from '../../store/slices/unitSlice';
-import { paymentAPI } from '../../services/api/paymentAPI';
-import { utilityAPI } from '../../services/api/utilityAPI';
+import PageHeader from '../../components/UI/PageHeader';
+import { ownerPrimaryButtonSx } from '../../theme/designTokens';
+import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
+import { formatMoney } from '../../utils/formatMoney';
+import { colors } from '../../theme/designTokens';
 
 const Payments = () => {
   const dispatch = useDispatch();
@@ -67,9 +69,6 @@ const Payments = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [utilityPayments, setUtilityPayments] = useState([]);
-  const [utilities, setUtilities] = useState([]);
-  const [unitUtilities, setUnitUtilities] = useState([]);
   const [formData, setFormData] = useState({
     unit_id: '',
     payer_id: '',
@@ -85,31 +84,7 @@ const Payments = () => {
   useEffect(() => {
     dispatch(fetchPayments());
     dispatch(fetchUnits());
-    loadUtilityPayments();
-    loadUtilities();
   }, [dispatch]);
-
-  const loadUtilityPayments = async () => {
-    try {
-      const response = await paymentAPI.getUtilityPayments();
-      setUtilityPayments(response.data);
-    } catch (error) {
-      console.error('Error loading utility payments:', error);
-    }
-  };
-
-  const loadUtilities = async () => {
-    try {
-      const [utilitiesResponse, unitUtilitiesResponse] = await Promise.all([
-        utilityAPI.getUtilities(),
-        utilityAPI.getUnitUtilities()
-      ]);
-      setUtilities(utilitiesResponse.data);
-      setUnitUtilities(unitUtilitiesResponse.data);
-    } catch (error) {
-      console.error('Error loading utilities:', error);
-    }
-  };
 
   useEffect(() => {
     if (error) {
@@ -223,23 +198,20 @@ const Payments = () => {
     return colors[type] || 'default';
   };
 
-  const filteredPayments = payments.filter(payment => {
+  const filteredPayments = payments.filter((payment) => {
     switch (activeTab) {
-      case 0: return true; // All
+      case 0: return true;
       case 1: return payment.status === 'pending';
       case 2: return payment.status === 'paid';
       case 3: return payment.status === 'overdue';
-      case 4: return payment.payment_type === 'utility'; // Utility payments
       default: return true;
     }
   });
 
-  // For utility payments tab, show utility payments instead of regular payments
-  const displayPayments = activeTab === 4 ? utilityPayments : filteredPayments;
-
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'unit_number', headerName: 'Unit', width: 100 },
+    { field: 'tenant_name', headerName: 'Tenant', width: 140 },
     { field: 'payer_name', headerName: 'Payer', width: 150 },
     {
       field: 'amount',
@@ -247,7 +219,7 @@ const Payments = () => {
       width: 120,
       renderCell: (params) => (
         <Typography variant="body2" fontWeight="bold">
-          ${params.value}
+          {formatMoney(params.value, 'UGX')}
         </Typography>
       ),
     },
@@ -281,7 +253,10 @@ const Payments = () => {
       field: 'payment_date',
       headerName: 'Date',
       width: 120,
-      renderCell: (params) => new Date(params.value).toLocaleDateString(),
+      renderCell: (params) => {
+        const raw = params.value || params.row.due_date || params.row.payment_date;
+        return raw ? new Date(raw).toLocaleDateString() : '—';
+      },
     },
     {
       field: 'status',
@@ -304,18 +279,20 @@ const Payments = () => {
       width: 150,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<Visibility />}
+          icon={<Visibility fontSize="small" />}
           label="View"
           onClick={() => handleOpenDialog(params.row)}
+          showInMenu
         />,
         <GridActionsCellItem
-          icon={<Edit />}
+          icon={<Edit fontSize="small" />}
           label="Edit"
           onClick={() => handleOpenDialog(params.row)}
+          showInMenu
         />,
         ...(params.row.status === 'pending' ? [
           <GridActionsCellItem
-            icon={<CheckCircle />}
+            icon={<CheckCircle fontSize="small" />}
             label="Mark as Paid"
             onClick={() => handleMarkAsPaid(params.id)}
             showInMenu
@@ -340,22 +317,20 @@ const Payments = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Payment Management
-        </Typography>
-        <Tooltip title="Add New Payment">
-          <Fab
-            color="primary"
-            aria-label="add"
+    <OwnerPageContainer>
+      <PageHeader
+        title="Payments"
+        action={
+          <Button
+            variant="contained"
+            startIcon={<Add />}
             onClick={() => handleOpenDialog()}
-            sx={{ boxShadow: 2 }}
+            sx={ownerPrimaryButtonSx}
           >
-            <Add />
-          </Fab>
-        </Tooltip>
-      </Box>
+            Add payment
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -363,146 +338,78 @@ const Payments = () => {
         </Alert>
       )}
 
-      {/* Payment Status Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      <Paper sx={{ mb: 3, border: `1px solid ${colors.border}`, borderRadius: 2, boxShadow: 'none' }}>
         <Tabs
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab
-            label={
-              <Badge badgeContent={payments.length} color="primary">
-                All Payments
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={payments.filter(p => p.status === 'pending').length} color="warning">
-                Pending
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={payments.filter(p => p.status === 'paid').length} color="success">
-                Paid
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={payments.filter(p => p.status === 'overdue').length} color="error">
-                Overdue
-              </Badge>
-            }
-          />
-          <Tab
-            label={
-              <Badge badgeContent={utilityPayments.length} color="info">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <ElectricalServices />
-                  Utilities
-                </Box>
-              </Badge>
-            }
-          />
+          <Tab label={<Badge badgeContent={payments.length} color="primary">All Payments</Badge>} />
+          <Tab label={<Badge badgeContent={payments.filter((p) => p.status === 'pending').length} color="primary">Pending</Badge>} />
+          <Tab label={<Badge badgeContent={payments.filter((p) => p.status === 'paid').length} color="primary">Paid</Badge>} />
+          <Tab label={<Badge badgeContent={payments.filter((p) => p.status === 'overdue').length} color="primary">Overdue</Badge>} />
         </Tabs>
       </Paper>
 
-      {/* Payment Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AttachMoney color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Total Revenue
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="primary" fontWeight="bold">
-                ${payments.reduce((sum, p) => sum + (p.status === 'paid' ? p.amount : 0), 0).toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                From paid payments
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Collected"
+            value={formatMoney(
+              payments.reduce((sum, p) => sum + (p.status === 'paid' ? p.amount : 0), 0),
+              'UGX'
+            )}
+            icon={<AttachMoney />}
+            variantIndex={0}
+            subtitle="Paid"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Schedule color="warning" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Pending
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="warning.main" fontWeight="bold">
-                ${payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Awaiting payment
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Pending"
+            value={formatMoney(
+              payments.filter((p) => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
+              'UGX'
+            )}
+            icon={<Schedule />}
+            variantIndex={1}
+            subtitle="Outstanding"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Warning color="error" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Overdue
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="error.main" fontWeight="bold">
-                ${payments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Past due date
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Overdue"
+            value={formatMoney(
+              payments.filter((p) => p.status === 'overdue').reduce((sum, p) => sum + p.amount, 0),
+              'UGX'
+            )}
+            icon={<Warning />}
+            variantIndex={2}
+            subtitle="Late"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <CheckCircle color="success" sx={{ mr: 1 }} />
-                <Typography variant="h6" fontWeight="bold">
-                  Collection Rate
-                </Typography>
-              </Box>
-              <Typography variant="h4" color="success.main" fontWeight="bold">
-                {payments.length > 0 ? Math.round((payments.filter(p => p.status === 'paid').length / payments.length) * 100) : 0}%
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Payment success rate
-              </Typography>
-            </CardContent>
-          </Card>
+          <OwnerStatCard
+            title="Collection rate"
+            value={`${payments.length > 0 ? Math.round((payments.filter((p) => p.status === 'paid').length / payments.length) * 100) : 0}%`}
+            icon={<CheckCircle />}
+            variantIndex={0}
+            subtitle="Success rate"
+          />
         </Grid>
       </Grid>
 
-      {/* Payments Grid View */}
-      
-
-      {/* Data Grid View */}
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={displayPayments}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          components={{ Toolbar: GridToolbar }}
-          loading={isLoading}
-          disableSelectionOnClick
-        />
-      </Paper>
+      <OwnerDataGrid
+        rows={filteredPayments}
+        columns={columns}
+        loading={isLoading}
+        emptyTitle="No payments yet"
+        emptyDescription="Record rent payments to track collections."
+        emptyIcon={Payment}
+        emptyActionLabel="Add payment"
+        onEmptyAction={() => handleOpenDialog()}
+      />
 
       {/* Add/Edit Payment Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -643,7 +550,7 @@ const Payments = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </OwnerPageContainer>
   );
 };
 

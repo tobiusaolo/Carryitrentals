@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import api from '../../services/api/api';
+import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
 import {
   Box,
   Typography,
@@ -14,19 +15,10 @@ import {
   MenuItem,
   TextField,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
   Alert,
   CircularProgress,
   Tabs,
   Tab,
-  IconButton,
-  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -52,7 +44,10 @@ import {
   BarChart,
   PieChart,
 } from '@mui/icons-material';
-// Removed complex date picker dependencies
+import DataTable from '../../components/UI/DataTable';
+import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import { fetchProperties } from '../../store/slices/propertySlice';
+import { formatMoney } from '../../utils/formatMoney';
 
 const Analytics = () => {
   const dispatch = useDispatch();
@@ -95,10 +90,26 @@ const Analytics = () => {
     end_date: null
   });
 
-  // Load dashboard summary on component mount
   useEffect(() => {
+    dispatch(fetchProperties());
     loadDashboardSummary();
-  }, []);
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (activeTab === 1 && properties.length > 0) {
+      const propertyId = selectedProperty || properties[0].id;
+      if (!selectedProperty) {
+        setSelectedProperty(propertyId);
+      }
+      loadPropertyAnalytics(propertyId);
+    }
+    if (activeTab === 2) {
+      loadPaymentAnalytics();
+    }
+    if (activeTab === 3) {
+      loadMonthlyReport();
+    }
+  }, [activeTab, properties.length]);
 
   const loadDashboardSummary = async () => {
     try {
@@ -195,33 +206,75 @@ const Analytics = () => {
     setActiveTab(newValue);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'pending': return 'warning';
-      case 'overdue': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
+  const formatCurrency = (amount) => formatMoney(amount, 'UGX');
 
   const formatPercentage = (value) => {
     return `${value.toFixed(1)}%`;
   };
 
+  const unitDetailColumns = [
+    {
+      id: 'unit_number',
+      label: 'Unit Number',
+      getSearchValue: (row) => row.unit_number,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (unit) => <OwnerStatusChip status={unit.status} />,
+    },
+    {
+      id: 'monthly_rent',
+      label: 'Monthly Rent',
+      render: (unit) => formatCurrency(unit.monthly_rent),
+    },
+    { id: 'bedrooms', label: 'Bedrooms' },
+    { id: 'bathrooms', label: 'Bathrooms' },
+    {
+      id: 'tenant_name',
+      label: 'Tenant',
+      getSearchValue: (row) => row.tenant_name || 'Available',
+      render: (unit) => unit.tenant_name || 'Available',
+    },
+  ];
+
+  const paymentDetailColumns = [
+    {
+      id: 'tenant_name',
+      label: 'Tenant',
+      getSearchValue: (row) => row.tenant_name,
+    },
+    {
+      id: 'unit_number',
+      label: 'Unit',
+      getSearchValue: (row) => row.unit_number,
+    },
+    {
+      id: 'property_name',
+      label: 'Property',
+      getSearchValue: (row) => row.property_name,
+    },
+    {
+      id: 'amount',
+      label: 'Amount',
+      render: (payment) => formatCurrency(payment.amount),
+    },
+    { id: 'payment_date', label: 'Date' },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (payment) => <OwnerStatusChip status={payment.status} />,
+    },
+  ];
+
+  useRegisterPageMeta({
+    title: 'Analytics',
+    subtitle: 'Occupancy & collections',
+  });
+
   return (
-    <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AnalyticsIcon />
-        Analytics & Reports
-      </Typography>
+    <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: { xs: 2, sm: 2.5 }, pb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
@@ -420,6 +473,18 @@ const Analytics = () => {
               </FormControl>
             </Box>
             
+            {!loading && properties.length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Add a property first to see property-level analytics.
+              </Alert>
+            )}
+
+            {!loading && properties.length > 0 && !propertyAnalytics && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Select a property above to view analytics.
+              </Alert>
+            )}
+
             {propertyAnalytics && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
@@ -479,45 +544,16 @@ const Analytics = () => {
                 </Grid>
                 
                 <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Unit Details
-                      </Typography>
-                      <TableContainer>
-                        <Table>
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Unit Number</TableCell>
-                              <TableCell>Status</TableCell>
-                              <TableCell>Monthly Rent</TableCell>
-                              <TableCell>Bedrooms</TableCell>
-                              <TableCell>Bathrooms</TableCell>
-                              <TableCell>Tenant</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {propertyAnalytics.units.map((unit) => (
-                              <TableRow key={unit.unit_id}>
-                                <TableCell>{unit.unit_number}</TableCell>
-                                <TableCell>
-                                  <Chip
-                                    label={unit.status}
-                                    color={unit.status === 'occupied' ? 'success' : 'default'}
-                                    size="small"
-                                  />
-                                </TableCell>
-                                <TableCell>{formatCurrency(unit.monthly_rent)}</TableCell>
-                                <TableCell>{unit.bedrooms}</TableCell>
-                                <TableCell>{unit.bathrooms}</TableCell>
-                                <TableCell>{unit.tenant_name || 'Available'}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </CardContent>
-                  </Card>
+                  <DataTable
+                    columns={unitDetailColumns}
+                    rows={propertyAnalytics.units || []}
+                    title="Units"
+                    emptyTitle="No units"
+                    emptyDescription="No units for this property."
+                    emptyIcon={Apartment}
+                    getRowId={(row) => row.unit_id}
+                    searchPlaceholder="Search by unit number or tenant…"
+                  />
                 </Grid>
               </Grid>
             )}
@@ -589,6 +625,12 @@ const Analytics = () => {
               </Grid>
             </Paper>
             
+            {!loading && paymentAnalytics && paymentAnalytics.summary?.total_payments === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                No payment records match these filters yet. Record rent payments under Payments to see them here.
+              </Alert>
+            )}
+
             {paymentAnalytics && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
@@ -626,45 +668,16 @@ const Analytics = () => {
                 </Grid>
                 
                 <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Payment Details
-                      </Typography>
-                      <TableContainer>
-                        <Table>
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Tenant</TableCell>
-                              <TableCell>Unit</TableCell>
-                              <TableCell>Property</TableCell>
-                              <TableCell>Amount</TableCell>
-                              <TableCell>Date</TableCell>
-                              <TableCell>Status</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {paymentAnalytics.payments.map((payment) => (
-                              <TableRow key={payment.payment_id}>
-                                <TableCell>{payment.tenant_name}</TableCell>
-                                <TableCell>{payment.unit_number}</TableCell>
-                                <TableCell>{payment.property_name}</TableCell>
-                                <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                                <TableCell>{payment.payment_date}</TableCell>
-                                <TableCell>
-                                  <Chip
-                                    label={payment.status}
-                                    color={getStatusColor(payment.status)}
-                                    size="small"
-                                  />
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </CardContent>
-                  </Card>
+                  <DataTable
+                    columns={paymentDetailColumns}
+                    rows={paymentAnalytics.payments || []}
+                    title="Payments"
+                    emptyTitle="No payments"
+                    emptyDescription="No records match filters."
+                    emptyIcon={AttachMoney}
+                    getRowId={(row) => row.payment_id}
+                    searchPlaceholder="Search by tenant, unit, or property…"
+                  />
                 </Grid>
               </Grid>
             )}
@@ -742,7 +755,11 @@ const Analytics = () => {
               </Grid>
       </Paper>
             
-            {monthlyReport && (
+            {!loading && monthlyReport?.message && (
+              <Alert severity="info" sx={{ mb: 2 }}>{monthlyReport.message}</Alert>
+            )}
+
+            {monthlyReport && !monthlyReport.message && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
                   <Card>

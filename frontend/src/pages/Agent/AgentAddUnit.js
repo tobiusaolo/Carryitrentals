@@ -39,6 +39,9 @@ import {
 } from '@mui/icons-material';
 import NotificationSystem from '../../components/UI/NotificationSystem';
 import api from '../../services/api/api';
+import { emptyRentalFormState, UNIT_TYPE_OPTIONS, CURRENCY_OPTIONS, COUNTRY_OPTIONS, MIN_RENTAL_LISTING_IMAGES } from '../../constants/rentalUnit';
+import { buildRentalUnitPayload, imagesPayloadFromSelection } from '../../utils/rentalUnitForm';
+import { RENTAL_STATUS_OPTIONS } from '../../utils/rentalStatus';
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -54,21 +57,7 @@ const AgentAddUnit = () => {
   const [successDialog, setSuccessDialog] = useState(false);
   const [createdUnit, setCreatedUnit] = useState(null);
   
-  const [formData, setFormData] = useState({
-    title: '',
-    location: '',
-    country: 'Uganda',
-    unit_type: 'one_bedroom',
-    floor: '',
-    bedrooms: 1,
-    bathrooms: 1,
-    monthly_rent: '',
-    currency: 'USD',
-    inspection_fee: '',
-    status: 'available',
-    description: '',
-    amenities: ''
-  });
+  const [formData, setFormData] = useState({ ...emptyRentalFormState(), agent_id: '' });
 
   const handleNext = () => {
     setActiveStep((prev) => prev + 1);
@@ -128,48 +117,19 @@ const AgentAddUnit = () => {
         return;
       }
 
-      // Convert File objects to base64 strings
-      let imageStrings = [];
-      if (selectedImages.length > 0) {
-        console.log('Converting images:', selectedImages.length);
-        for (const file of selectedImages) {
-          if (typeof file === 'string') {
-            imageStrings.push(file);
-          } else {
-            const base64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.onerror = () => reject(reader.error);
-              reader.readAsDataURL(file);
-            });
-            imageStrings.push(base64);
-          }
-        }
+      if (selectedImages.length < MIN_RENTAL_LISTING_IMAGES) {
+        setNotification({
+          open: true,
+          message: `Please add at least ${MIN_RENTAL_LISTING_IMAGES} photos`,
+          severity: 'error',
+        });
+        setLoading(false);
+        return;
       }
 
-      // Prepare unit data - match admin form format exactly
-      // Don't send agent_id - backend will set it automatically for agents
-      // Don't send deposit_amount - backend will use default (0)
-      let unitData = { 
-        title: formData.title,
-        location: formData.location,
-        country: formData.country || 'Uganda',
-        unit_type: formData.unit_type,
-        floor: formData.floor ? parseInt(formData.floor) : null,
-        bedrooms: parseInt(formData.bedrooms) || 1,
-        bathrooms: parseInt(formData.bathrooms) || 1,
-        monthly_rent: parseFloat(formData.monthly_rent),
-        inspection_fee: parseFloat(formData.inspection_fee) || 0,
-        currency: formData.currency,
-        status: formData.status,
-        description: formData.description || null,
-        amenities: formData.amenities || null,
-        images: imageStrings.length > 0 ? imageStrings.join('|||IMAGE_SEPARATOR|||') : null
-        // Note: agent_id and deposit_amount are NOT included - backend handles them
-      };
+      const images = await imagesPayloadFromSelection(selectedImages);
+      const unitData = buildRentalUnitPayload(formData, { images, includeAgentId: false });
 
-      console.log('Sending rental unit data:', unitData);
-      
       const response = await api.post('/rental-units/', unitData);
       
       setCreatedUnit(response.data);
@@ -379,9 +339,9 @@ const AgentAddUnit = () => {
                       value={formData.status}
                       onChange={(e) => setFormData({...formData, status: e.target.value})}
                     >
-                      <MenuItem value="available">Available</MenuItem>
-                      <MenuItem value="occupied">Occupied</MenuItem>
-                      <MenuItem value="maintenance">Under Maintenance</MenuItem>
+                      {RENTAL_STATUS_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>
