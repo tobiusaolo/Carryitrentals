@@ -140,7 +140,7 @@ const AdminLogin = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 2 }}>
               <Avatar
                 src={logoImage}
-                alt="Easy Rentals Logo"
+                alt="CarryIT Rentals Logo"
                 sx={{
                   width: 56,
                   height: 56,
@@ -152,7 +152,7 @@ const AdminLogin = () => {
               />
             </Box>
             <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-              Easy Rentals Property Management System
+              CarryIT Rentals Property Management System
             </Typography>
           </Box>
         </Slide>
@@ -416,7 +416,7 @@ const AdminLogin = () => {
         {/* Footer */}
         <Box sx={{ textAlign: 'center', mt: 3 }}>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-            © 2025 Easy Rentals. All rights reserved.
+            © 2025 CarryIT Rentals. All rights reserved.
           </Typography>
         </Box>
       </Container>

@@ -37,7 +37,7 @@ const Footer = () => {
 
   const socialLinks = {
     whatsapp: 'https://wa.me/256754577922',
-    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from Easy Rentals Website',
+    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from CarryIT Rentals Website',,
     facebook: 'https://www.facebook.com/easyrentals',
     instagram: 'https://www.instagram.com/easyrentals',
     tiktok: 'https://www.tiktok.com/@easyrentals',
@@ -70,7 +70,7 @@ const Footer = () => {
               <Box
                 component="img"
                 src={logoImage}
-                alt="Easy Rentals Logo"
+                alt="CarryIT Rentals Logo"
                 sx={{
                   height: { xs: 50, md: 60 },
                   width: 'auto',
@@ -87,7 +87,7 @@ const Footer = () => {
                   fontSize: { xs: '1.1rem', md: '1.25rem' },
                 }}
               >
-                Easy Rentals
+                CarryIT Rentals
               </Typography>
               <Typography
                 variant="body2"
@@ -391,7 +391,7 @@ const Footer = () => {
               textAlign: { xs: 'center', md: 'left' },
             }}
           >
-            © {currentYear} Easy Rentals. All rights reserved.
+            © {currentYear} CarryIT Rentals. All rights reserved.
           </Typography>
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
             <Link

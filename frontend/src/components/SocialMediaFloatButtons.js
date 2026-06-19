@@ -33,7 +33,7 @@ const SocialMediaFloatButtons = () => {
   // Social media links - Update these with your actual social media URLs
   const socialLinks = {
     whatsapp: 'https://wa.me/256754577922',
-    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from Easy Rentals Website',
+    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from CarryIT Rentals Website',
     facebook: 'https://www.facebook.com/easyrentals', // Update with your Facebook page URL
     instagram: 'https://www.instagram.com/easyrentals', // Update with your Instagram page URL
     tiktok: 'https://www.tiktok.com/@easyrentals', // Update with your TikTok page URL
