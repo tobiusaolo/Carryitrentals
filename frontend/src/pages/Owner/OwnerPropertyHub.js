@@ -7,12 +7,14 @@ import {
   Storefront,
   Bed,
   Group,
+  AccountBalanceWallet,
 } from '@mui/icons-material';
 import Properties from '../Properties/Properties';
 import Units from '../Units/Units';
 import UnitsForRent from '../UnitsForRent/UnitsForRent';
 import OwnerAirbnb from '../Airbnb/OwnerAirbnb';
 import Tenants from '../Tenants/Tenants';
+import Payments from '../Payments/Payments';
 import { colors } from '../../theme/designTokens';
 
 const TABS = [
@@ -21,6 +23,7 @@ const TABS = [
   { key: 'units-for-rent', label: 'Units for rent', icon: <Storefront fontSize="small" />, hint: 'Long-term marketplace listings' },
   { key: 'airbnb', label: 'Short stays', icon: <Bed fontSize="small" />, hint: 'Nightly Airbnb-style listings' },
   { key: 'tenants', label: 'Tenants', icon: <Group fontSize="small" />, hint: 'People renting your units — leases & payments' },
+  { key: 'payments', label: 'Payments', icon: <AccountBalanceWallet fontSize="small" />, hint: 'Rent collections, pending proofs & payment history' },
 ];
 
 const OwnerPropertyHub = () => {
@@ -87,6 +90,7 @@ const OwnerPropertyHub = () => {
         {activeTab?.key === 'units-for-rent' && <UnitsForRent />}
         {activeTab?.key === 'airbnb' && <OwnerAirbnb embedded />}
         {activeTab?.key === 'tenants' && <Tenants />}
+        {activeTab?.key === 'payments' && <Payments />}
       </Box>
     </Box>
   );

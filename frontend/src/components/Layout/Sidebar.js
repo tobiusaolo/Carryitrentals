@@ -51,14 +51,13 @@ const navSections = [
         text: 'Property & listings',
         icon: Apartment,
         path: '/owner/property-hub',
-        match: ['/owner/property-hub', '/owner/properties', '/owner/units', '/owner/tenants'],
+        match: ['/owner/property-hub', '/owner/properties', '/owner/units', '/owner/tenants', '/owner/payments'],
       },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { text: 'Rent payments', icon: AccountBalanceWallet, path: '/owner/payments' },
       { text: 'Billing & subscription', icon: ReceiptLong, path: '/owner/billing' },
       { text: 'Utilities', icon: Bolt, path: '/owner/utilities' },
       { text: 'Viewing payments', icon: ReceiptLong, path: '/owner/viewing-payments' },
