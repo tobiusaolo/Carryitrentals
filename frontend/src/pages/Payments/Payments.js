@@ -60,113 +60,6 @@ import OwnerStatCard from '../../components/Owner/OwnerStatCard';
 import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
 import { formatMoney } from '../../utils/formatMoney';
 
-// ─── Pending Rent Proof Card ───────────────────────────────────────────────
-function PendingProofCard({ intent, onApprove, onReject, acting }) {
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [reason, setReason] = useState('');
-
-  const handleReject = async () => {
-    await onReject(intent.id, reason);
-    setRejectOpen(false);
-    setReason('');
-  };
-
-  const meta = intent.metadata || {};
-
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2.5,
-        borderRadius: 2,
-        borderColor: 'warning.main',
-        borderWidth: 1.5,
-        position: 'relative',
-        bgcolor: '#fffbeb',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-        <Box sx={{ flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-            <HourglassTop fontSize="small" sx={{ color: 'warning.main' }} />
-            <Typography variant="subtitle2" fontWeight={700} color="warning.dark">
-              Awaiting Approval
-            </Typography>
-            <Chip label="Manual" size="small" sx={{ fontSize: 11, height: 20, bgcolor: '#fde68a', color: '#92400e' }} />
-          </Box>
-          <Typography variant="body1" fontWeight={700} sx={{ fontSize: 18, color: 'text.primary' }}>
-            {formatMoney(intent.amount, intent.currency || 'UGX')}
-          </Typography>
-          {intent.tenant_name && (
-            <Typography variant="body2" color="text.secondary">
-              Tenant: <strong>{intent.tenant_name}</strong>
-            </Typography>
-          )}
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            Reference: <code style={{ background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{intent.proof_reference}</code>
-          </Typography>
-          {meta.months_advance && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              Months paid: {meta.months_advance}
-            </Typography>
-          )}
-          {intent.created_at && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              Submitted: {new Date(intent.created_at).toLocaleString()}
-            </Typography>
-          )}
-        </Box>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={acting === intent.id + '_approve' ? <CircularProgress size={14} color="inherit" /> : <CheckCircle />}
-            disabled={!!acting}
-            onClick={() => onApprove(intent.id)}
-            sx={{ bgcolor: colors.brand, '&:hover': { bgcolor: colors.brandDark }, fontWeight: 700, textTransform: 'none' }}
-          >
-            Approve
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            color="error"
-            startIcon={acting === intent.id + '_reject' ? <CircularProgress size={14} color="inherit" /> : <Close />}
-            disabled={!!acting}
-            onClick={() => setRejectOpen(true)}
-            sx={{ fontWeight: 700, textTransform: 'none' }}
-          >
-            Reject
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Reject reason dialog */}
-      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Reject Payment Proof</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Optionally add a reason — the tenant will be notified.
-          </Typography>
-          <TextField
-            fullWidth
-            label="Reason (optional)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            multiline
-            rows={2}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleReject}>Reject</Button>
-        </DialogActions>
-      </Dialog>
-    </Paper>
-  );
-}
-
 // ─── Main Payments Page ────────────────────────────────────────────────────
 const Payments = () => {
   const dispatch = useDispatch();
@@ -191,20 +84,22 @@ const Payments = () => {
   // Pending rent proofs state
   const [pendingProofs, setPendingProofs] = useState([]);
   const [proofsLoading, setProofsLoading] = useState(false);
-  const [proofsError, setProofsError] = useState(null);
   const [acting, setActing] = useState(null); // intentId_action
   const [proofActionMsg, setProofActionMsg] = useState(null);
 
+  // Reject dialog state for inline actions
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectIntentId, setRejectIntentId] = useState(null);
+
   const loadPendingProofs = useCallback(async () => {
     setProofsLoading(true);
-    setProofsError(null);
     try {
       const res = await paymentIntentAPI.listPending();
       const all = Array.isArray(res.data) ? res.data : [];
-      // Only show rent category proofs
       setPendingProofs(all.filter((i) => i.category === 'rent' || !i.category));
     } catch (e) {
-      setProofsError('Could not load pending proofs. Check your connection.');
+      console.error('Could not load pending proofs', e);
     } finally {
       setProofsLoading(false);
     }
@@ -238,17 +133,27 @@ const Payments = () => {
     }
   };
 
-  const handleReject = async (intentId, reason) => {
-    setActing(intentId + '_reject');
+  const openRejectDialog = (intentId) => {
+    setRejectIntentId(intentId);
+    setRejectReason('');
+    setRejectOpen(true);
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectIntentId) return;
+    setActing(rejectIntentId + '_reject');
     setProofActionMsg(null);
     try {
-      await paymentIntentAPI.reject(intentId, reason);
+      await paymentIntentAPI.reject(rejectIntentId, rejectReason);
       setProofActionMsg({ type: 'warning', text: 'Payment proof rejected.' });
       await loadPendingProofs();
     } catch (e) {
       setProofActionMsg({ type: 'error', text: e.response?.data?.detail || 'Could not reject payment.' });
     } finally {
       setActing(null);
+      setRejectOpen(false);
+      setRejectReason('');
+      setRejectIntentId(null);
     }
   };
 
@@ -315,12 +220,12 @@ const Payments = () => {
   };
 
   const getStatusColor = (status) => {
-    const map = { pending: 'warning', paid: 'success', overdue: 'error', partial: 'info' };
+    const map = { pending: 'warning', paid: 'success', overdue: 'error', partial: 'info', awaiting_approval: 'warning' };
     return map[status] || 'default';
   };
 
   const getStatusIcon = (status) => {
-    const map = { pending: <Schedule />, paid: <CheckCircle />, overdue: <Warning />, partial: <Payment /> };
+    const map = { pending: <Schedule />, paid: <CheckCircle />, overdue: <Warning />, partial: <Payment />, awaiting_approval: <HourglassTop /> };
     return map[status] || <Payment />;
   };
 
@@ -329,12 +234,32 @@ const Payments = () => {
     return map[type] || 'default';
   };
 
-  const filteredPayments = payments.filter((payment) => {
+  // Merge pending proofs into the table data
+  const pendingRows = pendingProofs.map(intent => {
+    const meta = intent.metadata_json ? JSON.parse(intent.metadata_json) : (intent.metadata || {});
+    return {
+      id: intent.id,
+      is_intent: true,
+      unit_number: meta.unit_number || '—',
+      tenant_name: intent.tenant_name || meta.tenant_name || '—',
+      payer_name: intent.payer_name || '—',
+      amount: intent.amount,
+      payment_type: intent.category || 'rent',
+      payment_method: intent.method || 'manual',
+      payment_date: intent.created_at,
+      status: intent.status || 'awaiting_approval',
+      proof_reference: intent.proof_reference || '—',
+    };
+  });
+
+  const allRows = [...pendingRows, ...payments];
+
+  const filteredPayments = allRows.filter((row) => {
     switch (activeTab) {
       case 0: return true;
-      case 1: return payment.status === 'pending';
-      case 2: return payment.status === 'paid';
-      case 3: return payment.status === 'overdue';
+      case 1: return row.status === 'pending' || row.status === 'awaiting_approval';
+      case 2: return row.status === 'paid';
+      case 3: return row.status === 'overdue';
       default: return true;
     }
   });
@@ -364,10 +289,17 @@ const Payments = () => {
     },
     {
       field: 'payment_method',
-      headerName: 'Method',
-      width: 120,
+      headerName: 'Method / Ref',
+      width: 140,
       renderCell: (params) => (
-        <Chip label={params.value ? params.value.replace('_', ' ') : 'N/A'} variant="outlined" size="small" sx={{ textTransform: 'capitalize' }} />
+        <Box sx={{ display: 'flex', flexDirection: 'column', pt: 1, pb: 1, height: '100%', justifyContent: 'center' }}>
+          <Chip label={params.row.payment_method ? params.row.payment_method.replace('_', ' ') : 'N/A'} variant="outlined" size="small" sx={{ textTransform: 'capitalize', width: 'fit-content', mb: params.row.proof_reference && params.row.proof_reference !== '—' ? 0.5 : 0 }} />
+          {params.row.proof_reference && params.row.proof_reference !== '—' && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.1 }}>
+              {params.row.proof_reference}
+            </Typography>
+          )}
+        </Box>
       ),
     },
     {
@@ -382,24 +314,32 @@ const Payments = () => {
     {
       field: 'status',
       headerName: 'Status',
-      width: 120,
+      width: 130,
       renderCell: (params) => (
-        <Chip icon={getStatusIcon(params.value)} label={params.value} color={getStatusColor(params.value)} size="small" sx={{ textTransform: 'capitalize' }} />
+        <Chip icon={getStatusIcon(params.value)} label={params.value.replace('_', ' ')} color={getStatusColor(params.value)} size="small" sx={{ textTransform: 'capitalize' }} />
       ),
     },
     {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      width: 150,
-      getActions: (params) => [
-        <GridActionsCellItem icon={<Visibility fontSize="small" />} label="View" onClick={() => handleOpenDialog(params.row)} showInMenu />,
-        <GridActionsCellItem icon={<Edit fontSize="small" />} label="Edit" onClick={() => handleOpenDialog(params.row)} showInMenu />,
-        ...(params.row.status === 'pending'
-          ? [<GridActionsCellItem icon={<CheckCircle fontSize="small" />} label="Mark as Paid" onClick={() => handleMarkAsPaid(params.id)} showInMenu />]
-          : []),
-        <GridActionsCellItem icon={<Delete />} label="Delete" onClick={() => handleDelete(params.id)} showInMenu />,
-      ],
+      width: 160,
+      getActions: (params) => {
+        if (params.row.is_intent) {
+          return [
+            <GridActionsCellItem icon={acting === params.id + '_approve' ? <CircularProgress size={14} color="inherit" /> : <CheckCircle color="success" />} label="Approve" onClick={() => handleApprove(params.id)} showInMenu={false} disabled={!!acting} />,
+            <GridActionsCellItem icon={acting === params.id + '_reject' ? <CircularProgress size={14} color="inherit" /> : <Close color="error" />} label="Reject" onClick={() => openRejectDialog(params.id)} showInMenu={false} disabled={!!acting} />,
+          ];
+        }
+        return [
+          <GridActionsCellItem icon={<Visibility fontSize="small" />} label="View" onClick={() => handleOpenDialog(params.row)} showInMenu />,
+          <GridActionsCellItem icon={<Edit fontSize="small" />} label="Edit" onClick={() => handleOpenDialog(params.row)} showInMenu />,
+          ...(params.row.status === 'pending'
+            ? [<GridActionsCellItem icon={<CheckCircle fontSize="small" />} label="Mark as Paid" onClick={() => handleMarkAsPaid(params.id)} showInMenu />]
+            : []),
+          <GridActionsCellItem icon={<Delete />} label="Delete" onClick={() => handleDelete(params.id)} showInMenu />,
+        ];
+      },
     },
   ];
 
@@ -420,86 +360,15 @@ const Payments = () => {
         </Alert>
       )}
 
-      {/* ── Pending Rent Proofs Section ───────────────── */}
-      <Paper
-        variant="outlined"
-        sx={{
-          mb: 3,
-          borderRadius: 2,
-          borderColor: pendingProofs.length > 0 ? 'warning.main' : 'divider',
-          borderWidth: pendingProofs.length > 0 ? 2 : 1,
-          overflow: 'hidden',
-        }}
-      >
-        <Box
-          sx={{
-            px: 2.5,
-            py: 1.75,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            bgcolor: pendingProofs.length > 0 ? '#fefce8' : 'background.default',
-            borderBottom: '1px solid',
-            borderColor: pendingProofs.length > 0 ? 'warning.light' : 'divider',
-          }}
+      {proofActionMsg && (
+        <Alert
+          severity={proofActionMsg.type}
+          onClose={() => setProofActionMsg(null)}
+          sx={{ mb: 2, borderRadius: 1.5 }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <HourglassTop sx={{ color: pendingProofs.length > 0 ? 'warning.main' : 'text.disabled' }} />
-            <Typography variant="subtitle1" fontWeight={700}>
-              Pending Rent Proofs
-            </Typography>
-            {pendingProofs.length > 0 && (
-              <Chip
-                label={`${pendingProofs.length} awaiting`}
-                color="warning"
-                size="small"
-                sx={{ fontWeight: 700, fontSize: 12 }}
-              />
-            )}
-          </Box>
-          <Tooltip title="Refresh">
-            <IconButton size="small" onClick={loadPendingProofs} disabled={proofsLoading}>
-              <Refresh fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        {proofsLoading && <LinearProgress color="warning" />}
-
-        <Box sx={{ p: 2 }}>
-          {proofActionMsg && (
-            <Alert
-              severity={proofActionMsg.type}
-              onClose={() => setProofActionMsg(null)}
-              sx={{ mb: 2, borderRadius: 1.5 }}
-            >
-              {proofActionMsg.text}
-            </Alert>
-          )}
-
-          {proofsError && (
-            <Alert severity="error" sx={{ mb: 2 }}>{proofsError}</Alert>
-          )}
-
-          {!proofsLoading && pendingProofs.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-              No pending payment proofs — you're all caught up!
-            </Typography>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {pendingProofs.map((intent) => (
-                <PendingProofCard
-                  key={intent.id}
-                  intent={intent}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  acting={acting}
-                />
-              ))}
-            </Box>
-          )}
-        </Box>
-      </Paper>
+          {proofActionMsg.text}
+        </Alert>
+      )}
 
       {/* ── Payment History ───────────────────────────── */}
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2, mt: 1 }}>
@@ -646,6 +515,28 @@ const Payments = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Reject reason dialog */}
+      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Reject Payment Proof</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Optionally add a reason — the tenant will be notified.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Reason (optional)"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            multiline
+            rows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleRejectSubmit}>Reject</Button>
+        </DialogActions>
       </Dialog>
     </OwnerPageContainer>
   );
