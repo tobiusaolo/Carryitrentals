@@ -37,7 +37,7 @@ const Footer = () => {
 
   const socialLinks = {
     whatsapp: 'https://wa.me/256754577922',
-    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from CarryIT Rentals Website',,
+    email: 'mailto:stuartkevinz852@gmail.com?subject=Inquiry from CarryIT Rentals Website',
     facebook: 'https://www.facebook.com/easyrentals',
     instagram: 'https://www.instagram.com/easyrentals',
     tiktok: 'https://www.tiktok.com/@easyrentals',
