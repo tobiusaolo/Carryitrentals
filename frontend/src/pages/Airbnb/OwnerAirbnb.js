@@ -73,6 +73,7 @@ import OwnerDataTable from '../../components/Owner/OwnerDataTable';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import { formatMoney } from '../../utils/formatMoney';
 import { colors, getOwnerStatColor } from '../../theme/designTokens';
+import AirbnbCalendarDialog from '../../components/Airbnb/AirbnbCalendarDialog';
 
 const OwnerAirbnb = ({ embedded = false }) => {
   const [airbnbs, setAirbnbs] = useState([]);
@@ -96,6 +97,8 @@ const OwnerAirbnb = ({ embedded = false }) => {
   });
   
   const [formData, setFormData] = useState(emptyAirbnbFormState());
+  const [calendarListing, setCalendarListing] = useState(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     loadAirbnbs();
@@ -680,6 +683,17 @@ const OwnerAirbnb = ({ embedded = false }) => {
                             <IconButton
                               size="small"
                               color="primary"
+                              title="Calendar & blocks"
+                              onClick={() => {
+                                setCalendarListing(airbnb);
+                                setCalendarOpen(true);
+                              }}
+                            >
+                              <CalendarIcon />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="primary"
                               onClick={() => handleOpenDialog(airbnb)}
                             >
                               <Edit />
@@ -866,6 +880,16 @@ const OwnerAirbnb = ({ embedded = false }) => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <AirbnbCalendarDialog
+          open={calendarOpen}
+          onClose={() => {
+            setCalendarOpen(false);
+            setCalendarListing(null);
+          }}
+          listing={calendarListing}
+          onUpdated={loadAirbnbs}
+        />
 
         <NotificationSystem
           open={notification.open}

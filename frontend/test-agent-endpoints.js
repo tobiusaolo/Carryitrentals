@@ -11,7 +11,7 @@
 
 const axios = require('axios');
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
 
 // Test configuration
 const TEST_PHONE = process.env.TEST_AGENT_PHONE || '+256750371313'; // Change this to a valid agent phone number

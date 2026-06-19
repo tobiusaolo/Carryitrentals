@@ -64,4 +64,21 @@ export const tenantAPI = {
 
   sendChatMessage: (tenantId, message) =>
     api.post(`/tenants/${tenantId}/chat`, { message }),
+
+  getLeaseRecord: (tenantId) =>
+    api.get(`/tenants/${tenantId}/lease`),
+
+  uploadLeaseDocument: (tenantId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/tenants/${tenantId}/upload-lease-document`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 180000,
+    });
+  },
+
+  getPendingScreening: () => api.get('/tenants/screening/pending'),
+
+  reviewScreening: (tenantId, status, notes) =>
+    api.post(`/tenants/${tenantId}/screening/review`, { status, notes }),
 };

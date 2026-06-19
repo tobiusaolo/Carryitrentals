@@ -161,7 +161,7 @@ const PublicRentals = () => {
           <Grid container spacing={2.5}>
             {filteredUnits.map((unit) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={unit.id}>
-                <PropertyCard property={unit} onClick={() => navigate(`/rental/${unit.id}`)} />
+                <PropertyCard property={unit} variant="rental" onClick={() => navigate(`/rental/${unit.id}`)} />
               </Grid>
             ))}
           </Grid>

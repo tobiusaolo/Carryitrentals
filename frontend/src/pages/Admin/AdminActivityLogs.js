@@ -30,12 +30,12 @@ import {
   Schedule as ScheduleIcon,
   Business as BusinessIcon
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import DataTable from '../../components/UI/DataTable';
 import TableActions from '../../components/UI/TableActions';
+import adminAPI from '../../services/api/adminAPI';
 
 const AdminActivityLogs = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
@@ -88,109 +88,12 @@ const AdminActivityLogs = () => {
 
   const loadActivityLogs = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Mock data for now - replace with actual API call
-      const mockLogs = [
-        {
-          id: 1,
-          timestamp: '2024-10-21T12:05:00Z',
-          level: 'INFO',
-          category: 'Authentication',
-          user: 'admin@example.com',
-          action: 'User login',
-          description: 'Admin user logged in successfully',
-          ip_address: '192.168.1.100',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          details: { login_method: 'email', session_duration: '2h 30m' }
-        },
-        {
-          id: 2,
-          timestamp: '2024-10-21T12:03:00Z',
-          level: 'WARNING',
-          category: 'API',
-          user: 'system',
-          action: 'High response time',
-          description: 'API endpoint /api/v1/properties took 2.5s to respond',
-          ip_address: '127.0.0.1',
-          user_agent: 'System',
-          details: { endpoint: '/api/v1/properties', response_time: '2500ms', threshold: '1000ms' }
-        },
-        {
-          id: 3,
-          timestamp: '2024-10-21T12:01:00Z',
-          level: 'ERROR',
-          category: 'Database',
-          user: 'system',
-          action: 'Connection timeout',
-          description: 'Database connection timeout after 30s',
-          ip_address: '127.0.0.1',
-          user_agent: 'System',
-          details: { connection_pool: 'exhausted', retry_count: 3 }
-        },
-        {
-          id: 4,
-          timestamp: '2024-10-21T11:58:00Z',
-          level: 'INFO',
-          category: 'Property',
-          user: 'owner@example.com',
-          action: 'Property created',
-          description: 'New property "Sunset Apartments" created',
-          ip_address: '192.168.1.101',
-          user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          details: { property_id: 3, property_name: 'Sunset Apartments', location: 'Entebbe' }
-        },
-        {
-          id: 5,
-          timestamp: '2024-10-21T11:55:00Z',
-          level: 'INFO',
-          category: 'Payment',
-          user: 'tenant@example.com',
-          action: 'Payment received',
-          description: 'Rent payment of $1,200 received via mobile money',
-          ip_address: '192.168.1.102',
-          user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15',
-          details: { amount: 1200, method: 'MTN Mobile Money', transaction_id: 'MTN123456' }
-        },
-        {
-          id: 6,
-          timestamp: '2024-10-21T11:50:00Z',
-          level: 'WARNING',
-          category: 'Security',
-          user: 'unknown',
-          action: 'Failed login attempt',
-          description: 'Multiple failed login attempts from IP 192.168.1.200',
-          ip_address: '192.168.1.200',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          details: { attempts: 5, blocked: true, duration: '10 minutes' }
-        },
-        {
-          id: 7,
-          timestamp: '2024-10-21T11:45:00Z',
-          level: 'INFO',
-          category: 'Inspection',
-          user: 'agent@example.com',
-          action: 'Inspection completed',
-          description: 'Property inspection completed for Unit 101',
-          ip_address: '192.168.1.103',
-          user_agent: 'Mozilla/5.0 (Android 11; Mobile; rv:68.0) Gecko/68.0 Firefox/88.0',
-          details: { unit_id: 1, inspection_type: 'routine', status: 'completed', findings: 'Minor maintenance needed' }
-        },
-        {
-          id: 8,
-          timestamp: '2024-10-21T11:40:00Z',
-          level: 'ERROR',
-          category: 'System',
-          user: 'system',
-          action: 'Backup failed',
-          description: 'Daily backup process failed due to insufficient disk space',
-          ip_address: '127.0.0.1',
-          user_agent: 'System',
-          details: { backup_size: '2.5GB', available_space: '1.2GB', retry_scheduled: '2024-10-22T02:00:00Z' }
-        }
-      ];
-      setLogs(mockLogs);
+      const { data } = await adminAPI.getActivityLogs(300);
+      setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError('Failed to load activity logs');
+      setError(err.response?.data?.detail || 'Failed to load activity logs');
     } finally {
       setLoading(false);
     }
@@ -231,8 +134,18 @@ const AdminActivityLogs = () => {
   };
 
   const exportLogs = () => {
-    // TODO: Implement CSV/JSON export
-    console.log('Exporting logs...');
+    const header = ['timestamp', 'level', 'category', 'user', 'action', 'description'];
+    const rows = filteredLogs.map((log) =>
+      header.map((key) => `"${String(log[key] ?? '').replace(/"/g, '""')}"`).join(',')
+    );
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `carryit-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const refreshLogs = () => {
@@ -332,7 +245,7 @@ const AdminActivityLogs = () => {
       </Typography>
       
       <Typography variant="body1" color="text.secondary" paragraph>
-        Monitor system activity, user actions, and system events across the platform.
+        Events derived from tenants, properties, payments, and viewing bookings in your database.
       </Typography>
 
       {error && (

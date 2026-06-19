@@ -59,6 +59,7 @@ const navSections = [
     label: 'Finance',
     items: [
       { text: 'Rent payments', icon: AccountBalanceWallet, path: '/owner/payments' },
+      { text: 'Billing & subscription', icon: ReceiptLong, path: '/owner/billing' },
       { text: 'Utilities', icon: Bolt, path: '/owner/utilities' },
       { text: 'Viewing payments', icon: ReceiptLong, path: '/owner/viewing-payments' },
     ],

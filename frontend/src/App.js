@@ -28,12 +28,12 @@ import AdminSystemHealth from './pages/Admin/AdminSystemHealth';
 import AdminActivityLogs from './pages/Admin/AdminActivityLogs';
 import AdminNotifications from './pages/Admin/AdminNotifications';
 import AdminAnalytics from './pages/Admin/AdminAnalytics';
+import AdminRevenue from './pages/Admin/AdminRevenue';
 import AdminPaymentMethods from './pages/Admin/AdminPaymentMethods';
 import AdminViewingPayments from './pages/Admin/AdminViewingPayments';
 import AdminSettings from './pages/Admin/AdminSettings';
 import AdditionalServices from './pages/Admin/AdditionalServices';
 import InspectionPayment from './pages/InspectionPayment/InspectionPayment';
-import TestLogin from './pages/TestLogin';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import AuthGuard from './components/Auth/AuthGuard';
 import AgentLogin from './pages/Agent/AgentLogin';
@@ -49,10 +49,13 @@ import PublicRentals from './pages/Public/PublicRentals';
 import RentalUnitDetails from './pages/Public/RentalUnitDetails';
 import PublicAirbnb from './pages/Public/PublicAirbnb';
 import AirbnbDetails from './pages/Public/AirbnbDetails';
+import AirbnbPayment from './pages/Public/AirbnbPayment';
 import Guidelines from './pages/Public/Guidelines';
 import Portals from './pages/Public/Portals';
+import TenantRentPaymentReturn from './pages/Public/TenantRentPaymentReturn';
 import OwnerAirbnb from './pages/Airbnb/OwnerAirbnb';
 import OwnerPropertyHub from './pages/Owner/OwnerPropertyHub';
+import OwnerBilling from './pages/Owner/OwnerBilling';
 import OwnerViewingPayments from './pages/Owner/OwnerViewingPayments';
 import OwnerLogin from './pages/Auth/OwnerLogin';
 import OwnerRegister from './pages/Auth/OwnerRegister';
@@ -67,9 +70,11 @@ function App() {
       <Route path="/rentals" element={<PublicRentals />} />
       <Route path="/rental/:id" element={<RentalUnitDetails />} />
       <Route path="/airbnb" element={<PublicAirbnb />} />
+      <Route path="/airbnb/payment/:bookingId" element={<AirbnbPayment />} />
       <Route path="/airbnb/:id" element={<AirbnbDetails />} />
       <Route path="/guidelines" element={<Guidelines />} />
       <Route path="/portals" element={<Portals />} />
+      <Route path="/tenant/rent-payment-return" element={<TenantRentPaymentReturn />} />
       
       {/* Client Auth Routes */}
       <Route path="/login" element={<Login />} />
@@ -82,8 +87,6 @@ function App() {
       <Route path="/owner-register" element={<OwnerRegister />} />
       
       <Route path="/inspection-payment/:paymentId" element={<InspectionPayment />} />
-      <Route path="/test" element={<div>Test Route</div>} />
-      <Route path="/test-login" element={<TestLogin />} />
       
       {/* Property Owner Routes */}
       <Route path="/owner" element={
@@ -102,6 +105,7 @@ function App() {
         <Route path="airbnb" element={<Navigate to="/owner/property-hub?tab=airbnb" replace />} />
         <Route path="tenants" element={<Navigate to="/owner/property-hub?tab=tenants" replace />} />
         <Route path="payments" element={<Payments />} />
+        <Route path="billing" element={<OwnerBilling />} />
         <Route path="utilities" element={<Utilities />} />
         <Route path="inspections" element={<OwnerViewings />} />
         <Route path="viewings" element={<OwnerViewings />} />
@@ -136,6 +140,7 @@ function App() {
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="revenue" element={<AdminRevenue />} />
         <Route path="communications" element={<Communications />} />
         <Route path="reports" element={<Reports />} />
       </Route>

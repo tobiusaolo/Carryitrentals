@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
+import { API_BASE_URL } from '../../config/api';
 
 const paymentMonitoringAPI = {
   // Payment Monitoring

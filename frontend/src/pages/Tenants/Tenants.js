@@ -56,6 +56,7 @@ import {
   Forum,
 } from '@mui/icons-material';
 import TenantChatDialog from '../../components/Tenants/TenantChatDialog';
+import LeaseChecklistDialog from '../../components/Tenants/LeaseChecklistDialog';
 import {
   DataGrid,
   GridToolbar,
@@ -81,6 +82,7 @@ import OwnerStatCard from '../../components/Owner/OwnerStatCard';
 import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
 import { formatMoney } from '../../utils/formatMoney';
 import { colors } from '../../theme/designTokens';
+import { tenantAPI } from '../../services/api/tenantAPI';
 
 const TENANT_UTILITY_FIELDS = [
   { name: 'tenant_pays_garbage', label: 'Garbage' },
@@ -103,6 +105,14 @@ const defaultTenantFormState = () => ({
   previous_country: '',
   occupation: '',
   employer_name: '',
+  employer_phone: '',
+  employer_address: '',
+  monthly_income: '',
+  previous_landlord_name: '',
+  previous_landlord_phone: '',
+  previous_landlord_address: '',
+  previous_landlord_tenancy_from: '',
+  previous_landlord_tenancy_to: '',
   number_of_family_members: '',
   family_details: '',
   tenant_pays_garbage: false,
@@ -113,7 +123,9 @@ const defaultTenantFormState = () => ({
   property_id: '',
   unit_id: '',
   move_in_date: new Date().toISOString().split('T')[0],
+  lease_end_date: '',
   monthly_rent: '',
+  deposit_required: 0,
   deposit_paid: 0,
   months_paid: 0,
   emergency_contact_name: '',
@@ -135,6 +147,9 @@ const Tenants = () => {
   const [copyNotice, setCopyNotice] = useState('');
   const [formData, setFormData] = useState(defaultTenantFormState());
   const [chatTenant, setChatTenant] = useState(null);
+  const [checklistTenant, setChecklistTenant] = useState(null);
+  const [leaseDocFile, setLeaseDocFile] = useState(null);
+  const [leaseDocUploading, setLeaseDocUploading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchTenants());
@@ -169,6 +184,14 @@ const Tenants = () => {
         previous_country: tenant.previous_country || '',
         occupation: tenant.occupation || '',
         employer_name: tenant.employer_name || '',
+        employer_phone: tenant.employer_phone || '',
+        employer_address: tenant.employer_address || '',
+        monthly_income: tenant.monthly_income ?? '',
+        previous_landlord_name: tenant.previous_landlord_name || '',
+        previous_landlord_phone: tenant.previous_landlord_phone || '',
+        previous_landlord_address: tenant.previous_landlord_address || '',
+        previous_landlord_tenancy_from: tenant.previous_landlord_tenancy_from || '',
+        previous_landlord_tenancy_to: tenant.previous_landlord_tenancy_to || '',
         number_of_family_members: tenant.number_of_family_members ?? '',
         family_details: tenant.family_details || '',
         tenant_pays_garbage: Boolean(tenant.tenant_pays_garbage),
@@ -179,7 +202,9 @@ const Tenants = () => {
         property_id: tenant.property_id || '',
         unit_id: tenant.unit_id || '',
         move_in_date: tenant.move_in_date || new Date().toISOString().split('T')[0],
+        lease_end_date: tenant.lease_end_date || '',
         monthly_rent: tenant.monthly_rent || '',
+        deposit_required: tenant.deposit_required ?? tenant.deposit_paid ?? 0,
         deposit_paid: tenant.deposit_paid || 0,
         emergency_contact_name: tenant.emergency_contact_name || '',
         emergency_contact_phone: tenant.emergency_contact_phone || '',
@@ -191,11 +216,13 @@ const Tenants = () => {
       setFormData(defaultTenantFormState());
     }
     setOpenDialog(true);
+    setLeaseDocFile(null);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingTenant(null);
+    setLeaseDocFile(null);
   };
 
   const handleInputChange = (e) => {
@@ -235,13 +262,27 @@ const Tenants = () => {
         : null,
       family_details: formData.family_details?.trim() || null,
       monthly_rent: parseFloat(formData.monthly_rent),
-      deposit_paid: parseFloat(formData.deposit_paid),
+      monthly_income: formData.monthly_income ? parseFloat(formData.monthly_income) : null,
+      deposit_required: parseFloat(formData.deposit_required) || 0,
+      deposit_paid: parseFloat(formData.deposit_paid) || 0,
+      lease_end_date: formData.lease_end_date || null,
       months_paid: parseInt(formData.months_paid, 10) || 0,
     };
     
     if (editingTenant) {
       delete submitData.months_paid;
       await dispatch(updateTenant({ tenantId: editingTenant.id, tenantData: submitData }));
+      if (leaseDocFile) {
+        setLeaseDocUploading(true);
+        try {
+          await tenantAPI.uploadLeaseDocument(editingTenant.id, leaseDocFile);
+          setCopyNotice('Lease document uploaded');
+        } catch (err) {
+          setCopyNotice(err.response?.data?.detail || 'Lease saved but document upload failed');
+        } finally {
+          setLeaseDocUploading(false);
+        }
+      }
     } else {
       const result = await dispatch(createTenant(submitData));
       if (createTenant.fulfilled.match(result) && result.payload?.linking_code) {
@@ -360,6 +401,35 @@ const Tenants = () => {
       renderCell: (params) => `$${params.value}`,
     },
     {
+      field: 'lease_end_date',
+      headerName: 'Lease ends',
+      width: 120,
+      renderCell: (params) => (
+        params.value ? new Date(params.value).toLocaleDateString() : '—'
+      ),
+    },
+    {
+      field: 'lease_status',
+      headerName: 'Lease',
+      width: 110,
+      renderCell: (params) => (
+        <Chip
+          label={params.value ? String(params.value).replace('_', ' ') : 'active'}
+          color={params.value === 'expired' ? 'error' : params.value === 'expiring_soon' ? 'warning' : 'success'}
+          size="small"
+          sx={{ textTransform: 'capitalize' }}
+        />
+      ),
+    },
+    {
+      field: 'deposit_balance',
+      headerName: 'Deposit bal.',
+      width: 110,
+      renderCell: (params) => (
+        params.value != null ? `$${Number(params.value).toLocaleString()}` : '—'
+      ),
+    },
+    {
       field: 'rent_payment_status',
       headerName: 'Payment Status',
       width: 150,
@@ -389,6 +459,12 @@ const Tenants = () => {
           icon={<Forum fontSize="small" />}
           label="Message"
           onClick={() => setChatTenant(params.row)}
+          showInMenu
+        />,
+        <GridActionsCellItem
+          icon={<Visibility fontSize="small" />}
+          label="Checklist"
+          onClick={() => setChecklistTenant(params.row)}
           showInMenu
         />,
         <GridActionsCellItem
@@ -708,6 +784,90 @@ const Tenants = () => {
                   onChange={handleInputChange}
                 />
               </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Employer Phone"
+                  name="employer_phone"
+                  value={formData.employer_phone}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Employer Address"
+                  name="employer_address"
+                  value={formData.employer_address}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Monthly Income"
+                  name="monthly_income"
+                  type="number"
+                  value={formData.monthly_income}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+
+              {/* Screening pack — previous landlord */}
+              <Grid item xs={12}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', mt: 2 }}>
+                  Screening pack — previous landlord
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Previous landlord name"
+                  name="previous_landlord_name"
+                  value={formData.previous_landlord_name}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Previous landlord phone"
+                  name="previous_landlord_phone"
+                  value={formData.previous_landlord_phone}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Previous landlord address"
+                  name="previous_landlord_address"
+                  value={formData.previous_landlord_address}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Tenancy from"
+                  name="previous_landlord_tenancy_from"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={formData.previous_landlord_tenancy_from}
+                  onChange={handleInputChange}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Tenancy to"
+                  name="previous_landlord_tenancy_to"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={formData.previous_landlord_tenancy_to}
+                  onChange={handleInputChange}
+                />
+              </Grid>
               {/* Family Information (optional) */}
               <Grid item xs={12}>
                 <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', mt: 2 }}>
@@ -831,7 +991,30 @@ const Tenants = () => {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  label="Deposit Paid"
+                  label="Lease end date"
+                  name="lease_end_date"
+                  type="date"
+                  value={formData.lease_end_date}
+                  onChange={handleInputChange}
+                  InputLabelProps={{ shrink: true }}
+                  helperText="When the fixed-term lease expires"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Deposit required"
+                  name="deposit_required"
+                  type="number"
+                  value={formData.deposit_required}
+                  onChange={handleInputChange}
+                  inputProps={{ min: 0, step: 0.01 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Deposit paid"
                   name="deposit_paid"
                   type="number"
                   value={formData.deposit_paid}
@@ -866,6 +1049,36 @@ const Tenants = () => {
                     />
                   </Grid>
                 </>
+              )}
+
+              {editingTenant && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, mt: 1 }}>
+                    Lease agreement document
+                  </Typography>
+                  {editingTenant.lease_document_url ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Current: {editingTenant.lease_document_name || 'Uploaded lease'}
+                      {' · '}
+                      <a href={editingTenant.lease_document_url} target="_blank" rel="noreferrer">
+                        View
+                      </a>
+                    </Typography>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      No lease document on file yet.
+                    </Typography>
+                  )}
+                  <Button variant="outlined" component="label" disabled={leaseDocUploading}>
+                    {leaseDocFile ? leaseDocFile.name : 'Choose PDF or image'}
+                    <input
+                      type="file"
+                      hidden
+                      accept=".pdf,image/*"
+                      onChange={(e) => setLeaseDocFile(e.target.files?.[0] || null)}
+                    />
+                  </Button>
+                </Grid>
               )}
 
               {/* Emergency Contact */}
@@ -924,8 +1137,8 @@ const Tenants = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={isLoading}>
-              {isLoading ? <CircularProgress size={24} /> : (editingTenant ? 'Update' : 'Create')}
+            <Button type="submit" variant="contained" disabled={isLoading || leaseDocUploading}>
+              {isLoading || leaseDocUploading ? <CircularProgress size={24} /> : (editingTenant ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
@@ -943,6 +1156,13 @@ const Tenants = () => {
         open={Boolean(chatTenant)}
         tenant={chatTenant}
         onClose={() => setChatTenant(null)}
+      />
+
+      <LeaseChecklistDialog
+        open={Boolean(checklistTenant)}
+        onClose={() => setChecklistTenant(null)}
+        tenant={checklistTenant}
+        isOwner
       />
     </OwnerPageContainer>
   );

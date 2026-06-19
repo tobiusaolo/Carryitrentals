@@ -32,6 +32,7 @@ import {
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import reportsAPI from '../../services/api/reportsAPI';
+import { ownerPortfolioAPI } from '../../services/api/ownerPortfolioAPI';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import api from '../../services/api/api';
@@ -87,6 +88,37 @@ const Reports = () => {
     property_id: '',
     year: new Date().getFullYear()
   });
+
+  const [ledgerParams, setLedgerParams] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+  });
+
+  const handleDownloadMonthlyLedger = async () => {
+    setLoading(true);
+    try {
+      const response = await ownerPortfolioAPI.downloadMonthlyLedgerCsv(
+        ledgerParams.year,
+        ledgerParams.month
+      );
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `carryit-rent-ledger-${ledgerParams.year}-${String(ledgerParams.month).padStart(2, '0')}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      setSnackbar({ open: true, message: 'Monthly rent ledger downloaded', severity: 'success' });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.detail || 'Could not download ledger',
+        severity: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGenerateTenantStatement = async () => {
     if (!tenantStatementParams.tenant_id) {
@@ -294,6 +326,55 @@ const Reports = () => {
           Loading your properties and tenants... If this takes too long, please make sure you have properties and tenants set up.
         </Alert>
       )}
+
+      <Card sx={{ mb: 3, border: '1px solid', borderColor: 'success.light', bgcolor: 'success.50' }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            <MoneyIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Monthly rent ledger (for your accountant)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            CSV of rent you collected this month. This is your money — not CarryIT platform revenue.
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={6} sm={3}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Year"
+                value={ledgerParams.year}
+                onChange={(e) => setLedgerParams({ ...ledgerParams, year: Number(e.target.value) })}
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <FormControl fullWidth>
+                <InputLabel>Month</InputLabel>
+                <Select
+                  label="Month"
+                  value={ledgerParams.month}
+                  onChange={(e) => setLedgerParams({ ...ledgerParams, month: e.target.value })}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                    <MenuItem key={m} value={m}>
+                      {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <DownloadIcon />}
+                onClick={handleDownloadMonthlyLedger}
+                disabled={loading}
+              >
+                Download CSV
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* Report Type Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

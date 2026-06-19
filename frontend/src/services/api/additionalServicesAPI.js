@@ -1,7 +1,6 @@
 import api from './api';
 import axios from 'axios';
-
-const PRODUCTION_API_URL = 'https://carryit-backend-su8h.onrender.com/api/v1';
+import { API_BASE_URL } from '../../config/api';
 
 export const additionalServicesAPI = {
   // Get all additional services (public endpoint - uses production URL)
@@ -21,20 +20,18 @@ export const additionalServicesAPI = {
     }
     
     // For public access, use production URL directly
-    return axios.get(`${PRODUCTION_API_URL}/additional-services/${queryString ? `?${queryString}` : ''}`);
+    return axios.get(`${API_BASE_URL}/additional-services/${queryString ? `?${queryString}` : ''}`);
   },
 
   // Get active services only (public endpoint - uses correct API URL)
   getActiveServices: () => {
-    // Use the correct API base URL from environment or fallback to production
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
-    const baseURL = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash if present
+    const baseURL = API_BASE_URL.replace(/\/$/, '');
     return axios.get(`${baseURL}/additional-services/?active_only=true`);
   },
 
   // Get a specific service by ID (public endpoint - uses production URL)
   getService: (serviceId) => {
-    return axios.get(`${PRODUCTION_API_URL}/additional-services/${serviceId}`);
+    return axios.get(`${API_BASE_URL}/additional-services/${serviceId}`);
   },
 
   // Create a new service (admin only - uses authenticated API)

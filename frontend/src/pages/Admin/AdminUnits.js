@@ -68,6 +68,7 @@ import { adminPrimaryButtonSx } from '../../theme/designTokens';
 import DataTable from '../../components/UI/DataTable';
 import TableActions from '../../components/UI/TableActions';
 import { colors } from '../../theme/designTokens';
+import { resolveMediaUrl } from '../../config/api';
 import { RENTAL_STATUS_OPTIONS, normalizeRentalStatus } from '../../utils/rentalStatus';
 import {
   UNIT_TYPE_OPTIONS,
@@ -1211,18 +1212,10 @@ const AdminUnits = () => {
                         // Images are stored as base64 strings in Firestore, use directly
                         // If it's not base64 (legacy file path), convert to URL
                         const getImageUrl = (img) => {
-                          // If it's already base64 or full URL, return as-is
                           if (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://')) {
                             return img;
                           }
-                          // Legacy file path - convert to URL
-                          if (img.startsWith('/')) {
-                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
-                            return `${apiBaseUrl.replace('/api/v1', '')}${img}`;
-                          }
-                          // Relative path
-                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
-                          return `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${img}`;
+                          return resolveMediaUrl(img);
                         };
                         const imageUrl = getImageUrl(image);
                         return (
@@ -1278,14 +1271,9 @@ const AdminUnits = () => {
                                     transition: 'all 0.3s ease'
                                   }}
                                   onClick={() => {
-                                    // Create a beautiful full-screen image viewer
-                                    // Images are stored as base64, use directly or convert legacy paths
-                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
                                     const fullImageUrl = image.startsWith('data:image/') || image.startsWith('http://') || image.startsWith('https://')
-                                      ? image 
-                                      : image.startsWith('/') 
-                                        ? `${apiBaseUrl.replace('/api/v1', '')}${image}`
-                                        : `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${image}`;
+                                      ? image
+                                      : resolveMediaUrl(image);
                                     const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
                                     newWindow.document.write(`
                                       <html>

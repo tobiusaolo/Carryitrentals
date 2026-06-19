@@ -26,6 +26,7 @@ import {
   CheckCircle
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config/api';
 
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
@@ -49,7 +50,7 @@ const AdminSettings = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('https://carryit-backend-su8h.onrender.com/api/v1/admin/settings', {
+      const response = await axios.get(`${API_BASE_URL}/admin/settings`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -80,7 +81,7 @@ const AdminSettings = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'https://carryit-backend-su8h.onrender.com/api/v1/admin/settings/initialize-defaults',
+        `${API_BASE_URL}/admin/settings/initialize-defaults`,
         {},
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
@@ -100,7 +101,7 @@ const AdminSettings = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'https://carryit-backend-su8h.onrender.com/api/v1/admin/settings/bulk-update',
+        `${API_BASE_URL}/admin/settings/bulk-update`,
         settings,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );

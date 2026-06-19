@@ -482,8 +482,6 @@ const AdminPropertyOwners = () => {
             icon={<BusinessIcon />}
             color="primary.main"
             subtitle="Active property owners"
-            trend="up"
-            trendValue={12.5}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -493,8 +491,6 @@ const AdminPropertyOwners = () => {
             icon={<HomeIcon />}
             color="info.main"
             subtitle="Across all owners"
-            trend="up"
-            trendValue={8.3}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -504,19 +500,15 @@ const AdminPropertyOwners = () => {
             icon={<ApartmentIcon />}
             color="warning.main"
             subtitle="Managed units"
-            trend="up"
-            trendValue={5.7}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            title="Monthly Revenue"
-            value={`$${propertyOwners.reduce((sum, owner) => sum + owner.monthlyRevenue, 0).toLocaleString()}`}
+            title="Portfolio rent (monthly)"
+            value={`UGX ${propertyOwners.reduce((sum, owner) => sum + owner.monthlyRevenue, 0).toLocaleString()}`}
             icon={<MoneyIcon />}
             color="success.main"
-            subtitle="Total monthly income"
-            trend="up"
-            trendValue={18.2}
+            subtitle="Landlord rent inventory"
           />
         </Grid>
       </Grid>

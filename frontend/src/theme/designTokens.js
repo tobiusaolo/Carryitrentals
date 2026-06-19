@@ -276,6 +276,7 @@ export const OWNER_ROUTE_META = {
   '/owner/communications': { title: 'Messages', subtitle: 'SMS' },
   '/owner/reports': { title: 'Reports', subtitle: 'Exports' },
   '/owner/analytics': { title: 'Analytics', subtitle: 'Performance' },
+  '/owner/billing': { title: 'Billing & subscription', subtitle: 'Plan, wallet & approvals' },
 };
 
 export const OWNER_PROPERTY_HUB_TAB_META = {

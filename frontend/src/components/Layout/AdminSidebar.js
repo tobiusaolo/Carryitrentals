@@ -38,7 +38,10 @@ const drawerWidth = layout.adminSidebarWidth;
 const navSections = [
   {
     label: 'Overview',
-    items: [{ text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' }],
+    items: [
+      { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
+      { text: 'Platform revenue', icon: <PaymentIcon />, path: '/admin/revenue' },
+    ],
   },
   {
     label: 'Listings',

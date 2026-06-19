@@ -30,8 +30,7 @@ import {
 } from '../../constants/airbnb';
 import EmptyState from '../../components/UI/EmptyState';
 import { SearchOff as SearchOffIcon } from '@mui/icons-material';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
+import { API_BASE_URL } from '../../config/api';
 
 const PublicAirbnb = () => {
   const navigate = useNavigate();
@@ -145,14 +144,19 @@ const PublicAirbnb = () => {
             onAction={() => navigate('/airbnb')}
           />
         ) : (
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
             {filteredAirbnbs.map((airbnb, index) => (
               <Grid item xs={12} sm={6} md={4} lg={3} xl={2.4} key={airbnb.id}>
                 <Fade in={true} timeout={300 + (index * 50)}>
                   <Box>
-                    <PropertyCard 
-                      property={{...airbnb, rental_price: airbnb.price_per_night}} 
-                      onClick={() => navigate(`/airbnb/${airbnb.id}`)} 
+                    <PropertyCard
+                      property={{
+                        ...airbnb,
+                        rental_price: airbnb.price_per_night,
+                        price_per_night: airbnb.price_per_night,
+                      }}
+                      variant="airbnb"
+                      onClick={() => navigate(`/airbnb/${airbnb.id}`)}
                     />
                   </Box>
                 </Fade>

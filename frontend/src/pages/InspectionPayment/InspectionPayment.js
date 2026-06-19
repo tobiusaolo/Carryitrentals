@@ -9,20 +9,11 @@ import {
   Alert,
   CircularProgress,
   Divider,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
@@ -30,33 +21,57 @@ import {
   CheckCircle as CheckCircleIcon,
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   fetchPublicPaymentCheckout,
-  confirmPublicPayment,
+  initiatePesapalInspectionPayment,
+  fetchPesapalOrderStatus,
+  submitPublicPaymentProof,
 } from '../../services/api/inspectionPaymentAPI';
 
 const InspectionPayment = () => {
   const { paymentId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [payment, setPayment] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState('');
   const [paymentData, setPaymentData] = useState({
-    transaction_id: '',
-    payment_reference: '',
+    proof_reference: '',
     phone_number: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const [pesapalLoading, setPesapalLoading] = useState(false);
 
   useEffect(() => {
     if (paymentId) loadPaymentData();
   }, [paymentId]);
+
+  useEffect(() => {
+    const orderTrackingId = searchParams.get('orderTrackingId');
+    const pesapalReturn = searchParams.get('pesapal');
+    if (!orderTrackingId || !pesapalReturn) return;
+
+    (async () => {
+      try {
+        const { data } = await fetchPesapalOrderStatus(orderTrackingId);
+        if (data.status === 'completed') {
+          setSuccess(true);
+          setSuccessMessage('Your viewing fee is confirmed. An agent will contact you to schedule your visit.');
+        } else if (data.status === 'failed') {
+          setError('Pesapal payment was not completed. Please try again.');
+        }
+        await loadPaymentData();
+      } catch (err) {
+        console.error('Pesapal status check failed:', err);
+      }
+    })();
+  }, [searchParams]);
 
   const loadPaymentData = async () => {
     try {
@@ -64,8 +79,10 @@ const InspectionPayment = () => {
       setError(null);
       const response = await fetchPublicPaymentCheckout(paymentId);
       setPayment(response.data);
-      setPaymentMethods(response.data.payment_methods || []);
-      if (response.data.status === 'paid') setSuccess(true);
+      if (response.data.status === 'paid') {
+        setSuccess(true);
+        setSuccessMessage('Your viewing fee is confirmed. An agent will contact you to schedule your visit.');
+      }
     } catch (err) {
       console.error('Error loading payment data:', err);
       setError(
@@ -78,48 +95,62 @@ const InspectionPayment = () => {
     }
   };
 
-  const handlePaymentMethodSelect = (methodId) => {
-    setSelectedMethod(String(methodId));
-    setPaymentDialogOpen(true);
+  const handlePesapalPay = async () => {
+    try {
+      setPesapalLoading(true);
+      setError(null);
+      const { data } = await initiatePesapalInspectionPayment(paymentId, {
+        email: paymentData.phone_number ? undefined : undefined,
+        phone: paymentData.phone_number || undefined,
+      });
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        setError('Could not start Pesapal checkout.');
+      }
+    } catch (err) {
+      setError(
+        typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : 'Could not start Pesapal payment.'
+      );
+    } finally {
+      setPesapalLoading(false);
+    }
   };
 
-  const handlePaymentSubmit = async () => {
-    if (!selectedMethod || !paymentData.transaction_id.trim()) {
-      setError('Select a payment method and enter your transaction ID from the SMS receipt.');
+  const handleManualSubmit = async () => {
+    if (!paymentData.proof_reference.trim()) {
+      setError('Enter the transaction ID or reference from your payment receipt.');
       return;
     }
 
     try {
       setSubmitting(true);
       setError(null);
-      await confirmPublicPayment(paymentId, {
-        payment_method_id: selectedMethod,
-        transaction_id: paymentData.transaction_id.trim(),
-        payment_reference: paymentData.payment_reference || undefined,
-        phone_number: paymentData.phone_number || undefined,
+      const { data } = await submitPublicPaymentProof(paymentId, {
+        proof_reference: paymentData.proof_reference.trim(),
+        phone_number: paymentData.phone_number.trim() || undefined,
       });
-      setSuccess(true);
+      if (data.status === 'paid') {
+        setSuccess(true);
+        setSuccessMessage(data.message || 'Payment confirmed.');
+      } else {
+        setSuccess(true);
+        setSuccessMessage(
+          data.message ||
+            'Payment proof submitted. We will verify and confirm your viewing shortly.'
+        );
+      }
       setPaymentDialogOpen(false);
-      setTimeout(() => navigate('/'), 4000);
     } catch (err) {
       setError(
         typeof err.response?.data?.detail === 'string'
           ? err.response.data.detail
-          : 'Could not confirm payment. Check your transaction ID and try again.'
+          : 'Could not submit payment proof. Check your reference and try again.'
       );
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const getPaymentMethodColor = (type) => {
-    switch (type) {
-      case 'mtn_mobile_money':
-        return '#FFD700';
-      case 'airtel_money':
-        return '#E60012';
-      default:
-        return '#1976D2';
     }
   };
 
@@ -141,8 +172,7 @@ const InspectionPayment = () => {
               Payment recorded
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Your viewing fee is on file. A verified agent will contact you to confirm your visit.
-              Balance (40%) is paid after you view the property.
+              {successMessage || 'Your viewing fee is on file. A verified agent will contact you to confirm your visit.'}
             </Typography>
             <Button variant="contained" onClick={() => navigate('/')}>
               Back to listings
@@ -195,24 +225,19 @@ const InspectionPayment = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12}>
                 <Typography variant="body2" color="text.secondary">
-                  Pay now (60%)
+                  Viewing fee (pay in full)
                 </Typography>
                 <Typography variant="h4" color="primary.main" fontWeight="bold">
                   {payment?.currency} {payment?.amount?.toLocaleString()}
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">
-                  After viewing (40%)
-                </Typography>
-                <Typography variant="h6" color="text.secondary">
-                  {payment?.currency} {payment?.amount_due_after?.toLocaleString()}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total fee: {payment?.currency} {payment?.total_inspection_fee?.toLocaleString()}
-                </Typography>
+                {payment?.total_inspection_fee ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Total inspection fee: {payment?.currency}{' '}
+                    {payment?.total_inspection_fee?.toLocaleString()}
+                  </Typography>
+                ) : null}
               </Grid>
             </Grid>
             {payment?.qr_code && (
@@ -227,75 +252,71 @@ const InspectionPayment = () => {
         </Card>
 
         {!isPaid && (
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              {payment?.pesapal_enabled && (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Pay online with Pesapal
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Card, mobile money (MTN, Airtel), and more — secure checkout via Pesapal.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    onClick={handlePesapalPay}
+                    disabled={pesapalLoading}
+                    startIcon={pesapalLoading ? <CircularProgress size={20} color="inherit" /> : <PaymentIcon />}
+                    sx={{ mb: 2 }}
+                  >
+                    {pesapalLoading ? 'Redirecting…' : `Pay ${payment?.currency} ${payment?.amount?.toLocaleString()} with Pesapal`}
+                  </Button>
+                  <Divider sx={{ my: 2 }}>or pay manually</Divider>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {!isPaid && (
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <PaymentIcon />
-                1. Send money to CarryIT
+                Pay manually
               </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <List dense>
-                {paymentMethods.map((method) => (
-                  <ListItem key={method.id} divider>
-                    <ListItemText
-                      primary={method.name}
-                      secondary={`${method.account_name} · ${method.account_number}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                2. Confirm with your transaction ID
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Send the viewing fee via mobile money or bank transfer, then submit your transaction
+                reference for verification.
               </Typography>
-              <Grid container spacing={2}>
-                {paymentMethods.map((method) => (
-                  <Grid item xs={12} sm={6} md={4} key={method.id}>
-                    <Paper
-                      sx={{
-                        p: 2,
-                        cursor: 'pointer',
-                        border: '2px solid',
-                        borderColor: 'divider',
-                        '&:hover': { borderColor: getPaymentMethodColor(method.type) },
-                      }}
-                      onClick={() => handlePaymentMethodSelect(method.id)}
-                    >
-                      <Typography fontWeight={700}>{method.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Tap to confirm payment
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
+              <Button
+                variant="outlined"
+                size="large"
+                fullWidth
+                onClick={() => setPaymentDialogOpen(true)}
+              >
+                Submit payment proof
+              </Button>
             </CardContent>
           </Card>
         )}
       </Box>
 
       <Dialog open={paymentDialogOpen} onClose={() => setPaymentDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Confirm payment</DialogTitle>
+        <DialogTitle>Submit payment proof</DialogTitle>
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Enter the transaction ID from your MTN/Airtel SMS after sending {payment?.currency}{' '}
-            {payment?.amount?.toLocaleString()}.
+            After sending {payment?.currency} {payment?.amount?.toLocaleString()}, enter the
+            transaction ID or reference from your receipt.
           </Alert>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Method used</InputLabel>
-            <Select value={selectedMethod} label="Method used" disabled>
-              {paymentMethods.map((m) => (
-                <MenuItem key={m.id} value={String(m.id)}>
-                  {m.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <TextField
             fullWidth
             required
-            label="Transaction ID *"
-            value={paymentData.transaction_id}
-            onChange={(e) => setPaymentData({ ...paymentData, transaction_id: e.target.value })}
+            label="Transaction reference *"
+            value={paymentData.proof_reference}
+            onChange={(e) => setPaymentData({ ...paymentData, proof_reference: e.target.value })}
             sx={{ mb: 2 }}
           />
           <TextField
@@ -303,19 +324,12 @@ const InspectionPayment = () => {
             label="Phone used (optional)"
             value={paymentData.phone_number}
             onChange={(e) => setPaymentData({ ...paymentData, phone_number: e.target.value })}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            label="Reference (optional)"
-            value={paymentData.payment_reference}
-            onChange={(e) => setPaymentData({ ...paymentData, payment_reference: e.target.value })}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handlePaymentSubmit} disabled={submitting}>
-            {submitting ? <CircularProgress size={22} /> : 'Submit confirmation'}
+          <Button variant="contained" onClick={handleManualSubmit} disabled={submitting}>
+            {submitting ? <CircularProgress size={22} /> : 'Submit proof'}
           </Button>
         </DialogActions>
       </Dialog>

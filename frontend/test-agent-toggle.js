@@ -4,7 +4,7 @@
 
 const axios = require('axios');
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend.onrender.com/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
 
 // Test configuration - Admin credentials
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'carryitadmin@gmail.com';

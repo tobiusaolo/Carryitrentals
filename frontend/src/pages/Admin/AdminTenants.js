@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import adminAPI from '../../services/api/adminAPI';
+import { tenantAPI } from '../../services/api/tenantAPI';
 import DataTable from '../../components/UI/DataTable';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
@@ -53,6 +54,8 @@ const AdminTenants = () => {
   const [editingTenant, setEditingTenant] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
+  const [pendingScreening, setPendingScreening] = useState([]);
+  const [screeningBusy, setScreeningBusy] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -70,10 +73,67 @@ const AdminTenants = () => {
   useEffect(() => {
     if (user?.role === 'admin') {
       loadTenants();
-      loadProperties();
-      loadUnits();
+      loadPropertiesAndUnits();
+      loadPendingScreening();
     }
   }, [user]);
+
+  const loadPendingScreening = async () => {
+    try {
+      const res = await tenantAPI.getPendingScreening();
+      setPendingScreening(res.data || []);
+    } catch (err) {
+      console.error('Failed to load screening queue', err);
+    }
+  };
+
+  const reviewScreening = async (tenantId, status) => {
+    setScreeningBusy(tenantId);
+    try {
+      await tenantAPI.reviewScreening(tenantId, status);
+      await loadPendingScreening();
+      await loadTenants();
+    } catch (err) {
+      setError('Failed to update screening status');
+    } finally {
+      setScreeningBusy(null);
+    }
+  };
+
+  const loadPropertiesAndUnits = async () => {
+    try {
+      const [propsData, unitsData, rentalData] = await Promise.all([
+        adminAPI.getAllProperties(0, 500),
+        adminAPI.getAllUnits(0, 500),
+        adminAPI.getAllRentalUnits(0, 500),
+      ]);
+      const propList = (Array.isArray(propsData) ? propsData : []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        address: p.address || p.location || '',
+      }));
+      setProperties(propList);
+      const propertyMap = Object.fromEntries(propList.map((p) => [String(p.id), p.name]));
+      const units = Array.isArray(unitsData) ? unitsData : [];
+      const rentals = Array.isArray(rentalData) ? rentalData : [];
+      setUnits([
+        ...units.map((u) => ({
+          id: u.id,
+          unit_number: u.unit_number,
+          property_id: u.property_id,
+          property_name: propertyMap[String(u.property_id)] || u.property?.name || 'Property',
+        })),
+        ...rentals.map((u) => ({
+          id: u.id,
+          unit_number: u.title || u.unit_number || `Rental ${u.id}`,
+          property_id: u.property_id,
+          property_name: propertyMap[String(u.property_id)] || u.property_name || 'Property',
+        })),
+      ]);
+    } catch (err) {
+      console.error('Failed to load properties/units:', err);
+    }
+  };
 
   const loadTenants = async () => {
     setLoading(true);
@@ -107,34 +167,6 @@ const AdminTenants = () => {
       setError('Failed to load tenants');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadProperties = async () => {
-    try {
-      // Mock properties data
-      const mockProperties = [
-        { id: 1, name: 'Kiwo Estates', address: 'Plot 123, Kiwo Road, Kampala' },
-        { id: 2, name: 'Sunset Apartments', address: 'Plot 456, Sunset Boulevard, Entebbe' },
-        { id: 3, name: 'Garden Villas', address: 'Plot 789, Garden Street, Entebbe' }
-      ];
-      setProperties(mockProperties);
-    } catch (err) {
-      console.error('Failed to load properties:', err);
-    }
-  };
-
-  const loadUnits = async () => {
-    try {
-      // Mock units data
-      const mockUnits = [
-        { id: 1, unit_number: '101', property_id: 1, property_name: 'Kiwo Estates' },
-        { id: 2, unit_number: '102', property_id: 1, property_name: 'Kiwo Estates' },
-        { id: 3, unit_number: '1A', property_id: 2, property_name: 'Sunset Apartments' }
-      ];
-      setUnits(mockUnits);
-    } catch (err) {
-      console.error('Failed to load units:', err);
     }
   };
 
@@ -319,6 +351,51 @@ const AdminTenants = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {pendingScreening.length > 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Screening packs to review ({pendingScreening.length})
+          </Typography>
+          {pendingScreening.map((row) => (
+            <Box
+              key={row.tenant_id}
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 1,
+                py: 1,
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="body2" sx={{ flex: 1, minWidth: 200 }}>
+                {row.tenant_name} · NIN {row.national_id} · {row.property_name} Unit {row.unit_number}
+                {row.has_nin_images ? ' · NIN photos ✓' : ' · NIN photos missing'}
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                color="success"
+                disabled={screeningBusy === row.tenant_id}
+                onClick={() => reviewScreening(row.tenant_id, 'approved')}
+              >
+                Approve
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                disabled={screeningBusy === row.tenant_id}
+                onClick={() => reviewScreening(row.tenant_id, 'rejected')}
+              >
+                Reject
+              </Button>
+            </Box>
+          ))}
         </Alert>
       )}
 

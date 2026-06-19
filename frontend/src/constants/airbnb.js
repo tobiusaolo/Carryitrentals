@@ -76,7 +76,17 @@ export const emptyAirbnbFormState = () => ({
 });
 
 export function getListingStatusMeta(status) {
-  return AIRBNB_LISTING_STATUS_OPTIONS.find((o) => o.value === status) || { label: status, value: status };
+  const key = status || 'available';
+  const base = AIRBNB_LISTING_STATUS_OPTIONS.find((o) => o.value === key) || {
+    label: key,
+    value: key,
+  };
+  const palette = {
+    available: { chipColor: '#0d7a4a', chipBg: '#e8f5ee', isAvailable: true },
+    booked: { chipColor: '#6b2d2d', chipBg: '#fce8e8', isAvailable: false },
+    unavailable: { chipColor: '#6b7280', chipBg: '#f3f4f6', isAvailable: false },
+  };
+  return { ...base, ...(palette[key] || palette.available) };
 }
 
 export function getBookingStatusMeta(status) {

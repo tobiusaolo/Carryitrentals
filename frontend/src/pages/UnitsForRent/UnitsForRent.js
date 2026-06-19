@@ -87,6 +87,7 @@ import OwnerDataTable from '../../components/Owner/OwnerDataTable';
 import TableActions from '../../components/UI/TableActions';
 import { formatMoney } from '../../utils/formatMoney';
 import { colors, ownerPrimaryButtonSx } from '../../theme/designTokens';
+import { resolveMediaUrl } from '../../config/api';
 
 const UnitsForRent = () => {
   const dispatch = useDispatch();
@@ -1040,18 +1041,10 @@ const UnitsForRent = () => {
                         // Images are stored as base64 strings in Firestore, use directly
                         // If it's not base64 (legacy file path), convert to URL
                         const getImageUrl = (img) => {
-                          // If it's already base64 or full URL, return as-is
                           if (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://')) {
                             return img;
                           }
-                          // Legacy file path - convert to URL
-                          if (img.startsWith('/')) {
-                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
-                            return `${apiBaseUrl.replace('/api/v1', '')}${img}`;
-                          }
-                          // Relative path
-                          const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
-                          return `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${img}`;
+                          return resolveMediaUrl(img);
                         };
                         const imageUrl = getImageUrl(image);
                         return (
@@ -1073,15 +1066,10 @@ const UnitsForRent = () => {
                                 <IconButton
                                   sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
                                   onClick={() => {
-                                    // Create a new window with the image
                                     const newWindow = window.open();
-                                    // Images are stored as base64, use directly or convert legacy paths
-                                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
                                     const fullImageUrl = image.startsWith('data:image/') || image.startsWith('http://') || image.startsWith('https://')
-                                      ? image 
-                                      : image.startsWith('/') 
-                                        ? `${apiBaseUrl.replace('/api/v1', '')}${image}`
-                                        : `${apiBaseUrl.replace('/api/v1', '')}/uploads/unit_images/${image}`;
+                                      ? image
+                                      : resolveMediaUrl(image);
                                     newWindow.document.write(`
                                       <html>
                                         <head><title>Unit Image ${index + 1}</title></head>

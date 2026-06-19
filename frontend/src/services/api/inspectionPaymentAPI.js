@@ -1,12 +1,20 @@
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
+import { API_BASE_URL } from '../../config/api';
 
 export const fetchPublicPaymentCheckout = (paymentId) =>
   axios.get(`${API_BASE_URL}/inspection-payments/public/${paymentId}`);
 
 export const confirmPublicPayment = (paymentId, payload) =>
   axios.post(`${API_BASE_URL}/inspection-payments/public/${paymentId}/confirm`, payload);
+
+export const submitPublicPaymentProof = (paymentId, payload) =>
+  axios.post(`${API_BASE_URL}/inspection-payments/public/${paymentId}/submit-proof`, payload);
+
+export const initiatePesapalInspectionPayment = (paymentId, billing = {}) =>
+  axios.post(`${API_BASE_URL}/pesapal/inspection/${paymentId}/initiate`, { billing });
+
+export const fetchPesapalOrderStatus = (orderTrackingId) =>
+  axios.get(`${API_BASE_URL}/pesapal/orders/${orderTrackingId}/status`);
 
 export const generateBookingPaymentQr = (bookingId, token) => {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};

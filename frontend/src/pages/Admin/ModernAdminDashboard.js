@@ -162,15 +162,15 @@ const ModernAdminDashboard = () => {
               System health
             </Typography>
             {[
-              { label: 'Uptime', value: stats.system.uptime, color: colors.success },
-              { label: 'Response', value: stats.system.response_time, suffix: 'ms', color: '#667eea', bar: Math.max(0, 100 - stats.system.response_time / 10) },
-              { label: 'Errors', value: stats.system.error_rate, suffix: '%', color: colors.error, bar: stats.system.error_rate * 10 },
+              { label: 'Active users', value: stats.system?.active_users ?? 0, suffix: '', color: colors.success, bar: Math.min(100, (stats.system?.active_users ?? 0) * 5) },
+              { label: 'Pending payments', value: stats.revenue?.pending_payments ?? 0, suffix: '', color: '#667eea', bar: Math.min(100, (stats.revenue?.pending_payments ?? 0) * 10) },
+              { label: 'Overdue rent', value: stats.revenue?.overdue_payments ?? 0, suffix: '', color: colors.error, bar: Math.min(100, (stats.revenue?.overdue_payments ?? 0) * 10) },
             ].map((row) => (
               <Box key={row.label} sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.label}</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: row.color }}>
-                    {row.value}{row.suffix || '%'}
+                    {row.value}{row.suffix}
                   </Typography>
                 </Box>
                 <LinearProgress

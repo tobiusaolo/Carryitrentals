@@ -29,16 +29,14 @@ import {
   Payment as PaymentIcon,
   Phone as PhoneIcon,
   AccountBalance as BankIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import DataTable from '../../components/UI/DataTable';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import paymentMethodAPI from '../../services/api/paymentMethodAPI';
 
 const AdminPaymentMethods = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
@@ -64,46 +62,12 @@ const AdminPaymentMethods = () => {
 
   const loadPaymentMethods = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Mock data for now - replace with actual API call
-      const mockPaymentMethods = [
-        { 
-          id: 1, 
-          name: 'MTN Mobile Money', 
-          type: 'mtn_mobile_money',
-          account_number: '256700000000',
-          account_name: 'Admin MTN',
-          bank_name: null,
-          bank_code: null,
-          is_active: true,
-          created_at: '2024-01-15T10:00:00Z'
-        },
-        { 
-          id: 2, 
-          name: 'Airtel Money', 
-          type: 'airtel_money',
-          account_number: '256700000001',
-          account_name: 'Admin Airtel',
-          bank_name: null,
-          bank_code: null,
-          is_active: true,
-          created_at: '2024-01-15T10:30:00Z'
-        },
-        { 
-          id: 3, 
-          name: 'Bank Account', 
-          type: 'bank_account',
-          account_number: '1234567890',
-          account_name: 'Admin Bank Account',
-          bank_name: 'Example Bank',
-          bank_code: '001',
-          is_active: true,
-          created_at: '2024-01-15T11:00:00Z'
-        }
-      ];
-      setPaymentMethods(mockPaymentMethods);
+      const { data } = await paymentMethodAPI.list(0, 200);
+      setPaymentMethods(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError('Failed to load payment methods');
+      setError(err.response?.data?.detail || 'Failed to load payment methods');
     } finally {
       setLoading(false);
     }
@@ -139,73 +103,52 @@ const AdminPaymentMethods = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingMethod(null);
-    setFormData({
-      name: '',
-      type: '',
-      account_number: '',
-      account_name: '',
-      bank_name: '',
-      bank_code: '',
-      is_active: true
-    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      
+      setError(null);
+      const payload = {
+        ...formData,
+        bank_name: formData.type === 'bank_account' ? formData.bank_name : null,
+        bank_code: formData.type === 'bank_account' ? formData.bank_code : null,
+      };
       if (editingMethod) {
-        // Update existing payment method
-        const updatedMethods = paymentMethods.map(method => 
-          method.id === editingMethod.id 
-            ? { ...method, ...formData }
-            : method
-        );
-        setPaymentMethods(updatedMethods);
+        await paymentMethodAPI.update(editingMethod.id, payload);
       } else {
-        // Add new payment method
-        const newMethod = {
-          id: Date.now(), // Mock ID
-          ...formData,
-          created_at: new Date().toISOString()
-        };
-        setPaymentMethods([...paymentMethods, newMethod]);
+        await paymentMethodAPI.create(payload);
       }
-      
       handleCloseDialog();
+      await loadPaymentMethods();
     } catch (err) {
-      setError('Failed to save payment method');
+      setError(err.response?.data?.detail || 'Failed to save payment method');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (methodId) => {
-    if (window.confirm('Are you sure you want to delete this payment method?')) {
-      try {
-        setLoading(true);
-        const updatedMethods = paymentMethods.filter(method => method.id !== methodId);
-        setPaymentMethods(updatedMethods);
-      } catch (err) {
-        setError('Failed to delete payment method');
-      } finally {
-        setLoading(false);
-      }
+    if (!window.confirm('Are you sure you want to delete this payment method?')) return;
+    try {
+      setLoading(true);
+      await paymentMethodAPI.remove(methodId);
+      await loadPaymentMethods();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete payment method');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleToggleActive = async (methodId) => {
+  const handleToggleActive = async (method) => {
     try {
       setLoading(true);
-      const updatedMethods = paymentMethods.map(method => 
-        method.id === methodId 
-          ? { ...method, is_active: !method.is_active }
-          : method
-      );
-      setPaymentMethods(updatedMethods);
+      await paymentMethodAPI.update(method.id, { is_active: !method.is_active });
+      await loadPaymentMethods();
     } catch (err) {
-      setError('Failed to update payment method status');
+      setError(err.response?.data?.detail || 'Failed to update payment method status');
     } finally {
       setLoading(false);
     }
@@ -294,8 +237,9 @@ const AdminPaymentMethods = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Switch
             checked={method.is_active}
-            onChange={() => handleToggleActive(method.id)}
+            onChange={() => handleToggleActive(method)}
             size="small"
+            disabled={loading}
           />
           <OwnerStatusChip status={method.is_active ? 'active' : 'inactive'} label={method.is_active ? 'Active' : 'Inactive'} />
         </Box>
@@ -306,7 +250,7 @@ const AdminPaymentMethods = () => {
       label: 'Created',
       render: (method) => (
         <Typography variant="body2" color="text.secondary">
-          {new Date(method.created_at).toLocaleDateString()}
+          {method.created_at ? new Date(method.created_at).toLocaleDateString() : '—'}
         </Typography>
       ),
     },
@@ -341,21 +285,22 @@ const AdminPaymentMethods = () => {
               Add Payment Method
             </Button>
           </Box>
-          
+
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
               {error}
             </Alert>
           )}
-          
+
           <DataTable
             columns={paymentMethodColumns}
             rows={paymentMethods}
             loading={loading}
+            getRowId={(row) => String(row.id)}
             title="Payment methods"
-            subtitle="Mobile money and bank accounts for receiving payments"
+            subtitle="Mobile money and bank accounts shown on viewing-fee checkout"
             emptyTitle="No payment methods"
-            emptyDescription="Add a payment method so tenants can pay rent and fees."
+            emptyDescription="Add a payment method so prospects can pay viewing fees manually."
             emptyIcon={PaymentIcon}
             emptyActionLabel="Add Payment Method"
             onEmptyAction={() => handleOpenDialog()}
@@ -364,7 +309,6 @@ const AdminPaymentMethods = () => {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Payment Method Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           {editingMethod ? 'Edit Payment Method' : 'Add New Payment Method'}
@@ -378,7 +322,7 @@ const AdminPaymentMethods = () => {
                   label="Payment Method Name"
                   name="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </Grid>
@@ -388,7 +332,8 @@ const AdminPaymentMethods = () => {
                   <Select
                     name="type"
                     value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+                    label="Payment Type"
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   >
                     <MenuItem value="mtn_mobile_money">MTN Mobile Money</MenuItem>
                     <MenuItem value="airtel_money">Airtel Money</MenuItem>
@@ -402,7 +347,7 @@ const AdminPaymentMethods = () => {
                   label={formData.type === 'bank_account' ? 'Account Number' : 'Phone Number'}
                   name="account_number"
                   value={formData.account_number}
-                  onChange={(e) => setFormData({...formData, account_number: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
                   required
                 />
               </Grid>
@@ -412,7 +357,7 @@ const AdminPaymentMethods = () => {
                   label="Account Holder Name"
                   name="account_name"
                   value={formData.account_name}
-                  onChange={(e) => setFormData({...formData, account_name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
                   required
                 />
               </Grid>
@@ -424,7 +369,7 @@ const AdminPaymentMethods = () => {
                       label="Bank Name"
                       name="bank_name"
                       value={formData.bank_name}
-                      onChange={(e) => setFormData({...formData, bank_name: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
                       required
                     />
                   </Grid>
@@ -434,7 +379,7 @@ const AdminPaymentMethods = () => {
                       label="Bank Code"
                       name="bank_code"
                       value={formData.bank_code}
-                      onChange={(e) => setFormData({...formData, bank_code: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, bank_code: e.target.value })}
                     />
                   </Grid>
                 </>
@@ -444,7 +389,7 @@ const AdminPaymentMethods = () => {
                   control={
                     <Switch
                       checked={formData.is_active}
-                      onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     />
                   }
                   label="Active"

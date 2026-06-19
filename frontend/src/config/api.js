@@ -1,8 +1,11 @@
+/** Production API — https://carryit-backend-su8h.onrender.com */
+export const DEPLOYED_API_BASE_URL = 'https://carryit-backend-su8h.onrender.com/api/v1';
+
 /** Normalize API URL — Render requires HTTPS; trailing slashes on base are stripped. */
 export function normalizeApiBaseUrl(url) {
   let base = String(url || '').trim();
   if (!base) {
-    base = 'https://carryit-backend-su8h.onrender.com/api/v1';
+    base = DEPLOYED_API_BASE_URL;
   }
   if (base.startsWith('http://') && base.includes('onrender.com')) {
     base = base.replace('http://', 'https://');
@@ -12,7 +15,7 @@ export function normalizeApiBaseUrl(url) {
 
 /** Shared API base URL — keep public pages and owner portal on the same backend. */
 export const API_BASE_URL = normalizeApiBaseUrl(
-  process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1'
+  process.env.REACT_APP_API_URL || DEPLOYED_API_BASE_URL
 );
 
 export function getApiOrigin() {

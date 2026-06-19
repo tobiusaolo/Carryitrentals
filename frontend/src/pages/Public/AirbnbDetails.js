@@ -44,8 +44,7 @@ import {
   buildAirbnbBookingPayload,
   canReserveListing,
 } from '../../utils/airbnbBooking';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1';
+import { API_BASE_URL } from '../../config/api';
 
 const emptyBookingForm = () => ({
   guest_name: '',
@@ -118,14 +117,17 @@ const AirbnbDetails = () => {
     try {
       setSubmitting(true);
       const bookingData = buildAirbnbBookingPayload(bookingForm, airbnb.id);
-      await axios.post(`${API_BASE_URL}/airbnb/bookings`, bookingData);
+      const { data: booking } = await axios.post(`${API_BASE_URL}/airbnb/bookings`, bookingData);
       setSnackbar({
         open: true,
-        message: 'Request sent! The host will confirm your dates. Payment is arranged after confirmation.',
+        message: 'Request sent! Pay your prepayment to confirm your stay.',
         severity: 'success',
       });
       setBookingDialog(false);
       setBookingForm(emptyBookingForm());
+      if (booking?.id && Number(booking.prepayment_amount) > 0) {
+        setTimeout(() => navigate(`/airbnb/payment/${booking.id}`), 1200);
+      }
     } catch (error) {
       const detail = error.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : 'Failed to send booking request.';

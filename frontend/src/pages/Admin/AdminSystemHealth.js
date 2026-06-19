@@ -36,137 +36,39 @@ import {
   Schedule as ScheduleIcon,
   Notifications as NotificationsIcon,
   BugReport as BugReportIcon,
-  Update as UpdateIcon
+  Update as UpdateIcon,
+  AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
+import adminAPI from '../../services/api/adminAPI';
 
 const AdminSystemHealth = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [systemHealth, setSystemHealth] = useState({
-    status: 'healthy',
-    uptime: 99.9,
-    responseTime: 120,
-    memoryUsage: 65,
-    cpuUsage: 45,
-    diskUsage: 78,
-    activeUsers: 25,
-    totalRequests: 15420,
-    errorRate: 0.2,
-    lastBackup: '2024-10-21T10:30:00Z',
-    version: '1.2.3'
-  });
-
+  const [systemHealth, setSystemHealth] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       loadSystemHealth();
-      loadAlerts();
-      loadLogs();
     }
   }, [user]);
 
   const loadSystemHealth = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Mock system health data
-      const mockHealth = {
-        status: 'healthy',
-        uptime: 99.9,
-        responseTime: 120,
-        memoryUsage: 65,
-        cpuUsage: 45,
-        diskUsage: 78,
-        activeUsers: 25,
-        totalRequests: 15420,
-        errorRate: 0.2,
-        lastBackup: '2024-10-21T10:30:00Z',
-        version: '1.2.3'
-      };
-      setSystemHealth(mockHealth);
+      const { data } = await adminAPI.getSystemHealth();
+      setSystemHealth(data);
+      setAlerts(data.alerts || []);
+      setLogs(data.logs || []);
     } catch (err) {
-      setError('Failed to load system health');
+      setError(err.response?.data?.detail || 'Failed to load system health');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadAlerts = async () => {
-    try {
-      // Mock alerts data
-      const mockAlerts = [
-        {
-          id: 1,
-          type: 'warning',
-          message: 'High memory usage detected',
-          severity: 'medium',
-          timestamp: '2024-10-21T12:00:00Z',
-          resolved: false
-        },
-        {
-          id: 2,
-          type: 'info',
-          message: 'Database backup completed successfully',
-          severity: 'low',
-          timestamp: '2024-10-21T10:30:00Z',
-          resolved: true
-        },
-        {
-          id: 3,
-          type: 'error',
-          message: 'Failed login attempts exceeded threshold',
-          severity: 'high',
-          timestamp: '2024-10-21T11:45:00Z',
-          resolved: false
-        }
-      ];
-      setAlerts(mockAlerts);
-    } catch (err) {
-      console.error('Failed to load alerts:', err);
-    }
-  };
-
-  const loadLogs = async () => {
-    try {
-      // Mock logs data
-      const mockLogs = [
-        {
-          id: 1,
-          level: 'INFO',
-          message: 'User admin@example.com logged in',
-          timestamp: '2024-10-21T12:05:00Z',
-          source: 'auth'
-        },
-        {
-          id: 2,
-          level: 'WARNING',
-          message: 'High response time detected for /api/v1/properties',
-          timestamp: '2024-10-21T12:03:00Z',
-          source: 'api'
-        },
-        {
-          id: 3,
-          level: 'ERROR',
-          message: 'Database connection timeout',
-          timestamp: '2024-10-21T12:01:00Z',
-          source: 'database'
-        },
-        {
-          id: 4,
-          level: 'INFO',
-          message: 'System backup completed',
-          timestamp: '2024-10-21T10:30:00Z',
-          source: 'backup'
-        }
-      ];
-      setLogs(mockLogs);
-    } catch (err) {
-      console.error('Failed to load logs:', err);
     }
   };
 
@@ -217,6 +119,18 @@ const AdminSystemHealth = () => {
     );
   }
 
+  if (loading && !systemHealth) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!systemHealth) {
+    return null;
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -225,7 +139,7 @@ const AdminSystemHealth = () => {
       </Typography>
       
       <Typography variant="body1" color="text.secondary" paragraph>
-        Monitor system performance, health metrics, and security alerts.
+        Operational health from live payment, maintenance, and booking counts.
       </Typography>
 
       {error && (
@@ -263,42 +177,33 @@ const AdminSystemHealth = () => {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <SpeedIcon />
+                  <NetworkIcon />
                 </Avatar>
                 <Box>
-                  <Typography variant="h5">Uptime</Typography>
+                  <Typography variant="h5">Active users</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    System availability
+                    Registered accounts on platform
                   </Typography>
                 </Box>
               </Box>
-              <Typography variant="h4" color="success.main">
-                {systemHealth.uptime}%
+              <Typography variant="h4" color="primary.main">
+                {systemHealth.active_users} / {systemHealth.total_users}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Performance Metrics */}
+      {/* Operational Metrics */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <SpeedIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Response Time
-                </Typography>
+                <MoneyIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">Pending payments</Typography>
               </Box>
-              <Typography variant="h4">
-                {systemHealth.responseTime}ms
-              </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={systemHealth.responseTime / 2} 
-                sx={{ mt: 1 }}
-              />
+              <Typography variant="h4">{systemHealth.pending_payments}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -306,20 +211,12 @@ const AdminSystemHealth = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <MemoryIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Memory Usage
-                </Typography>
+                <WarningIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">Overdue rent</Typography>
               </Box>
-              <Typography variant="h4">
-                {systemHealth.memoryUsage}%
+              <Typography variant="h4" color={systemHealth.overdue_payments > 0 ? 'error.main' : 'text.primary'}>
+                {systemHealth.overdue_payments}
               </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={systemHealth.memoryUsage} 
-                color={systemHealth.memoryUsage > 80 ? 'error' : 'primary'}
-                sx={{ mt: 1 }}
-              />
             </CardContent>
           </Card>
         </Grid>
@@ -327,20 +224,10 @@ const AdminSystemHealth = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <StorageIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Disk Usage
-                </Typography>
+                <ScheduleIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">Pending viewings</Typography>
               </Box>
-              <Typography variant="h4">
-                {systemHealth.diskUsage}%
-              </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={systemHealth.diskUsage} 
-                color={systemHealth.diskUsage > 80 ? 'error' : 'primary'}
-                sx={{ mt: 1 }}
-              />
+              <Typography variant="h4">{systemHealth.pending_inspections}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -348,14 +235,10 @@ const AdminSystemHealth = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <NetworkIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Active Users
-                </Typography>
+                <BugReportIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">Open maintenance</Typography>
               </Box>
-              <Typography variant="h4">
-                {systemHealth.activeUsers}
-              </Typography>
+              <Typography variant="h4">{systemHealth.active_maintenance}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -460,19 +343,17 @@ const AdminSystemHealth = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" color="text.secondary">
-                Last Backup: {new Date(systemHealth.lastBackup).toLocaleString()}
+                Manual proofs pending: {systemHealth.pending_manual_proofs}
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Total Requests: {systemHealth.totalRequests.toLocaleString()}
-              </Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">
-                Error Rate: {systemHealth.errorRate}%
-              </Typography>
-            </Grid>
+            {!systemHealth.infrastructure_monitored && (
+              <Grid item xs={12}>
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Server CPU, memory, and disk are not monitored in this deployment. Metrics above
+                  reflect live business operations from your database.
+                </Alert>
+              </Grid>
+            )}
           </Grid>
         </CardContent>
       </Card>

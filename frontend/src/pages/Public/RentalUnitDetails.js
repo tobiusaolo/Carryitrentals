@@ -31,6 +31,7 @@ import {
   Favorite,
   FavoriteBorder,
   Verified,
+  ContentCopy,
 } from '@mui/icons-material';
 import axios from 'axios';
 import PublicHeader from '../../components/Navigation/PublicHeader';
@@ -46,6 +47,11 @@ import DisplayPrice from '../../components/Public/DisplayPrice';
 import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
 import { convertAmount, normalizeCurrency } from '../../config/currencyLocale';
 import { getRentalStatusMeta, normalizeRentalStatus } from '../../utils/rentalStatus';
+import {
+  openWhatsAppShare,
+  copySyndicationAd,
+  copyListingUrl,
+} from '../../utils/listingShare';
 
 const normalizeUnit = (unit) => ({
   ...normalizePublicRentalUnit(unit),
@@ -77,6 +83,7 @@ const RentalUnitDetails = () => {
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [bookingResult, setBookingResult] = useState(null);
+  const [copyAdPlatform, setCopyAdPlatform] = useState('jiji');
 
   useEffect(() => {
     loadUnit();
@@ -209,9 +216,42 @@ const RentalUnitDetails = () => {
           <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)} sx={{ color: '#222', textTransform: 'none', fontWeight: 600 }}>
             Back
           </Button>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button startIcon={<Share />} sx={{ color: '#222', textTransform: 'none', fontWeight: 600 }} onClick={() => navigator.clipboard?.writeText(window.location.href)}>
-              Share
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#25D366', color: '#fff', '&:hover': { bgcolor: '#1da851' } }}
+              onClick={() => openWhatsAppShare(unit)}
+            >
+              WhatsApp
+            </Button>
+            <Button
+              startIcon={<ContentCopy />}
+              sx={{ color: '#222', textTransform: 'none', fontWeight: 600 }}
+              onClick={async () => {
+                await copySyndicationAd(unit, copyAdPlatform);
+                setSnackbar({ open: true, message: `Ad copied (${copyAdPlatform})`, severity: 'success' });
+              }}
+            >
+              Copy ad
+            </Button>
+            <TextField
+              select
+              size="small"
+              value={copyAdPlatform}
+              onChange={(e) => setCopyAdPlatform(e.target.value)}
+              sx={{ minWidth: 100 }}
+            >
+              <MenuItem value="jiji">Jiji</MenuItem>
+              <MenuItem value="facebook">Facebook</MenuItem>
+            </TextField>
+            <Button
+              startIcon={<Share />}
+              sx={{ color: '#222', textTransform: 'none', fontWeight: 600 }}
+              onClick={async () => {
+                await copyListingUrl(unit);
+                setSnackbar({ open: true, message: 'Link copied', severity: 'success' });
+              }}
+            >
+              Copy link
             </Button>
             <Button
               startIcon={saved ? <Favorite sx={{ color: '#ff385c' }} /> : <FavoriteBorder />}
@@ -225,8 +265,14 @@ const RentalUnitDetails = () => {
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
           {unit.listing_code && <Chip label={unit.listing_code} size="small" sx={{ fontWeight: 700 }} />}
-          {unit.is_verified && (
-            <Chip icon={<Verified />} label="Verified listing" color="success" size="small" sx={{ fontWeight: 700 }} />
+          {(unit.carryit_verified || unit.is_verified) && (
+            <Chip
+              icon={<Verified />}
+              label={unit.carryit_verified ? 'CarryIT Verified' : 'Verified listing'}
+              color="success"
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
           )}
           {unit.agent_verified && (
             <Chip label="NIN-verified agent" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
@@ -310,7 +356,7 @@ const RentalUnitDetails = () => {
                 <Grid container spacing={2}>
                   {similarUnits.map((u) => (
                     <Grid item xs={12} sm={6} key={u.id}>
-                      <PropertyCard property={u} onClick={() => navigate(`/rental/${u.id}`)} />
+                      <PropertyCard property={u} variant="rental" onClick={() => navigate(`/rental/${u.id}`)} />
                     </Grid>
                   ))}
                 </Grid>

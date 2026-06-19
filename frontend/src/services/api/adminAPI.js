@@ -136,13 +136,17 @@ const adminAPI = {
   // Get all inspection bookings
   getAllInspectionBookings: async (skip = 0, limit = 100) => {
     try {
-      const response = await api.get(`/inspections/?skip=${skip}&limit=${limit}`);
+      const response = await api.get(`/admin/inspection-bookings?skip=${skip}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching inspection bookings:', error);
       throw error;
     }
-  }
+  },
+
+  getAnalytics: () => api.get('/admin/analytics'),
+  getActivityLogs: (limit = 200) => api.get(`/admin/activity-logs?limit=${limit}`),
+  getSystemHealth: () => api.get('/admin/system-health'),
 };
 
 export default adminAPI;

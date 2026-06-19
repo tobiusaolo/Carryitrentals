@@ -12,11 +12,7 @@ import {
   peekCachedData,
 } from './apiCache';
 
-import { normalizeApiBaseUrl } from '../config/api';
-
-const API_BASE_URL = normalizeApiBaseUrl(
-  process.env.REACT_APP_API_URL || 'https://carryit-backend-su8h.onrender.com/api/v1'
-);
+import { API_BASE_URL } from '../config/api';
 
 /** Collection routes are registered with a trailing slash on the backend. */
 function withCollectionTrailingSlash(url = '') {
