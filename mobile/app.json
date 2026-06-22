@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "CarryIT Rentals",
+    "slug": "carryit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "carryit",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0E9F6E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.carryit.app"
+    },
+    "android": {
+      "package": "com.carryit.app",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E9F6E",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0E9F6E"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "13c4f76f-38be-4ad8-966d-ffbf0d5ea568"
+      }
+    }
+  }
+}
