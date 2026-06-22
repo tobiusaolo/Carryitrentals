@@ -80,14 +80,14 @@ const Communications = () => {
   const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
   const [openBulkMessageDialog, setOpenBulkMessageDialog] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
+  
   const [allTenants, setAllTenants] = useState([]);
   const [selectedTenants, setSelectedTenants] = useState([]);
   const [filterProperty, setFilterProperty] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-
+  
   const { properties } = useSelector((state) => state.properties);
-
+  
   const [templateForm, setTemplateForm] = useState({
     name: '',
     type: 'both',
@@ -96,7 +96,7 @@ const Communications = () => {
     body: '',
     variables: [],
   });
-
+  
   const [bulkMessageForm, setBulkMessageForm] = useState({
     recipient_type: 'all',
     method: 'sms',
@@ -122,8 +122,8 @@ const Communications = () => {
       setAllTenants(response.data);
     } catch (error) {
       console.error('Error loading tenants:', error);
-      setSnackbar({
-        open: true,
+      setSnackbar({ 
+        open: true, 
         message: 'Could not load tenants',
         severity: 'warning',
       });
@@ -164,11 +164,11 @@ const Communications = () => {
         ...bulkMessageForm,
         custom_recipients: selectedTenants.length > 0 ? selectedTenants : [],
       };
-
+      
       if (selectedTenants.length > 0) {
         messageData.recipient_type = 'custom';
       }
-
+      
       const result = await communicationsAPI.sendBulkMessage(messageData);
       setSnackbar({
         open: true,
@@ -296,15 +296,15 @@ const Communications = () => {
         variant={isAdmin ? 'admin' : 'owner'}
         title="Messages"
         action={
-          <Button
-            variant="contained"
-            startIcon={<SendIcon />}
-            onClick={() => setOpenBulkMessageDialog(true)}
-            disabled={allTenants.length === 0}
+        <Button
+          variant="contained"
+          startIcon={<SendIcon />}
+          onClick={() => setOpenBulkMessageDialog(true)}
+          disabled={allTenants.length === 0}
             sx={primaryButtonSx}
-          >
+        >
             Send SMS
-          </Button>
+        </Button>
         }
       />
 
@@ -393,9 +393,9 @@ const Communications = () => {
       >
         <Tab icon={<MessageIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Templates (${templates.length})`} />
         <Tab icon={<HistoryIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`Log (${logs.length})`} />
-      </Tabs>
+          </Tabs>
 
-      <TabPanel value={selectedTab} index={0}>
+        <TabPanel value={selectedTab} index={0}>
         {templates.length === 0 && (
           <Box
             sx={{
@@ -479,21 +479,21 @@ const Communications = () => {
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Button variant="outlined" onClick={handleSeedTemplates} disabled={loading} sx={portalOutlinedButtonSx}>
                       Seed defaults
-                    </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => setOpenTemplateDialog(true)}
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenTemplateDialog(true)}
                       sx={primaryButtonSx}
-                    >
+              >
                       New template
-                    </Button>
-                  </Box>
+              </Button>
+            </Box>
                 }
         />
-      </TabPanel>
+        </TabPanel>
 
-      <TabPanel value={selectedTab} index={1}>
+        <TabPanel value={selectedTab} index={1}>
         <DataTable
               title="Message log"
               columns={[
@@ -532,7 +532,7 @@ const Communications = () => {
               emptyActionLabel="Send SMS"
               onEmptyAction={() => setOpenBulkMessageDialog(true)}
         />
-      </TabPanel>
+        </TabPanel>
 
       {/* Send SMS dialog */}
       <Dialog
@@ -545,28 +545,28 @@ const Communications = () => {
         <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Send SMS</DialogTitle>
         <DialogContent dividers sx={{ borderColor: colors.border }}>
           <Grid container spacing={2} sx={{ pt: 0.5 }}>
-            <Grid item xs={12}>
+              <Grid item xs={12}>
               <FormSection title="Delivery" subtitle="SMS via Twilio" first>
-                <RadioGroup
-                  row
-                  value={bulkMessageForm.method}
-                  onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, method: e.target.value })}
-                >
+                  <RadioGroup
+                    row
+                    value={bulkMessageForm.method}
+                    onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, method: e.target.value })}
+                  >
                   <FormControlLabel value="sms" control={<Radio size="small" />} label="SMS" />
                   <FormControlLabel value="email" control={<Radio size="small" />} label="Email" disabled />
                   <FormControlLabel value="both" control={<Radio size="small" />} label="Both" disabled />
-                </RadioGroup>
+                  </RadioGroup>
               </FormSection>
-            </Grid>
-
-            <Grid item xs={12}>
+              </Grid>
+              
+              <Grid item xs={12}>
               <FormControl fullWidth size="small">
-                <InputLabel>Recipients</InputLabel>
-                <Select
-                  value={bulkMessageForm.recipient_type}
-                  label="Recipients"
-                  onChange={(e) => {
-                    setBulkMessageForm({ ...bulkMessageForm, recipient_type: e.target.value });
+                  <InputLabel>Recipients</InputLabel>
+                  <Select
+                    value={bulkMessageForm.recipient_type}
+                    label="Recipients"
+                    onChange={(e) => {
+                      setBulkMessageForm({ ...bulkMessageForm, recipient_type: e.target.value });
                     if (e.target.value !== 'custom') setSelectedTenants([]);
                   }}
                 >
@@ -574,52 +574,52 @@ const Communications = () => {
                   <MenuItem value="status">By rent status</MenuItem>
                   <MenuItem value="property">By property</MenuItem>
                   <MenuItem value="custom">Pick individuals</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {bulkMessageForm.recipient_type === 'status' && (
-              <Grid item xs={12}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Rent status</InputLabel>
-                  <Select
-                    value={bulkMessageForm.status_filter || ''}
-                    label="Rent status"
-                    onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, status_filter: e.target.value })}
-                  >
-                    <MenuItem value="paid">Paid ({recipientGroups.paid?.count || 0})</MenuItem>
-                    <MenuItem value="due">Due ({recipientGroups.due?.count || 0})</MenuItem>
-                    <MenuItem value="overdue">Overdue ({recipientGroups.overdue?.count || 0})</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-            )}
 
-            {bulkMessageForm.recipient_type === 'property' && (
-              <Grid item xs={12}>
+              {bulkMessageForm.recipient_type === 'status' && (
+                <Grid item xs={12}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Rent status</InputLabel>
+                    <Select
+                      value={bulkMessageForm.status_filter || ''}
+                    label="Rent status"
+                      onChange={(e) => setBulkMessageForm({ ...bulkMessageForm, status_filter: e.target.value })}
+                    >
+                      <MenuItem value="paid">Paid ({recipientGroups.paid?.count || 0})</MenuItem>
+                      <MenuItem value="due">Due ({recipientGroups.due?.count || 0})</MenuItem>
+                      <MenuItem value="overdue">Overdue ({recipientGroups.overdue?.count || 0})</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+
+              {bulkMessageForm.recipient_type === 'property' && (
+                <Grid item xs={12}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Property</InputLabel>
-                  <Select
-                    value={bulkMessageForm.property_id || ''}
+                    <Select
+                      value={bulkMessageForm.property_id || ''}
                     label="Property"
                     onChange={(e) =>
                       setBulkMessageForm({ ...bulkMessageForm, property_id: e.target.value || null })
                     }
-                    disabled={properties.length === 0}
-                  >
+                      disabled={properties.length === 0}
+                    >
                     <MenuItem value="">Select property</MenuItem>
-                    {properties.map((property) => (
-                      <MenuItem key={property.id} value={property.id}>
+                      {properties.map((property) => (
+                        <MenuItem key={property.id} value={property.id}>
                         {property.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
 
-            {bulkMessageForm.recipient_type === 'custom' && (
-              <Grid item xs={12}>
+              {bulkMessageForm.recipient_type === 'custom' && (
+                <Grid item xs={12}>
                 <Paper
                   variant="outlined"
                   sx={{
@@ -641,77 +641,77 @@ const Communications = () => {
                   >
                     <Typography variant="caption" sx={{ fontWeight: 600 }}>
                       {selectedTenants.length} selected
-                    </Typography>
+                      </Typography>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Button size="small" onClick={handleSelectAll} sx={{ textTransform: 'none', fontWeight: 600 }}>
                         All ({getFilteredTenants().length})
-                      </Button>
+                        </Button>
                       <Button size="small" onClick={handleDeselectAll} color="inherit" sx={{ textTransform: 'none' }}>
                         Clear
-                      </Button>
+                        </Button>
+                      </Box>
                     </Box>
-                  </Box>
-
+                    
                   <Grid container spacing={1.5} sx={{ p: 2, pb: 1 }}>
-                    <Grid item xs={6}>
-                      <FormControl fullWidth size="small">
+                      <Grid item xs={6}>
+                        <FormControl fullWidth size="small">
                         <InputLabel>Property</InputLabel>
-                        <Select
-                          value={filterProperty}
+                          <Select
+                            value={filterProperty}
                           label="Property"
-                          onChange={(e) => setFilterProperty(e.target.value)}
-                        >
+                            onChange={(e) => setFilterProperty(e.target.value)}
+                          >
                           <MenuItem value="">All</MenuItem>
-                          {properties.map((property) => (
+                            {properties.map((property) => (
                             <MenuItem key={property.id} value={property.id}>
                               {property.name}
                             </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <FormControl fullWidth size="small">
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <FormControl fullWidth size="small">
                         <InputLabel>Status</InputLabel>
-                        <Select
-                          value={filterStatus}
+                          <Select
+                            value={filterStatus}
                           label="Status"
-                          onChange={(e) => setFilterStatus(e.target.value)}
-                        >
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                          >
                           <MenuItem value="">All</MenuItem>
-                          <MenuItem value="paid">Paid</MenuItem>
-                          <MenuItem value="due">Due</MenuItem>
-                          <MenuItem value="overdue">Overdue</MenuItem>
-                          <MenuItem value="pending">Pending</MenuItem>
-                        </Select>
-                      </FormControl>
+                            <MenuItem value="paid">Paid</MenuItem>
+                            <MenuItem value="due">Due</MenuItem>
+                            <MenuItem value="overdue">Overdue</MenuItem>
+                            <MenuItem value="pending">Pending</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
                     </Grid>
-                  </Grid>
-
+                    
                   <Box sx={{ maxHeight: 260, overflow: 'auto' }}>
                     <List dense disablePadding>
-                      {getFilteredTenants().map((tenant, index) => (
-                        <React.Fragment key={tenant.id}>
+                        {getFilteredTenants().map((tenant, index) => (
+                          <React.Fragment key={tenant.id}>
                           <ListItemButton
-                            onClick={() => handleToggleTenant(tenant.id)}
+                              onClick={() => handleToggleTenant(tenant.id)}
                             selected={selectedTenants.includes(tenant.id)}
-                            sx={{
+                              sx={{
                               py: 0.75,
                               '&.Mui-selected': { bgcolor: colors.brandSoft },
                               '&.Mui-selected:hover': { bgcolor: alpha(colors.brand, 0.12) },
-                            }}
-                          >
+                              }}
+                            >
                             <ListItemIcon sx={{ minWidth: 36 }}>
-                              <Checkbox
-                                edge="start"
+                                <Checkbox
+                                  edge="start"
                                 size="small"
-                                checked={selectedTenants.includes(tenant.id)}
-                                tabIndex={-1}
-                                disableRipple
-                              />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={`${tenant.first_name} ${tenant.last_name}`}
+                                  checked={selectedTenants.includes(tenant.id)}
+                                  tabIndex={-1}
+                                  disableRipple
+                                />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={`${tenant.first_name} ${tenant.last_name}`}
                               secondary={tenant.phone || 'No phone'}
                               primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
                               secondaryTypographyProps={{ variant: 'caption' }}
@@ -720,23 +720,23 @@ const Communications = () => {
                               <OwnerStatusChip status={tenant.rent_payment_status} />
                             )}
                           </ListItemButton>
-                          {index < getFilteredTenants().length - 1 && <Divider />}
-                        </React.Fragment>
-                      ))}
-                      {getFilteredTenants().length === 0 && (
+                            {index < getFilteredTenants().length - 1 && <Divider />}
+                          </React.Fragment>
+                        ))}
+                        {getFilteredTenants().length === 0 && (
                         <Box sx={{ py: 3, textAlign: 'center' }}>
                           <Typography variant="caption" color="text.secondary">
                             No tenants match filters
                           </Typography>
                         </Box>
-                      )}
-                    </List>
-                  </Box>
-                </Paper>
-              </Grid>
-            )}
+                        )}
+                      </List>
+                    </Box>
+                  </Paper>
+                </Grid>
+              )}
 
-            <Grid item xs={12}>
+              <Grid item xs={12}>
               <FormSection title="Message">
                 <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                   <InputLabel>Template (optional)</InputLabel>
@@ -780,20 +780,20 @@ const Communications = () => {
                   placeholder="Hi {tenant_name}, your rent of {amount} is due {due_date}."
                 />
               </FormSection>
+              </Grid>
             </Grid>
-          </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
           <Typography variant="caption" sx={{ color: colors.textMuted, fontWeight: 600 }}>
             {recipientPreview()}
-          </Typography>
+            </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button onClick={() => setOpenBulkMessageDialog(false)} sx={portalOutlinedButtonSx} variant="outlined">
               Cancel
             </Button>
-            <Button
-              variant="contained"
-              onClick={handleSendBulkMessage}
+          <Button
+            variant="contained"
+            onClick={handleSendBulkMessage}
               disabled={
                 loading ||
                 !bulkMessageForm.custom_message ||
@@ -803,7 +803,7 @@ const Communications = () => {
               sx={primaryButtonSx}
             >
               {loading ? 'Sending…' : 'Send'}
-            </Button>
+          </Button>
           </Box>
         </DialogActions>
       </Dialog>
@@ -819,66 +819,66 @@ const Communications = () => {
         <DialogTitle sx={{ fontWeight: 700 }}>New template</DialogTitle>
         <DialogContent dividers sx={{ borderColor: colors.border }}>
           <Grid container spacing={2} sx={{ pt: 0.5 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
                 size="small"
                 label="Name"
-                value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={6}>
+                  value={templateForm.name}
+                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={6}>
               <FormControl fullWidth size="small">
-                <InputLabel>Type</InputLabel>
-                <Select
-                  value={templateForm.type}
-                  label="Type"
-                  onChange={(e) => setTemplateForm({ ...templateForm, type: e.target.value })}
-                >
-                  <MenuItem value="sms">SMS</MenuItem>
+                  <InputLabel>Type</InputLabel>
+                  <Select
+                    value={templateForm.type}
+                    label="Type"
+                    onChange={(e) => setTemplateForm({ ...templateForm, type: e.target.value })}
+                  >
+                    <MenuItem value="sms">SMS</MenuItem>
                   <MenuItem value="email">Email</MenuItem>
-                  <MenuItem value="both">Both</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
+                    <MenuItem value="both">Both</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6}>
               <FormControl fullWidth size="small">
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={templateForm.category}
-                  label="Category"
-                  onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
-                >
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={templateForm.category}
+                    label="Category"
+                    onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
+                  >
                   <MenuItem value="rent_reminder">Rent reminder</MenuItem>
                   <MenuItem value="lease_expiry">Lease expiry</MenuItem>
                   <MenuItem value="payment_confirmation">Payment confirmation</MenuItem>
                   <MenuItem value="overdue_notice">Overdue notice</MenuItem>
-                  <MenuItem value="maintenance">Maintenance</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
+                    <MenuItem value="maintenance">Maintenance</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
                 size="small"
                 label="Subject (email)"
-                value={templateForm.subject}
-                onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
+                  value={templateForm.subject}
+                  onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
                 label="Body"
-                multiline
+                  multiline
                 minRows={5}
-                value={templateForm.body}
-                onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
+                  value={templateForm.body}
+                  onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
                 helperText="Variables: {tenant_name}, {amount}, {due_date}, {unit_number}"
-              />
+                />
+              </Grid>
             </Grid>
-          </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setOpenTemplateDialog(false)} sx={portalOutlinedButtonSx} variant="outlined">
