@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   AppBar,
@@ -29,6 +29,8 @@ import PortalNavTitle from './PortalNavTitle';
 import authService from '../../services/authService';
 import { PageMetaProvider, usePageMeta } from '../../contexts/PageMetaContext';
 import { ADMIN_ROUTE_META, colors, layout } from '../../theme/designTokens';
+import { triggerAdminRefresh } from '../../utils/adminRefresh';
+import useAdminNavBadges from '../../hooks/useAdminNavBadges';
 
 const drawerWidth = layout.adminSidebarWidth;
 const toolbarHeight = 64;
@@ -37,12 +39,16 @@ const AdminLayoutChrome = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useSelector((state) => state.auth);
   const { meta } = usePageMeta();
+  const { refresh: refreshBadges } = useAdminNavBadges(Boolean(user));
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadUnreadCount = async () => {
     try {
@@ -61,6 +67,13 @@ const AdminLayoutChrome = () => {
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  const handleSoftRefresh = async () => {
+    setRefreshing(true);
+    triggerAdminRefresh();
+    await Promise.all([loadUnreadCount(), refreshBadges()]);
+    setTimeout(() => setRefreshing(false), 400);
+  };
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: colors.surfaceMuted }}>
@@ -92,14 +105,20 @@ const AdminLayoutChrome = () => {
               title={meta?.title || 'Admin'}
               subtitle={meta?.subtitle}
               meta={meta?.meta}
+              pathname={location.pathname.startsWith('/admin') ? location.pathname : null}
             />
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-            <IconButton size="small" onClick={() => window.location.reload()} aria-label="Refresh page">
-              <Refresh fontSize="small" />
+            <IconButton
+              size="small"
+              onClick={handleSoftRefresh}
+              disabled={refreshing}
+              aria-label="Refresh data"
+            >
+              <Refresh fontSize="small" sx={refreshing ? { animation: 'spin 0.8s linear infinite', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } } : {}} />
             </IconButton>
-            <IconButton size="small" onClick={() => (window.location.href = '/admin/notifications')}>
+            <IconButton size="small" onClick={() => navigate('/admin/notifications')}>
               <Badge badgeContent={unreadCount} color="error">
                 <NotificationsIcon fontSize="small" />
               </Badge>
@@ -124,7 +143,7 @@ const AdminLayoutChrome = () => {
           minHeight: `calc(100vh - ${toolbarHeight}px)`,
         }}
       >
-        <Box sx={{ px: { xs: 2, md: 2.5 }, py: 2.5, maxWidth: layout.adminMaxWidth, mx: 'auto', width: '100%' }}>
+        <Box sx={{ px: { xs: 1.5, sm: 2, md: 2.5 }, py: { xs: 2, md: 2.5 }, maxWidth: layout.adminMaxWidth, mx: 'auto', width: '100%', minWidth: 0 }}>
           <Outlet />
         </Box>
       </Box>
@@ -140,7 +159,7 @@ const AdminLayoutChrome = () => {
           <Typography variant="caption" color="text.secondary">Administrator</Typography>
         </Box>
         <Divider />
-        <MenuItem onClick={() => { setAnchorEl(null); window.location.href = '/admin/settings'; }}>
+        <MenuItem onClick={() => { setAnchorEl(null); navigate('/admin/settings'); }}>
           <Settings sx={{ mr: 1, fontSize: 18 }} /> Settings
         </MenuItem>
         <MenuItem onClick={() => { dispatch(logout()); setAnchorEl(null); }} sx={{ color: colors.error }}>

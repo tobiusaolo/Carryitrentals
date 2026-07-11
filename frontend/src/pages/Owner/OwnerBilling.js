@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -19,26 +19,22 @@ import {
   AccountBalanceWallet,
   Verified,
   HomeWork,
-  Nightlight,
   Schedule,
   InfoOutlined,
 } from '@mui/icons-material';
+import { Link as RouterLink } from 'react-router-dom';
 import PageHeader from '../../components/UI/PageHeader';
 import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
-import OwnerStatCard from '../../components/Owner/OwnerStatCard';
-import OwnerDataTable from '../../components/Owner/OwnerDataTable';
+import OwnerStatStrip from '../../components/Owner/OwnerStatStrip';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
-import TableActions from '../../components/UI/TableActions';
-import EmptyState from '../../components/UI/EmptyState';
 import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
-import { subscriptionAPI, walletAPI, paymentIntentAPI } from '../../services/api/subscriptionAPI';
+import { subscriptionAPI, walletAPI } from '../../services/api/subscriptionAPI';
 import { formatMoney } from '../../utils/formatMoney';
 import {
   colors,
   layout,
   ownerPrimaryButtonSx,
   portalOutlinedButtonSx,
-  ownerTablePaperSx,
 } from '../../theme/designTokens';
 
 const POPULAR_SLUG = 'pro';
@@ -163,7 +159,6 @@ const OwnerBilling = () => {
   const [plans, setPlans] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [wallet, setWallet] = useState(null);
-  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState('');
@@ -172,7 +167,7 @@ const OwnerBilling = () => {
 
   useRegisterPageMeta({
     title: 'Billing & subscription',
-    subtitle: 'Your plan, Airbnb wallet, and tenant payment approvals',
+    subtitle: 'Your plan and Airbnb wallet',
   });
 
   const load = useCallback(async (silent = false) => {
@@ -181,17 +176,15 @@ const OwnerBilling = () => {
       else setLoading(true);
       setError(null);
 
-      const [plansRes, subRes, walletRes, pendingRes] = await Promise.all([
+      const [plansRes, subRes, walletRes] = await Promise.all([
         subscriptionAPI.getPlans(),
         subscriptionAPI.getMySubscription(),
         walletAPI.getMyWallet(),
-        paymentIntentAPI.listPending(),
       ]);
 
       setPlans(plansRes.data || []);
       setSubscription(subRes.data);
       setWallet(walletRes.data);
-      setPending(pendingRes.data || []);
     } catch (e) {
       setError(e.response?.data?.detail || 'Could not load billing');
     } finally {
@@ -223,26 +216,6 @@ const OwnerBilling = () => {
     }
   };
 
-  const approve = async (id) => {
-    try {
-      await paymentIntentAPI.approve(id);
-      await load(true);
-      setMessage('Rent payment approved and recorded on the tenant account.');
-    } catch (e) {
-      setError(e.response?.data?.detail || 'Approval failed');
-    }
-  };
-
-  const rentPending = useMemo(
-    () => pending.filter((p) => p.category === 'rent'),
-    [pending]
-  );
-
-  const otherPending = useMemo(
-    () => pending.filter((p) => p.category !== 'rent'),
-    [pending]
-  );
-
   const periodEndLabel = subscription?.current_period_end
     ? new Date(subscription.current_period_end).toLocaleDateString(undefined, {
         day: 'numeric',
@@ -250,48 +223,6 @@ const OwnerBilling = () => {
         year: 'numeric',
       })
     : '—';
-
-  const pendingColumns = [
-    {
-      id: 'amount',
-      label: 'Amount',
-      render: (p) => (
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {formatMoney(p.amount, p.currency || 'UGX')}
-        </Typography>
-      ),
-    },
-    {
-      id: 'reference',
-      label: 'Reference',
-      render: (p) => (
-        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: colors.textMuted }}>
-          {p.proof_reference || '—'}
-        </Typography>
-      ),
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      render: (p) => <OwnerStatusChip status={p.status} />,
-    },
-    {
-      id: 'actions',
-      label: '',
-      align: 'right',
-      render: (p) => (
-        <TableActions
-          actions={[
-            {
-              icon: <CheckCircle fontSize="small" />,
-              label: 'Approve payment',
-              onClick: () => approve(p.id),
-            },
-          ]}
-        />
-      ),
-    },
-  ];
 
   if (loading) {
     return (
@@ -332,48 +263,52 @@ const OwnerBilling = () => {
         </Alert>
       )}
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            variantIndex={0}
-            icon={<ReceiptLong />}
-            title="Current plan"
-            value={subscription?.is_active ? subscription.plan?.name || 'Active' : 'None'}
-            subtitle={
-              subscription?.is_active
-                ? `${subscription.status || 'active'} · renews ${periodEndLabel}`
-                : 'Choose a plan below to publish listings'
-            }
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            variantIndex={1}
-            icon={<Schedule />}
-            title="Days remaining"
-            value={subscription?.is_active ? String(subscription.days_remaining ?? 0) : '—'}
-            subtitle={subscription?.is_active ? 'On your billing period' : 'Subscribe to unlock features'}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            variantIndex={2}
-            icon={<AccountBalanceWallet />}
-            title="Airbnb wallet"
-            value={formatMoney(wallet?.balance ?? 0, wallet?.currency || 'UGX')}
-            subtitle="Short-stay payouts after platform fee"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            variantIndex={0}
-            icon={<Payment />}
-            title="Pending approvals"
-            value={String(rentPending.length)}
-            subtitle="Tenant rent proofs awaiting you"
-          />
-        </Grid>
-      </Grid>
+      <Alert
+        severity="info"
+        sx={{ mb: 3, borderRadius: `${layout.radius.sm}px` }}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            component={RouterLink}
+            to="/owner/property-hub?tab=payments"
+          >
+            Review proofs
+          </Button>
+        }
+      >
+        Tenant rent proof approvals live under <strong>Property hub → Payments</strong>. Approve manual proofs there
+        when tenants pay outside Pesapal.
+      </Alert>
+
+      <OwnerStatStrip
+        sx={{ mb: 3 }}
+        stats={[
+          {
+            variantIndex: 0,
+            icon: <ReceiptLong />,
+            title: 'Current plan',
+            value: subscription?.is_active ? subscription.plan?.name || 'Active' : 'None',
+            subtitle: subscription?.is_active
+              ? `${subscription.status || 'active'} · renews ${periodEndLabel}`
+              : 'Choose a plan below to publish listings',
+          },
+          {
+            variantIndex: 1,
+            icon: <Schedule />,
+            title: 'Days remaining',
+            value: subscription?.is_active ? String(subscription.days_remaining ?? 0) : '—',
+            subtitle: subscription?.is_active ? 'On your billing period' : 'Subscribe to unlock features',
+          },
+          {
+            variantIndex: 2,
+            icon: <AccountBalanceWallet />,
+            title: 'Airbnb wallet',
+            value: formatMoney(wallet?.balance ?? 0, wallet?.currency || 'UGX'),
+            subtitle: 'Short-stay payouts after platform fee',
+          },
+        ]}
+      />
 
       <Paper
         elevation={0}
@@ -395,8 +330,7 @@ const OwnerBilling = () => {
           </Typography>
           <Typography variant="caption" sx={{ color: colors.textMuted, display: 'block', lineHeight: 1.5 }}>
             Your subscription unlocks listings, viewings, and optional short stays. Tenant rent is paid directly to
-            you — it never mixes with your Airbnb wallet or platform subscription. Approve manual rent proofs below
-            when tenants pay outside Pesapal.
+            you — it never mixes with your Airbnb wallet or platform subscription.
           </Typography>
         </Box>
       </Paper>
@@ -424,7 +358,7 @@ const OwnerBilling = () => {
         Subscription plans
       </Typography>
 
-      <Grid container spacing={2} sx={{ mb: 4 }}>
+      <Grid container spacing={2}>
         {plans.map((plan) => (
           <Grid item xs={12} md={4} key={plan.id}>
             <PlanCard
@@ -436,60 +370,6 @@ const OwnerBilling = () => {
           </Grid>
         ))}
       </Grid>
-
-      <Typography
-        variant="overline"
-        sx={{
-          display: 'block',
-          color: colors.textMuted,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          mb: 1,
-        }}
-      >
-        Tenant rent awaiting approval
-      </Typography>
-      <Typography variant="body2" sx={{ color: colors.textMuted, mb: 2, maxWidth: 640 }}>
-        These payments were sent directly to you. Approving records rent on the tenant ledger — funds do not pass
-        through CarryIT.
-      </Typography>
-
-      <Box sx={ownerTablePaperSx}>
-        {rentPending.length === 0 ? (
-          <EmptyState
-            compact
-            icon={Payment}
-            title="No pending rent proofs"
-            description="When tenants submit manual payment proof, they appear here for your approval."
-          />
-        ) : (
-          <OwnerDataTable
-            columns={pendingColumns}
-            rows={rentPending}
-            searchable={false}
-            hidePaginationWhenEmpty
-          />
-        )}
-      </Box>
-
-      {otherPending.length > 0 && (
-        <Box sx={{ ...ownerTablePaperSx, mt: 3 }}>
-          <Box sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${colors.border}`, bgcolor: colors.surfaceMuted }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Nightlight sx={{ fontSize: 18, color: colors.textMuted }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Other pending items
-              </Typography>
-            </Stack>
-          </Box>
-          <OwnerDataTable
-            columns={pendingColumns.filter((c) => c.id !== 'actions')}
-            rows={otherPending}
-            searchable={false}
-            hidePaginationWhenEmpty
-          />
-        </Box>
-      )}
     </OwnerPageContainer>
   );
 };

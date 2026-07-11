@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import authService from '../services/authService';
 import { buildKey, peekCachedData } from '../services/apiCache';
+import { ADMIN_REFRESH_EVENT, OWNER_REFRESH_EVENT } from '../utils/ownerRefresh';
 
 /**
  * Cached GET for admin / owner screens.
@@ -66,8 +67,13 @@ export function useCachedQuery(url, { config = {}, enabled = true, deps = [], se
   useEffect(() => {
     mounted.current = true;
     run(false);
+    const handler = () => run(true);
+    window.addEventListener(ADMIN_REFRESH_EVENT, handler);
+    window.addEventListener(OWNER_REFRESH_EVENT, handler);
     return () => {
       mounted.current = false;
+      window.removeEventListener(ADMIN_REFRESH_EVENT, handler);
+      window.removeEventListener(OWNER_REFRESH_EVENT, handler);
     };
   }, [run]);
 
@@ -133,6 +139,13 @@ export function useCachedQueries(queries, { enabled = true, deps = [] } = {}) {
 
   useEffect(() => {
     run(false);
+    const handler = () => run(true);
+    window.addEventListener(ADMIN_REFRESH_EVENT, handler);
+    window.addEventListener(OWNER_REFRESH_EVENT, handler);
+    return () => {
+      window.removeEventListener(ADMIN_REFRESH_EVENT, handler);
+      window.removeEventListener(OWNER_REFRESH_EVENT, handler);
+    };
   }, [run]);
 
   return { data, loading, refreshing, error, refresh: () => run(true) };

@@ -45,7 +45,10 @@ import { fetchProperties } from '../../store/slices/propertySlice';
 import api from '../../services/api/api';
 import DataTable from '../../components/UI/DataTable';
 import PageHeader from '../../components/UI/PageHeader';
-import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
+import { OwnerPage } from '../../components/Owner';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
 import OwnerStatCard from '../../components/Owner/OwnerStatCard';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
@@ -71,6 +74,7 @@ const Communications = () => {
   const isAdmin = location.pathname.startsWith('/admin');
   const primaryButtonSx = isAdmin ? adminPrimaryButtonSx : ownerPrimaryButtonSx;
   const tabIndicatorColor = isAdmin ? colors.adminAccent : colors.brand;
+  const StatusChip = isAdmin ? AdminStatusChip : OwnerStatusChip;
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [templates, setTemplates] = useState([]);
@@ -314,31 +318,47 @@ const Communications = () => {
         </Alert>
       )}
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard title="Templates" value={templates.length} icon={<MessageIcon />} variantIndex={0} />
+      {isAdmin ? (
+        <AdminStatStrip
+          stats={[
+            { title: 'Templates', value: templates.length, icon: <MessageIcon /> },
+            { title: 'Sent', value: logs.length, icon: <SendIcon /> },
+            { title: 'Recipients', value: recipientGroups.all?.count || 0, icon: <PeopleIcon /> },
+            {
+              title: 'Overdue',
+              value: recipientGroups.overdue?.count || 0,
+              icon: <SmsIcon />,
+              subtitle: 'Quick-send target',
+            },
+          ]}
+        />
+      ) : (
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={6} sm={3}>
+            <OwnerStatCard title="Templates" value={templates.length} icon={<MessageIcon />} variantIndex={0} />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <OwnerStatCard title="Sent" value={logs.length} icon={<SendIcon />} variantIndex={1} />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <OwnerStatCard
+              title="Recipients"
+              value={recipientGroups.all?.count || 0}
+              icon={<PeopleIcon />}
+              variantIndex={2}
+            />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <OwnerStatCard
+              title="Overdue"
+              value={recipientGroups.overdue?.count || 0}
+              icon={<SmsIcon />}
+              variantIndex={0}
+              subtitle="Quick-send target"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard title="Sent" value={logs.length} icon={<SendIcon />} variantIndex={1} />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard
-            title="Recipients"
-            value={recipientGroups.all?.count || 0}
-            icon={<PeopleIcon />}
-            variantIndex={2}
-          />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard
-            title="Overdue"
-            value={recipientGroups.overdue?.count || 0}
-            icon={<SmsIcon />}
-            variantIndex={0}
-            subtitle="Quick-send target"
-          />
-        </Grid>
-      </Grid>
+      )}
 
       {(recipientGroups.overdue?.count || 0) > 0 && (
         <Alert
@@ -420,7 +440,7 @@ const Communications = () => {
                   {
                     id: 'type',
                     label: 'Type',
-                    render: (t) => <OwnerStatusChip status={t.type} label={t.type} />,
+                    render: (t) => <StatusChip status={t.type} label={t.type} />,
                   },
                   {
                     id: 'category',
@@ -509,7 +529,7 @@ const Communications = () => {
                 {
                   id: 'method',
                   label: 'Channel',
-                  render: (log) => <OwnerStatusChip status={log.method} label={log.method?.toUpperCase()} />,
+                  render: (log) => <StatusChip status={log.method} label={log.method?.toUpperCase()} />,
                 },
                 {
                   id: 'recipients',
@@ -521,7 +541,7 @@ const Communications = () => {
                 {
                   id: 'status',
                   label: 'Status',
-                  render: (log) => <OwnerStatusChip status={log.status} />,
+                  render: (log) => <StatusChip status={log.status} />,
                 },
               ]}
               rows={logs}
@@ -717,7 +737,7 @@ const Communications = () => {
                               secondaryTypographyProps={{ variant: 'caption' }}
                             />
                             {tenant.rent_payment_status && (
-                              <OwnerStatusChip status={tenant.rent_payment_status} />
+                              <StatusChip status={tenant.rent_payment_status} />
                             )}
                           </ListItemButton>
                             {index < getFilteredTenants().length - 1 && <Divider />}
@@ -905,10 +925,10 @@ const Communications = () => {
   );
 
   if (isAdmin) {
-    return <Box>{content}</Box>;
+    return <AdminPage>{content}</AdminPage>;
   }
 
-  return <OwnerPageContainer>{content}</OwnerPageContainer>;
+  return <OwnerPage>{content}</OwnerPage>;
 };
 
 export default Communications;

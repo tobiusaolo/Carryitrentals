@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Drawer,
@@ -11,7 +11,14 @@ import {
   Box,
   Avatar,
   alpha,
+  Badge,
+  Collapse,
+  IconButton,
 } from '@mui/material';
+import {
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+} from '@mui/icons-material';
 import logoImage from '../../assets/images/er13.png';
 import {
   Dashboard as DashboardIcon,
@@ -30,58 +37,44 @@ import {
   Description as DescriptionIcon,
   Bed as AirbnbIcon,
   MiscellaneousServices as ServicesIcon,
+  Analytics as AnalyticsIcon,
+  Report as ReportIcon,
+  Build as BuildIcon,
 } from '@mui/icons-material';
 import { colors, layout } from '../../theme/designTokens';
+import { ADMIN_NAV_SECTIONS } from '../../constants/adminNav';
+import useAdminNavBadges from '../../hooks/useAdminNavBadges';
 
 const drawerWidth = layout.adminSidebarWidth;
 
-const navSections = [
-  {
-    label: 'Overview',
-    items: [
-      { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
-      { text: 'Platform revenue', icon: <PaymentIcon />, path: '/admin/revenue' },
-    ],
-  },
-  {
-    label: 'Listings',
-    items: [
-      { text: 'Owners', icon: <BusinessIcon />, path: '/admin/owners' },
-      { text: 'Properties', icon: <HomeIcon />, path: '/admin/properties' },
-      { text: 'Units', icon: <ApartmentIcon />, path: '/admin/units' },
-      { text: 'Airbnb', icon: <AirbnbIcon />, path: '/admin/airbnb' },
-    ],
-  },
-  {
-    label: 'People',
-    items: [
-      { text: 'Agents', icon: <PersonIcon />, path: '/admin/agents' },
-      { text: 'Tenants', icon: <PeopleIcon />, path: '/admin/tenants' },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { text: 'Inspections', icon: <AssignmentIcon />, path: '/admin/inspections' },
-      { text: 'Services', icon: <ServicesIcon />, path: '/admin/additional-services' },
-      { text: 'Payment methods', icon: <PaymentIcon />, path: '/admin/payment-methods' },
-      { text: 'Viewing payments', icon: <PaymentIcon />, path: '/admin/viewing-payments' },
-      { text: 'Messages', icon: <MessageIcon />, path: '/admin/communications' },
-      { text: 'Reports', icon: <DescriptionIcon />, path: '/admin/reports' },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { text: 'Health', icon: <SecurityIcon />, path: '/admin/system' },
-      { text: 'Logs', icon: <TimelineIcon />, path: '/admin/activity' },
-      { text: 'Alerts', icon: <NotificationsIcon />, path: '/admin/notifications' },
-      { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
-    ],
-  },
-];
+const PATH_ICONS = {
+  '/admin': <DashboardIcon />,
+  '/admin/revenue': <PaymentIcon />,
+  '/admin/analytics': <AnalyticsIcon />,
+  '/admin/owners': <BusinessIcon />,
+  '/admin/properties': <HomeIcon />,
+  '/admin/internal-units': <ApartmentIcon />,
+  '/admin/listing-requests': <AssignmentIcon />,
+  '/admin/listing-reports': <ReportIcon />,
+  '/admin/payment-intents': <PaymentIcon />,
+  '/admin/maintenance': <BuildIcon />,
+  '/admin/units': <ApartmentIcon />,
+  '/admin/airbnb': <AirbnbIcon />,
+  '/admin/tenants': <PeopleIcon />,
+  '/admin/agents': <PersonIcon />,
+  '/admin/inspections': <AssignmentIcon />,
+  '/admin/viewing-payments': <PaymentIcon />,
+  '/admin/additional-services': <ServicesIcon />,
+  '/admin/communications': <MessageIcon />,
+  '/admin/reports': <DescriptionIcon />,
+  '/admin/payment-methods': <PaymentIcon />,
+  '/admin/notifications': <NotificationsIcon />,
+  '/admin/system': <SecurityIcon />,
+  '/admin/activity': <TimelineIcon />,
+  '/admin/settings': <SettingsIcon />,
+};
 
-const NavItem = ({ item, isActive, onNavigate }) => (
+const NavItem = ({ item, isActive, onNavigate, badgeCount = 0 }) => (
   <ListItem disablePadding sx={{ mb: 0.25 }}>
     <ListItemButton
       onClick={() => onNavigate(item.path)}
@@ -95,7 +88,14 @@ const NavItem = ({ item, isActive, onNavigate }) => (
       }}
     >
       <ListItemIcon sx={{ color: 'inherit', minWidth: 32 }}>
-        {React.cloneElement(item.icon, { sx: { fontSize: 18 } })}
+        <Badge
+          badgeContent={badgeCount}
+          color="error"
+          invisible={!badgeCount}
+          sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}
+        >
+          {React.cloneElement(PATH_ICONS[item.path] || <DashboardIcon />, { sx: { fontSize: 18 } })}
+        </Badge>
       </ListItemIcon>
       <ListItemText
         primary={item.text}
@@ -105,9 +105,32 @@ const NavItem = ({ item, isActive, onNavigate }) => (
   </ListItem>
 );
 
+const COLLAPSE_STORAGE_KEY = 'carryit-admin-nav-collapsed';
+
 const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { badges } = useAdminNavBadges(true);
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleSection = (label) => {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      try {
+        localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const go = (path) => {
     navigate(path);
@@ -116,7 +139,16 @@ const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: colors.surface }}>
-      <Box sx={{ px: 2.5, py: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: `1px solid ${colors.border}` }}>
+      <Box
+        sx={{
+          px: 2.5,
+          py: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          borderBottom: `1px solid ${colors.border}`,
+        }}
+      >
         <Avatar src={logoImage} alt="CarryIT" sx={{ width: 36, height: 36, borderRadius: '8px' }} variant="rounded" />
         <Box>
           <Typography variant="subtitle2" sx={{ fontWeight: 800, color: colors.text, lineHeight: 1.2 }}>
@@ -129,23 +161,40 @@ const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
       </Box>
 
       <Box sx={{ flex: 1, px: 1.5, py: 2, overflowY: 'auto' }}>
-        {navSections.map((section) => (
+        {ADMIN_NAV_SECTIONS.map((section) => {
+          const isCollapsed = Boolean(collapsedSections[section.label]);
+          return (
           <Box key={section.label} sx={{ mb: 2 }}>
-            <Typography
-              variant="caption"
+            <Box
               sx={{
-                px: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 1,
                 mb: 0.5,
-                display: 'block',
-                fontWeight: 700,
-                color: colors.textMuted,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontSize: '0.65rem',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
+              onClick={() => toggleSection(section.label)}
             >
-              {section.label}
-            </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 0.5,
+                  fontWeight: 700,
+                  color: colors.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  fontSize: '0.65rem',
+                }}
+              >
+                {section.label}
+              </Typography>
+              <IconButton size="small" sx={{ p: 0.25 }} aria-label={`Toggle ${section.label}`}>
+                {isCollapsed ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ExpandLessIcon sx={{ fontSize: 16 }} />}
+              </IconButton>
+            </Box>
+            <Collapse in={!isCollapsed}>
             <List disablePadding>
               {section.items.map((item) => (
                 <NavItem
@@ -153,11 +202,14 @@ const AdminSidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
                   item={item}
                   isActive={location.pathname === item.path}
                   onNavigate={go}
+                  badgeCount={item.badgeKey ? badges[item.badgeKey] : 0}
                 />
               ))}
             </List>
+            </Collapse>
           </Box>
-        ))}
+        );
+        })}
       </Box>
     </Box>
   );

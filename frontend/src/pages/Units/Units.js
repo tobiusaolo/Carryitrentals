@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -42,11 +42,14 @@ import {
 } from '../../store/slices/unitSlice';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import PageHeader from '../../components/UI/PageHeader';
-import { ownerPrimaryButtonSx } from '../../theme/designTokens';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import { ownerPrimaryButtonSx, adminPrimaryButtonSx } from '../../theme/designTokens';
 import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
 import OwnerStatCard from '../../components/Owner/OwnerStatCard';
 import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
 import { formatMoney } from '../../utils/formatMoney';
+import { showSuccess } from '../../utils/sweetAlert';
 
 // ── Unit-type metadata ────────────────────────────────────────────────────────
 const COMMERCIAL_TYPES = ['office', 'shop', 'warehouse', 'co_working', 'storage'];
@@ -101,8 +104,19 @@ const getStatusColor = (s) =>
 const Units = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAdmin = location.pathname.startsWith('/admin');
+  const primaryButtonSx = isAdmin ? adminPrimaryButtonSx : ownerPrimaryButtonSx;
   const { units, isLoading, error } = useSelector((s) => s.units);
   const { properties }              = useSelector((s) => s.properties);
+  const filterPropertyId = searchParams.get('property_id');
+  const filterProperty = filterPropertyId
+    ? properties.find((p) => String(p.id) === String(filterPropertyId))
+    : null;
+  const displayedUnits = filterPropertyId
+    ? units.filter((u) => String(u.property_id) === String(filterPropertyId))
+    : units;
 
   const [openDialog,  setOpenDialog]  = useState(false);
   const [editingUnit, setEditingUnit] = useState(null);
@@ -139,7 +153,10 @@ const Units = () => {
       });
     } else {
       setEditingUnit(null);
-      setFormData(emptyForm());
+      setFormData({
+        ...emptyForm(),
+        property_id: filterPropertyId || '',
+      });
     }
     setOpenDialog(true);
   };
@@ -178,10 +195,27 @@ const Units = () => {
       monthly_rent:   parseFloat(formData.monthly_rent),
     };
 
+    const becameAvailable = submitData.status === 'available'
+      && (!editingUnit || editingUnit.status !== 'available');
+
     if (editingUnit) {
-      await dispatch(updateUnit({ unitId: editingUnit.id, unitData: submitData }));
+      const result = await dispatch(updateUnit({ unitId: editingUnit.id, unitData: submitData }));
+      if (!isAdmin && updateUnit.fulfilled.match(result) && result.payload?.listing_request_submitted) {
+        showSuccess(
+          'Listing request sent',
+          'Admins were notified to publish this unit on the marketplace. Track status under Units for rent → Your listing requests.'
+        );
+      } else if (!isAdmin && becameAvailable && updateUnit.fulfilled.match(result)) {
+        showSuccess('Unit updated', 'Unit saved. A listing request is already pending or this unit is already on the marketplace.');
+      }
     } else {
-      await dispatch(createUnit(submitData));
+      const result = await dispatch(createUnit(submitData));
+      if (!isAdmin && createUnit.fulfilled.match(result) && result.payload?.listing_request_submitted) {
+        showSuccess(
+          'Listing request sent',
+          'Admins were notified to publish this unit on the marketplace. Track status under Units for rent → Your listing requests.'
+        );
+      }
     }
     handleCloseDialog();
   };
@@ -242,17 +276,28 @@ const Units = () => {
   ];
 
   const commercial = isCommercial(formData.unit_type);
+  const availableCount = displayedUnits.filter((u) => u.status === 'available').length;
+  const occupiedCount = displayedUnits.filter((u) => u.status === 'occupied').length;
+  const rentPotential = displayedUnits.reduce((sum, u) => sum + (parseFloat(u.monthly_rent) || 0), 0);
 
-  return (
-    <OwnerPageContainer>
+  const clearPropertyFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('property_id');
+    setSearchParams(next);
+  };
+
+  const pageContent = (
+    <>
       <PageHeader
-        title="Units"
+        variant={isAdmin ? 'admin' : 'owner'}
+        title={isAdmin ? 'Internal units' : 'Units'}
+        subtitle={isAdmin ? `${units.length} rooms & spaces across properties` : filterProperty ? `Units at ${filterProperty.name}` : undefined}
         action={
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => handleOpenDialog()}
-            sx={ownerPrimaryButtonSx}
+            sx={primaryButtonSx}
           >
             Add unit
           </Button>
@@ -265,38 +310,69 @@ const Units = () => {
         </Alert>
       )}
 
-      <Alert severity="info" sx={{ mb: 2 }} action={
-        <Button color="inherit" size="small" onClick={() => navigate('/owner/units-for-rent')}>
-          Units for rent
-        </Button>
-      }>
-        Units here are for property management (tenants, rent tracking). To publish on the public marketplace with photos, use <strong>Units for rent</strong>.
-      </Alert>
+      {!isAdmin && filterPropertyId && (
+        <Chip
+          label={`Showing units for ${filterProperty?.name || `property #${filterPropertyId}`}`}
+          onDelete={clearPropertyFilter}
+          color="primary"
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+      )}
 
-      {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard title="Total units" value={units.length} icon={<Apartment />} variantIndex={0} subtitle="All spaces" />
+      {!isAdmin && (
+        <Alert severity="info" sx={{ mb: 2 }} action={
+          <Button color="inherit" size="small" onClick={() => navigate('/owner/property-hub?tab=units-for-rent')}>
+            Units for rent
+          </Button>
+        }>
+          When you mark a unit <strong>Available</strong>, CarryIT automatically sends a listing request to admins
+          to publish it on the marketplace. Track requests under <strong>Units for rent</strong>.
+        </Alert>
+      )}
+
+      {isAdmin ? (
+        <AdminStatStrip
+          loading={isLoading}
+          stats={[
+            { title: 'Total units', value: units.length, icon: <Apartment />, subtitle: 'All spaces' },
+            { title: 'Available', value: availableCount, icon: <CheckCircle />, subtitle: 'Ready for occupancy' },
+            { title: 'Occupied', value: occupiedCount, icon: <Home />, subtitle: 'Currently rented' },
+            {
+              title: 'Rent potential',
+              value: formatMoney(rentPotential, 'UGX'),
+              icon: <AttachMoney />,
+              subtitle: 'If all units filled',
+            },
+          ]}
+        />
+      ) : (
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <OwnerStatCard title="Total units" value={displayedUnits.length} icon={<Apartment />} variantIndex={0} subtitle="All spaces" />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <OwnerStatCard title="Available" value={availableCount} icon={<CheckCircle />} variantIndex={1} subtitle="Ready for occupancy" />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <OwnerStatCard title="Occupied" value={occupiedCount} icon={<Home />} variantIndex={2} subtitle="Currently rented" />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <OwnerStatCard
+              title="Rent potential"
+              value={formatMoney(rentPotential, 'UGX')}
+              icon={<AttachMoney />}
+              variantIndex={0}
+              subtitle="If all units filled"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard title="Available" value={units.filter((u) => u.status === 'available').length} icon={<CheckCircle />} variantIndex={1} subtitle="Ready for occupancy" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard title="Occupied"  value={units.filter((u) => u.status === 'occupied').length}  icon={<Home />}        variantIndex={2} subtitle="Currently rented" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            title="Rent potential"
-            value={formatMoney(units.reduce((sum, u) => sum + (parseFloat(u.monthly_rent) || 0), 0), 'UGX')}
-            icon={<AttachMoney />} variantIndex={0} subtitle="If all units filled"
-          />
-        </Grid>
-      </Grid>
+      )}
 
       <OwnerDataGrid
-        rows={units} columns={columns} loading={isLoading}
+        rows={displayedUnits} columns={columns} loading={isLoading}
         emptyTitle="No units yet"
-        emptyDescription="Add units to your properties to start managing tenants and rent."
+        emptyDescription={isAdmin ? 'Add internal units to properties for tenant and rent tracking.' : 'Add units to your properties to start managing tenants and rent.'}
         emptyIcon={Apartment} emptyActionLabel="Add unit" onEmptyAction={() => handleOpenDialog()}
       />
 
@@ -450,8 +526,14 @@ const Units = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </OwnerPageContainer>
+    </>
   );
+
+  if (isAdmin) {
+    return <AdminPage>{pageContent}</AdminPage>;
+  }
+
+  return <OwnerPageContainer>{pageContent}</OwnerPageContainer>;
 };
 
 export default Units;

@@ -53,8 +53,13 @@ import { showSuccess, showError, showConfirm, showLoading, showWarning, closeAle
 import adminAPI from '../../services/api/adminAPI';
 import { propertyAPI } from '../../services/api/propertyAPI';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import { formatMoney } from '../../utils/formatMoney';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
 
 const AdminPropertyOwners = () => {
   const dispatch = useDispatch();
@@ -294,53 +299,17 @@ const AdminPropertyOwners = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon, color, subtitle, trend, trendValue }) => (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Avatar sx={{ bgcolor: color, mr: 2 }}>
-            {icon}
-          </Avatar>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h4" component="div">
-              {value}
-            </Typography>
-            <Typography color="text.secondary" variant="body2">
-              {title}
-            </Typography>
-            {subtitle && (
-              <Typography variant="caption" color="text.secondary">
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-          {trend && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {trend === 'up' ? (
-                <TrendingUpIcon color="success" />
-              ) : (
-                <TrendingDownIcon color="error" />
-              )}
-              <Typography variant="body2" color={trend === 'up' ? 'success.main' : 'error.main'}>
-                {trendValue}%
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      </CardContent>
-    </Card>
-  );
-
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
+
+  const totalProperties = propertyOwners.reduce((sum, owner) => sum + owner.totalProperties, 0);
+  const totalUnits = propertyOwners.reduce((sum, owner) => sum + owner.totalUnits, 0);
+  const totalPortfolioRent = propertyOwners.reduce((sum, owner) => sum + owner.monthlyRevenue, 0);
 
   const ownerColumns = [
     {
@@ -420,7 +389,7 @@ const AdminPropertyOwners = () => {
       label: 'Monthly Revenue',
       render: (owner) => (
         <Typography variant="body2" fontWeight="bold" color="success.main">
-          ${owner.monthlyRevenue.toLocaleString()}
+          {formatMoney(owner.monthlyRevenue, 'UGX')}
         </Typography>
       ),
     },
@@ -438,7 +407,7 @@ const AdminPropertyOwners = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (owner) => <OwnerStatusChip status={owner.status} />,
+      render: (owner) => <AdminStatusChip status={owner.status} />,
     },
     {
       id: 'actions',
@@ -457,15 +426,8 @@ const AdminPropertyOwners = () => {
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Property Owners Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Overview of all property owners, their properties, and high-level performance metrics.
-      </Typography>
+    <AdminPage>
+      <PageHeader variant="admin" title="Owners" subtitle="Property owner accounts" />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -473,45 +435,21 @@ const AdminPropertyOwners = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Owners"
-            value={propertyOwners.length}
-            icon={<BusinessIcon />}
-            color="primary.main"
-            subtitle="Active property owners"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Properties"
-            value={propertyOwners.reduce((sum, owner) => sum + owner.totalProperties, 0)}
-            icon={<HomeIcon />}
-            color="info.main"
-            subtitle="Across all owners"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Units"
-            value={propertyOwners.reduce((sum, owner) => sum + owner.totalUnits, 0)}
-            icon={<ApartmentIcon />}
-            color="warning.main"
-            subtitle="Managed units"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Portfolio rent (monthly)"
-            value={`UGX ${propertyOwners.reduce((sum, owner) => sum + owner.monthlyRevenue, 0).toLocaleString()}`}
-            icon={<MoneyIcon />}
-            color="success.main"
-            subtitle="Landlord rent inventory"
-          />
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { id: 'owners', title: 'Total owners', value: propertyOwners.length, icon: <BusinessIcon /> },
+          { id: 'properties', title: 'Total properties', value: totalProperties, icon: <HomeIcon /> },
+          { id: 'units', title: 'Total units', value: totalUnits, icon: <ApartmentIcon /> },
+          {
+            id: 'rent',
+            title: 'Portfolio rent (monthly)',
+            value: formatMoney(totalPortfolioRent, 'UGX'),
+            subtitle: 'Landlord rent inventory',
+            icon: <MoneyIcon />,
+          },
+        ]}
+      />
 
       <DataTable
         columns={ownerColumns}
@@ -598,7 +536,7 @@ const AdminPropertyOwners = () => {
                                 {property.occupied}/{property.units} units occupied
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                ${property.revenue.toLocaleString()}/month revenue
+                                {formatMoney(property.revenue, 'UGX')}/month revenue
                               </Typography>
                             </Box>
                           }
@@ -632,7 +570,9 @@ const AdminPropertyOwners = () => {
                       <Card variant="outlined">
                         <CardContent>
                           <Typography variant="subtitle2" color="text.secondary">Monthly Revenue</Typography>
-                          <Typography variant="h4" color="success.main">${selectedOwner.monthlyRevenue.toLocaleString()}</Typography>
+                          <Typography variant="h4" color="success.main">
+                            {formatMoney(selectedOwner.monthlyRevenue, 'UGX')}
+                          </Typography>
                         </CardContent>
                       </Card>
                     </Grid>
@@ -755,7 +695,7 @@ const AdminPropertyOwners = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

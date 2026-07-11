@@ -45,7 +45,11 @@ import {
   PieChart,
 } from '@mui/icons-material';
 import DataTable from '../../components/UI/DataTable';
+import PageHeader from '../../components/UI/PageHeader';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import { OwnerPage, OwnerStatStrip } from '../../components/Owner';
+import { ownerPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
+import useOwnerSoftRefresh from '../../hooks/useOwnerSoftRefresh';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { formatMoney } from '../../utils/formatMoney';
 
@@ -272,28 +276,35 @@ const Analytics = () => {
     subtitle: 'Occupancy & collections',
   });
 
+  useOwnerSoftRefresh(loadDashboardSummary);
+
   return (
-    <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: { xs: 2, sm: 2.5 }, pb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={loadDashboardSummary}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Download />}
-              onClick={() => setExportDialog(true)}
-              sx={{ borderRadius: 2 }}
-            >
-              Export Excel
-            </Button>
-          </Box>
-        </Box>
+    <OwnerPage>
+        <PageHeader
+          title="Analytics"
+          subtitle="Occupancy, collections, and payment trends"
+          action={
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={loadDashboardSummary}
+                disabled={loading}
+                sx={portalOutlinedButtonSx}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<Download />}
+                onClick={() => setExportDialog(true)}
+                sx={ownerPrimaryButtonSx}
+              >
+                Export Excel
+              </Button>
+            </Box>
+          }
+        />
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -319,79 +330,26 @@ const Analytics = () => {
                 <CircularProgress />
               </Box>
             ) : dashboardSummary ? (
+              <>
+              <OwnerStatStrip
+                sx={{ mb: 3 }}
+                loading={loading}
+                stats={[
+                  { title: 'Properties', value: dashboardSummary.total_properties, icon: <Home /> },
+                  { title: 'Units', value: dashboardSummary.total_units, icon: <Apartment /> },
+                  {
+                    title: 'Occupancy',
+                    value: formatPercentage(dashboardSummary.occupancy_rate),
+                    icon: <TrendingUp />,
+                  },
+                  {
+                    title: 'Collection rate',
+                    value: formatPercentage(dashboardSummary.collection_rate),
+                    icon: <AttachMoney />,
+                  },
+                ]}
+              />
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box>
-                          <Typography color="textSecondary" gutterBottom>
-                            Total Properties
-                          </Typography>
-                          <Typography variant="h4">
-                            {dashboardSummary.total_properties}
-                          </Typography>
-                        </Box>
-                        <Home color="primary" sx={{ fontSize: 40 }} />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box>
-                          <Typography color="textSecondary" gutterBottom>
-                            Total Units
-                          </Typography>
-                          <Typography variant="h4">
-                            {dashboardSummary.total_units}
-                          </Typography>
-                        </Box>
-                        <Apartment color="info" sx={{ fontSize: 40 }} />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box>
-                          <Typography color="textSecondary" gutterBottom>
-                            Occupancy Rate
-                          </Typography>
-                          <Typography variant="h4">
-                            {formatPercentage(dashboardSummary.occupancy_rate)}
-                          </Typography>
-                        </Box>
-                        <TrendingUp color="success" sx={{ fontSize: 40 }} />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box>
-                          <Typography color="textSecondary" gutterBottom>
-                            Collection Rate
-                          </Typography>
-                          <Typography variant="h4">
-                            {formatPercentage(dashboardSummary.collection_rate)}
-                          </Typography>
-                        </Box>
-                        <AttachMoney color="secondary" sx={{ fontSize: 40 }} />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                
                 <Grid item xs={12} md={6}>
                   <Card>
                     <CardContent>
@@ -440,6 +398,7 @@ const Analytics = () => {
                   </Card>
                 </Grid>
               </Grid>
+              </>
             ) : (
               <Alert severity="info">
                 No data available. Please check your properties and units.
@@ -899,7 +858,7 @@ const Analytics = () => {
             </Button>
           </DialogActions>
         </Dialog>
-    </Box>
+    </OwnerPage>
   );
 };
 

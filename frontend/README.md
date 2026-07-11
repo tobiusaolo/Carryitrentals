@@ -62,8 +62,8 @@ See [DEPLOY_TO_RENDER.md](./DEPLOY_TO_RENDER.md) for detailed instructions.
 ### Environment Variables
 
 Backend API URL is configured in the code:
-- Development: `http://localhost:8000/api/v1`
-- Production: `https://carryit-backend.onrender.com/api/v1`
+- API: `https://carryit-backend-su8h.onrender.com/api/v1`
+- Production: `https://carryit-backend-su8h.onrender.com/api/v1`
 
 To change the backend URL, update files in `src/services/` and `src/pages/`.
 

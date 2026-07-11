@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -63,7 +64,8 @@ import { agentAPI } from '../../services/api/agentAPI';
 import { propertyAPI } from '../../services/api/propertyAPI';
 import { showSuccess, showError, showWarning, showLoading, closeAlert } from '../../utils/sweetAlert';
 import PageHeader from '../../components/UI/PageHeader';
-import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
 import { adminPrimaryButtonSx } from '../../theme/designTokens';
 import DataTable from '../../components/UI/DataTable';
 import TableActions from '../../components/UI/TableActions';
@@ -84,6 +86,8 @@ import {
   imagesPayloadFromSelection,
   splitListingImages,
 } from '../../utils/rentalUnitForm';
+import { buildAdminUnitColumns } from './columns/adminUnitColumns';
+import adminConfirm from '../../components/Admin/AdminConfirmDialog';
 
 const AdminUnits = () => {
   const dispatch = useDispatch();
@@ -111,6 +115,33 @@ const AdminUnits = () => {
       loadProperties();
     }
   }, [user]);
+
+  const [searchParams] = useSearchParams();
+  const prefillApplied = useRef(false);
+  useEffect(() => {
+    const propertyId = searchParams.get('property_id');
+    const requestId = searchParams.get('request_id');
+    if (!propertyId || properties.length === 0 || prefillApplied.current) return;
+    if (requestId) prefillApplied.current = true;
+    const prefill = {
+      ...emptyRentalFormState(),
+      property_id: propertyId,
+      internal_unit_id: searchParams.get('unit_id') || '',
+      title: searchParams.get('title') || '',
+    };
+    const prop = properties.find((p) => String(p.id) === String(propertyId));
+    if (prop) {
+      prefill.location = [prop.address, prop.city].filter(Boolean).join(', ');
+      prefill.country = prop.country || prefill.country;
+    }
+    const notes = searchParams.get('notes');
+    if (notes) prefill.description = notes;
+    setEditingUnit(null);
+    setFormData(prefill);
+    setSelectedImages([]);
+    setActiveStep(0);
+    setOpenDialog(true);
+  }, [searchParams, properties]);
 
   const loadProperties = async () => {
     try {
@@ -146,14 +177,6 @@ const AdminUnits = () => {
       // Load only rental units (admin-added units for rent)
       const rentalUnitsResponse = await unitAPI.getRentalUnits();
       const units = rentalUnitsResponse.data || [];
-      console.log('📥 Loaded rental units:', units.length);
-      console.log('📥 Sample unit data:', units[0] ? {
-        id: units[0].id,
-        title: units[0].title,
-        agent_id: units[0].agent_id,
-        agent_name: units[0].agent_name,
-        full_unit: units[0]
-      } : 'No units');
       setRentalUnits(
         units.map((u) => ({ ...u, status: normalizeRentalStatus(u.status) }))
       );
@@ -264,6 +287,10 @@ const AdminUnits = () => {
 
       const imagesString = await imagesPayloadFromSelection(selectedImages);
       const unitData = buildRentalUnitPayload(formData, { images: imagesString });
+      const listingRequestId = searchParams.get('request_id');
+      if (listingRequestId && !editingUnit) {
+        unitData.listing_request_id = listingRequestId;
+      }
 
       console.log('📤 Sending rental unit data:', {
         title: unitData.title,
@@ -344,26 +371,26 @@ const AdminUnits = () => {
   };
 
   const handleView = async (unit) => {
-    console.log('Viewing unit:', unit);
-    console.log('Unit images:', unit.images);
-    
-    // Fetch full unit details to ensure we have complete image data
     try {
       const fullUnitResponse = await unitAPI.getRentalUnit(unit.id);
       const fullUnit = fullUnitResponse.data || fullUnitResponse;
-      console.log('Full unit data:', fullUnit);
-      console.log('Full unit images:', fullUnit.images);
       setViewingUnit(fullUnit);
     } catch (err) {
       console.error('Failed to fetch full unit details:', err);
-      // Fallback to using the unit from the list
       setViewingUnit(unit);
     }
   };
 
   const handleDelete = async (unitId, isRentalUnit = false) => {
-    if (window.confirm('Are you sure you want to delete this unit?')) {
-      try {
+    const confirmed = await adminConfirm(
+      'Delete unit?',
+      'This listing will be permanently removed from the marketplace.',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
+
+    try {
         if (isRentalUnit) {
           await unitAPI.deleteRentalUnit(unitId);
         } else {
@@ -379,7 +406,6 @@ const AdminUnits = () => {
         setError(errorMsg);
         showError('Delete Failed', errorMsg);
       }
-    }
   };
 
   const handleStatusChange = async (unitId, newStatus) => {
@@ -425,142 +451,30 @@ const AdminUnits = () => {
     }
   };
 
-  const unitColumns = [
-    {
-      id: 'title',
-      label: 'Title',
-      getSearchValue: (row) => `${row.title} ${row.bedrooms} ${row.bathrooms}`,
-      render: (unit) => (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar sx={{ mr: 2, bgcolor: 'success.light' }}>
-            <ApartmentIcon />
-          </Avatar>
-          <Box>
-            <Typography variant="subtitle2">{unit.title}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {isCommercialUnit(unit.unit_type) 
-                ? `${unit.square_feet || '—'} sq ft` 
-                : `${unit.bedrooms || '—'} bed, ${unit.bathrooms || '—'} bath`}
-            </Typography>
-          </Box>
-        </Box>
-      ),
-    },
-    {
-      id: 'location',
-      label: 'Location',
-      getSearchValue: (row) => `${row.location} ${row.country || ''}`,
-      render: (unit) => (
-        <Box>
-          <Typography variant="body2" fontWeight="bold">{unit.title}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {unit.location}{unit.country ? `, ${unit.country}` : ''}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      id: 'monthly_rent',
-      label: 'Rent Amount',
-      render: (unit) => (
-        <Typography variant="body2" fontWeight="bold" color="success.main">
-          {unit.currency || 'USD'} {unit.monthly_rent?.toLocaleString() || '0'}
-        </Typography>
-      ),
-    },
-    {
-      id: 'description',
-      label: 'Details',
-      getSearchValue: (row) => row.description || '',
-      render: (unit) => (
-        <Typography variant="body2">{unit.description}</Typography>
-      ),
-    },
-    {
-      id: 'agent_name',
-      label: 'Agent',
-      getSearchValue: (row) => row.agent_name || '',
-      render: (unit) => (
-        <Box>
-          <Typography variant="body2" fontWeight="bold">
-            {unit.agent_name || 'No Agent'}
-          </Typography>
-          {unit.agent_name && (
-            <Typography variant="caption" color="text.secondary">Assigned Agent</Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      render: (unit) => (
-        <FormControl size="small" sx={{ minWidth: 130 }}>
-          <Select
-            value={unit.status || 'available'}
-            onChange={(e) => handleStatusChange(unit.id, e.target.value)}
-            sx={{ fontSize: '0.8rem' }}
-          >
-            {RENTAL_STATUS_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      ),
-    },
-    {
-      id: 'verified',
-      label: 'Public verified',
-      render: (unit) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Switch
-            size="small"
-            checked={Boolean(unit.is_verified)}
-            onChange={(e) => handleVerifiedChange(unit.id, e.target.checked)}
-            color="success"
-          />
-          {unit.is_verified && (
-            <Chip
-              icon={<VerifiedIcon sx={{ fontSize: '14px !important' }} />}
-              label="Verified"
-              size="small"
-              color="success"
-              variant="outlined"
-              sx={{ fontWeight: 700, fontSize: '0.7rem' }}
-            />
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'actions',
-      label: 'Actions',
-      align: 'right',
-      render: (unit) => (
-        <TableActions
-          actions={[
-            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleView(unit) },
-            { icon: <EditIcon fontSize="small" />, label: 'Edit Unit', onClick: () => handleOpenDialog({ ...unit, isRentalUnit: true }) },
-            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Unit', onClick: () => handleDelete(unit.id, true) },
-          ]}
-        />
-      ),
-    },
-  ];
+  const unitColumns = buildAdminUnitColumns({
+    handleStatusChange,
+    handleVerifiedChange,
+    handleView,
+    handleOpenDialog,
+    handleDelete,
+  });
 
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
+      <AdminPage>
         <Alert severity="error">
           <Typography variant="h6">Access Denied</Typography>
           <Typography>You need admin privileges to access this page.</Typography>
         </Alert>
-      </Box>
+      </AdminPage>
     );
   }
 
+  const availableCount = rentalUnits.filter((unit) => unit.status === 'available').length;
+  const occupiedCount = rentalUnits.filter((unit) => unit.status === 'occupied').length;
+
   return (
-    <Box>
+    <AdminPage>
       <PageHeader
         variant="admin"
         title="Rental units"
@@ -578,27 +492,14 @@ const AdminUnits = () => {
         </Alert>
       )}
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
-          <OwnerStatCard title="Total" value={rentalUnits.length} icon={<ApartmentIcon />} variantIndex={1} />
-        </Grid>
-        <Grid item xs={6} sm={4}>
-          <OwnerStatCard
-            title="Available"
-            value={rentalUnits.filter((unit) => unit.status === 'available').length}
-            icon={<CheckCircleIcon />}
-            variantIndex={0}
-          />
-        </Grid>
-        <Grid item xs={6} sm={4}>
-          <OwnerStatCard
-            title="Occupied"
-            value={rentalUnits.filter((unit) => unit.status === 'occupied').length}
-            icon={<PersonIcon />}
-            variantIndex={2}
-          />
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { title: 'Total', value: rentalUnits.length, icon: <ApartmentIcon /> },
+          { title: 'Available', value: availableCount, icon: <CheckCircleIcon /> },
+          { title: 'Occupied', value: occupiedCount, icon: <PersonIcon /> },
+        ]}
+      />
 
       <DataTable
         columns={unitColumns}
@@ -1651,7 +1552,7 @@ const AdminUnits = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

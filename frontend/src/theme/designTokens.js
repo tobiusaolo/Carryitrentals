@@ -34,6 +34,26 @@ export const getOwnerStatColor = (index = 0) => {
   return ownerPalette[keys[index % 3]];
 };
 
+/** Admin portal — neutral accent palette for KPI cards */
+export const adminPalette = {
+  primary: colors.adminAccent,
+  indigo: '#4F46E5',
+  success: colors.success,
+  warning: colors.warning,
+  muted: colors.textMuted,
+};
+
+export const getAdminStatColor = (index = 0) => {
+  const palette = [
+    adminPalette.primary,
+    adminPalette.indigo,
+    adminPalette.success,
+    adminPalette.warning,
+    adminPalette.muted,
+  ];
+  return palette[index % palette.length];
+};
+
 export const layout = {
   publicMaxWidth: 'xl',
   adminMaxWidth: 1320,
@@ -122,6 +142,15 @@ export const tableHeadCellSx = {
 export const ownerTableHeadSx = {
   bgcolor: colors.surfaceMuted,
   '& .MuiTableCell-head': tableHeadCellSx,
+};
+
+export const adminTableHeadSx = {
+  bgcolor: colors.surfaceMuted,
+  '& .MuiTableCell-head': {
+    ...tableHeadCellSx,
+    bgcolor: colors.surfaceMuted,
+    color: colors.adminAccent,
+  },
 };
 
 export const tableBodyCellSx = {
@@ -240,14 +269,26 @@ export const ADMIN_ROUTE_TITLES = {
   '/admin/activity': 'Activity logs',
   '/admin/notifications': 'Notifications',
   '/admin/settings': 'Settings',
+  '/admin/revenue': 'Platform revenue',
+  '/admin/listing-requests': 'Listing requests',
+  '/admin/listing-reports': 'Listing reports',
+  '/admin/payment-intents': 'Payment approvals',
+  '/admin/maintenance': 'Maintenance',
   '/admin/analytics': 'Analytics',
 };
 
 export const ADMIN_ROUTE_META = {
-  '/admin': { title: 'Dashboard', subtitle: 'Overview' },
+  '/admin': { title: 'Dashboard', subtitle: 'Platform overview' },
+  '/admin/revenue': { title: 'Platform revenue', subtitle: 'MRR, subscriptions & fees' },
+  '/admin/analytics': { title: 'Analytics', subtitle: 'Trends & performance' },
   '/admin/owners': { title: 'Owners', subtitle: 'Property owner accounts' },
-  '/admin/properties': { title: 'Properties', subtitle: 'All portfolios' },
-  '/admin/units': { title: 'Rental units', subtitle: 'Listings & availability' },
+  '/admin/properties': { title: 'Properties', subtitle: 'Add & manage portfolios' },
+  '/admin/internal-units': { title: 'Internal units', subtitle: 'Rooms & spaces' },
+  '/admin/units': { title: 'Units for rent', subtitle: 'Marketplace listings' },
+  '/admin/listing-requests': { title: 'Listing requests', subtitle: 'Owner publish requests' },
+  '/admin/listing-reports': { title: 'Listing reports', subtitle: 'Marketplace abuse reports' },
+  '/admin/payment-intents': { title: 'Payment approvals', subtitle: 'Manual payment proofs' },
+  '/admin/maintenance': { title: 'Maintenance', subtitle: 'Property repair requests' },
   '/admin/inspections': { title: 'Inspections', subtitle: 'Viewing bookings' },
   '/admin/additional-services': { title: 'Services', subtitle: 'Add-on bookings' },
   '/admin/payment-methods': { title: 'Payment methods', subtitle: 'Guest payment options' },
@@ -261,7 +302,6 @@ export const ADMIN_ROUTE_META = {
   '/admin/activity': { title: 'Activity', subtitle: 'Audit log' },
   '/admin/notifications': { title: 'Notifications', subtitle: 'Alerts' },
   '/admin/settings': { title: 'Settings', subtitle: 'Platform config' },
-  '/admin/analytics': { title: 'Analytics', subtitle: 'Trends' },
 };
 
 export const OWNER_ROUTE_META = {
@@ -285,4 +325,5 @@ export const OWNER_PROPERTY_HUB_TAB_META = {
   'units-for-rent': { title: 'Listings', subtitle: 'Public marketplace' },
   airbnb: { title: 'Short stays', subtitle: 'Nightly bookings' },
   tenants: { title: 'Tenants', subtitle: 'Residents & rent' },
+  payments: { title: 'Payments', subtitle: 'Rent collected & proofs' },
 };

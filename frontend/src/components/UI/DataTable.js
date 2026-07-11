@@ -63,6 +63,8 @@ const DataTable = ({
   pageSize: defaultPageSize = 10,
   pageSizeOptions = [10, 25, 50],
   getRowId = (row) => row.id,
+  getRowDomId,
+  getRowSx,
   stickyHeader = true,
   maxHeight = 520,
   dense = false,
@@ -176,10 +178,12 @@ const DataTable = ({
               paginatedRows.map((row) => (
                 <TableRow
                   key={getRowId(row)}
+                  id={getRowDomId ? getRowDomId(row) : undefined}
                   hover
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   sx={{
                     ...getTableRowSx(),
+                    ...(getRowSx ? getRowSx(row) : {}),
                     cursor: onRowClick ? 'pointer' : 'default',
                   }}
                 >

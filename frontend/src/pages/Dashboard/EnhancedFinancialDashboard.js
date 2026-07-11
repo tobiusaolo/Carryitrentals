@@ -12,7 +12,6 @@ import {
   AccordionDetails,
   LinearProgress,
   Divider,
-  Container,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -29,7 +28,9 @@ import {
 } from '@mui/icons-material';
 import { useCachedQuery } from '../../hooks/useCachedQuery';
 import CriticalAlerts from '../../components/UI/CriticalAlerts';
-import EnhancedStatCard from '../../components/UI/EnhancedStatCard';
+import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import OwnerStatStrip from '../../components/Owner/OwnerStatStrip';
+import OwnerPage from '../../components/Owner/OwnerPage';
 import StatusBadge from '../../components/UI/StatusBadge';
 import QuickActionButton from '../../components/UI/QuickActionButton';
 import DataTable from '../../components/UI/DataTable';
@@ -38,6 +39,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../../utils/formatMoney';
 import { colors, getOwnerStatColor } from '../../theme/designTokens';
 import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
+import useOwnerSoftRefresh from '../../hooks/useOwnerSoftRefresh';
 
 const EnhancedFinancialDashboard = () => {
   const navigate = useNavigate();
@@ -48,6 +50,8 @@ const EnhancedFinancialDashboard = () => {
     error,
     refresh: loadFinancialData,
   } = useCachedQuery('/analytics/owner-financial-summary');
+
+  const { data: arrearsData } = useCachedQuery('/owner-portfolio/arrears');
 
   const [criticalAlerts, setCriticalAlerts] = useState([]);
 
@@ -62,12 +66,14 @@ const EnhancedFinancialDashboard = () => {
     if (financialData && financialData.overall) {
       generateCriticalAlerts();
     }
-  }, [financialData]);
+  }, [financialData, arrearsData]);
+
+  useOwnerSoftRefresh(loadFinancialData);
 
   const generateCriticalAlerts = () => {
     const alerts = [];
     const { overall, income_streams: streams } = financialData;
-    const currency = streams?.display_currency || 'UGX';
+    const currency = streams?.display_currency || arrearsData?.currency || 'UGX';
 
     if (streams?.viewing_fees?.pending_bookings > 0) {
       alerts.push({
@@ -80,7 +86,20 @@ const EnhancedFinancialDashboard = () => {
       });
     }
 
-    if (overall.tenants_unpaid > 0 && overall.remaining_to_collect > 0) {
+    const overdueTenants = arrearsData?.overdue_tenants ?? [];
+    const totalArrears = Number(arrearsData?.total_balance_due ?? 0);
+    if (overdueTenants.length > 0) {
+      alerts.push({
+        type: 'overdue',
+        title: `${overdueTenants.length} in arrears`,
+        message: `${formatMoney(totalArrears, currency)} outstanding across your portfolio.`,
+        amount: totalArrears,
+        count: overdueTenants.length,
+        actions: [
+          { label: 'View tenants', key: 'view_arrears', icon: <ViewIcon /> },
+        ],
+      });
+    } else if (overall.tenants_unpaid > 0 && overall.remaining_to_collect > 0) {
       alerts.push({
         type: 'overdue',
         title: `${overall.tenants_unpaid} Unpaid Payments`,
@@ -89,7 +108,7 @@ const EnhancedFinancialDashboard = () => {
         count: overall.tenants_unpaid,
         actions: [
           { label: 'Remind All', key: 'send_reminder', icon: <SendIcon /> },
-          { label: 'Review', key: 'view_details', icon: <ViewIcon /> },
+          { label: 'Review', key: 'view_arrears', icon: <ViewIcon /> },
         ],
       });
     }
@@ -104,7 +123,10 @@ const EnhancedFinancialDashboard = () => {
         break;
       case 'view_details':
       case 'view_payments':
-        navigate('/owner/payments');
+        navigate('/owner/property-hub?tab=payments');
+        break;
+      case 'view_arrears':
+        navigate('/owner/property-hub?tab=tenants');
         break;
       case 'view_viewings':
         navigate('/owner/viewings');
@@ -117,17 +139,18 @@ const EnhancedFinancialDashboard = () => {
     }
   };
 
-  if (loading && !financialData) return <Container sx={{ mt: 4 }}><DashboardSkeleton /></Container>;
-  if (error) return <Container sx={{ mt: 4 }}><Alert severity="error">{error}</Alert></Container>;
-  if (!financialData || !financialData.overall) return <Container sx={{ mt: 4 }}><Alert severity="info">No dashboard data available</Alert></Container>;
+  if (loading && !financialData) return <OwnerPage><DashboardSkeleton /></OwnerPage>;
+  if (error) return <OwnerPage><Alert severity="error">{error}</Alert></OwnerPage>;
+  if (!financialData || !financialData.overall) {
+    return <OwnerPage><Alert severity="info">No dashboard data available</Alert></OwnerPage>;
+  }
 
   const { overall, properties, current_month, income_streams: streams } = financialData;
   const currency = streams?.display_currency || 'UGX';
 
   return (
-    <Box sx={{ pb: 8 }}>
-      <Container maxWidth="xl" sx={{ pt: 3 }}>
-        {/* Critical Alerts */}
+    <OwnerPage disableMaxWidth sx={{ pb: 4 }}>
+      <Box sx={{ pb: 4 }}>
         {criticalAlerts.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <CriticalAlerts alerts={criticalAlerts} onAction={handleAlertAction} />
@@ -139,146 +162,129 @@ const EnhancedFinancialDashboard = () => {
             <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <AttachMoney sx={{ color: colors.brand }} /> Income this month (all sources)
             </Typography>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <EnhancedStatCard
-                  title="Tenant rent collected"
-                  value={formatMoney(streams.rent?.amount, streams.rent?.currency || currency)}
-                  subtitle={streams.rent?.label}
-                  icon={<AttachMoney />}
-                  color={getOwnerStatColor(0)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <EnhancedStatCard
-                  title="Viewing fees"
-                  value={formatMoney(streams.viewing_fees?.amount, streams.viewing_fees?.currency || currency)}
-                  subtitle={
-                    streams.viewing_fees?.pending_bookings
-                      ? `${streams.viewing_fees.pending_bookings} pending booking(s)`
-                      : 'Paid upfront (60%)'
-                  }
-                  icon={<PaymentIcon />}
-                  color={getOwnerStatColor(1)}
-                  onClick={() => navigate('/owner/viewing-payments')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <EnhancedStatCard
-                  title="Short stays"
-                  value={formatMoney(streams.airbnb?.amount, streams.airbnb?.currency || currency)}
-                  subtitle={
-                    streams.airbnb?.confirmed_count
-                      ? `${streams.airbnb.confirmed_count} confirmed booking(s)`
-                      : 'Airbnb / short stays'
-                  }
-                  icon={<Home />}
-                  color={getOwnerStatColor(2)}
-                  onClick={() => navigate('/owner/airbnb')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <EnhancedStatCard
-                  title="Estimated total"
-                  value={formatMoney(streams.total_estimated?.amount, streams.total_estimated?.currency || currency)}
-                  subtitle={streams.total_estimated?.note || 'Combined estimate'}
-                  icon={<TrendingUp />}
-                  color={getOwnerStatColor(0)}
-                />
-              </Grid>
-            </Grid>
+            <OwnerStatStrip
+              sx={{ mb: 4 }}
+              stats={[
+                {
+                  title: 'Tenant rent collected',
+                  value: formatMoney(streams.rent?.amount, streams.rent?.currency || currency),
+                  subtitle: streams.rent?.label,
+                  icon: <AttachMoney />,
+                  color: getOwnerStatColor(0),
+                },
+                {
+                  title: 'Viewing fees',
+                  value: formatMoney(streams.viewing_fees?.amount, streams.viewing_fees?.currency || currency),
+                  subtitle: streams.viewing_fees?.pending_bookings
+                    ? `${streams.viewing_fees.pending_bookings} pending booking(s)`
+                    : 'Paid upfront (60%)',
+                  icon: <PaymentIcon />,
+                  color: getOwnerStatColor(1),
+                  onClick: () => navigate('/owner/viewing-payments'),
+                },
+                {
+                  title: 'Short stays',
+                  value: formatMoney(streams.airbnb?.amount, streams.airbnb?.currency || currency),
+                  subtitle: streams.airbnb?.confirmed_count
+                    ? `${streams.airbnb.confirmed_count} confirmed booking(s)`
+                    : 'Airbnb / short stays',
+                  icon: <Home />,
+                  color: getOwnerStatColor(2),
+                  onClick: () => navigate('/owner/airbnb'),
+                },
+                {
+                  title: 'Estimated total',
+                  value: formatMoney(streams.total_estimated?.amount, streams.total_estimated?.currency || currency),
+                  subtitle: streams.total_estimated?.note || 'Combined estimate',
+                  icon: <TrendingUp />,
+                  color: getOwnerStatColor(0),
+                },
+              ]}
+            />
           </>
         )}
 
         <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <AttachMoney sx={{ color: colors.brand }} /> Tenant rent (properties)
         </Typography>
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          <Grid item xs={12} md={3}>
-            <EnhancedStatCard
-              title="Expected Revenue"
-              value={formatMoney(overall.expected_monthly_revenue, currency)}
-              subtitle="Current billing cycle"
-              icon={<AttachMoney />}
-              color={getOwnerStatColor(0)}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <EnhancedStatCard
-              title="Collected"
-              value={formatMoney(overall.current_month_collected, currency)}
-              subtitle="Payments confirmed"
-              icon={<CheckCircle />}
-              color={getOwnerStatColor(1)}
-              progress={(overall.current_month_collected / overall.expected_monthly_revenue) * 100}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <EnhancedStatCard
-              title="Outstanding"
-              value={formatMoney(overall.remaining_to_collect, currency)}
-              subtitle="Pending collection"
-              icon={<TrendingUp />}
-              color={getOwnerStatColor(2)}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <EnhancedStatCard
-              title="Collection Rate"
-              value={`${overall.collection_rate.toFixed(1)}%`}
-              subtitle="Performance target: 95%"
-              icon={<TrendingUp />}
-              color={getOwnerStatColor(0)}
-              progress={overall.collection_rate}
-            />
-          </Grid>
-        </Grid>
+        <OwnerStatStrip
+          sx={{ mb: 6 }}
+          stats={[
+            {
+              title: 'Expected Revenue',
+              value: formatMoney(overall.expected_monthly_revenue, currency),
+              subtitle: 'Current billing cycle',
+              icon: <AttachMoney />,
+              color: getOwnerStatColor(0),
+            },
+            {
+              title: 'Collected',
+              value: formatMoney(overall.current_month_collected, currency),
+              subtitle: 'Payments confirmed',
+              icon: <CheckCircle />,
+              color: getOwnerStatColor(1),
+            },
+            {
+              title: 'Outstanding',
+              value: formatMoney(overall.remaining_to_collect, currency),
+              subtitle: 'Pending collection',
+              icon: <TrendingUp />,
+              color: getOwnerStatColor(2),
+            },
+            {
+              title: 'Collection Rate',
+              value: `${overall.collection_rate.toFixed(1)}%`,
+              subtitle: 'Performance target: 95%',
+              icon: <TrendingUp />,
+              color: getOwnerStatColor(0),
+            },
+          ]}
+        />
 
         {/* Occupancy & Tenants */}
         <Grid container spacing={3} sx={{ mb: 6 }}>
           <Grid item xs={12} md={6}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#222', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Home sx={{ color: '#667eea' }} /> Portfolio Status
+            <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Home sx={{ color: colors.brand }} /> Portfolio Status
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6}>
-                <EnhancedStatCard
+                <OwnerStatCard
                   title="Total Units"
                   value={overall.total_units}
                   icon={<Home />}
-                  color="#6366f1"
+                  color={getOwnerStatColor(3)}
                 />
               </Grid>
               <Grid item xs={6}>
-                <EnhancedStatCard
+                <OwnerStatCard
                   title="Occupancy"
                   value={`${overall.occupancy_rate.toFixed(1)}%`}
                   icon={<People />}
-                  color="#10b981"
-                  progress={overall.occupancy_rate}
+                  color={getOwnerStatColor(1)}
                 />
               </Grid>
             </Grid>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#222', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <People sx={{ color: '#667eea' }} /> Tenant Activity
+            <Typography variant="h6" sx={{ fontWeight: 800, color: colors.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <People sx={{ color: colors.brand }} /> Tenant Activity
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6}>
-                <EnhancedStatCard
+                <OwnerStatCard
                   title="Paid Ahead"
                   value={overall.tenants_paid_ahead}
                   icon={<FastForward />}
-                  color="#8b5cf6"
+                  color={getOwnerStatColor(2)}
                 />
               </Grid>
               <Grid item xs={6}>
-                <EnhancedStatCard
+                <OwnerStatCard
                   title="Unpaid"
                   value={overall.tenants_unpaid}
                   icon={<Cancel />}
-                  color="#ef4444"
+                  color={colors.error}
                 />
               </Grid>
             </Grid>
@@ -383,7 +389,7 @@ const EnhancedFinancialDashboard = () => {
                               <QuickActionButton
                                 icon={<PaymentIcon sx={{ fontSize: 18 }} />}
                                 tooltip="Record"
-                                onClick={() => navigate('/owner/payments')}
+                                onClick={() => navigate('/owner/property-hub?tab=payments')}
                                 color="primary"
                               />
                             </Box>
@@ -401,8 +407,8 @@ const EnhancedFinancialDashboard = () => {
             </AccordionDetails>
           </Accordion>
         ))}
-      </Container>
-    </Box>
+      </Box>
+    </OwnerPage>
   );
 };
 

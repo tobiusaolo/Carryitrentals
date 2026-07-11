@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -38,9 +39,16 @@ import { fetchProperties } from '../../store/slices/propertySlice';
 import api from '../../services/api/api';
 import NotificationSystem from '../../components/UI/NotificationSystem';
 import EmptyState from '../../components/UI/EmptyState';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import { OwnerPage } from '../../components/Owner';
+import { adminPrimaryButtonSx, ownerPrimaryButtonSx } from '../../theme/designTokens';
 
 const Reports = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
+  const primaryButtonSx = isAdmin ? adminPrimaryButtonSx : ownerPrimaryButtonSx;
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [tenants, setTenants] = useState([]);
@@ -305,22 +313,8 @@ const Reports = () => {
     }
   ];
 
-  return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom fontWeight="bold">
-          <PdfIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Reports & Statements
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Generate PDF reports for tenants, properties, and financial statements
-        </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} • {tenants.length} tenant{tenants.length === 1 ? '' : 's'} loaded
-        </Typography>
-      </Box>
-
-      {/* Show loading or empty state */}
+  const reportBody = (
+    <>
       {properties.length === 0 && tenants.length === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
           Loading your properties and tenants... If this takes too long, please make sure you have properties and tenants set up.
@@ -668,7 +662,6 @@ const Reports = () => {
         </Grid>
       </Grid>
 
-      {/* Professional Notification System */}
       <NotificationSystem
         open={snackbar.open}
         message={snackbar.message}
@@ -676,7 +669,31 @@ const Reports = () => {
         title={snackbar.severity === 'success' ? 'Success!' : snackbar.severity === 'error' ? 'Error' : null}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       />
-    </Box>
+    </>
+  );
+
+  if (isAdmin) {
+    return (
+      <AdminPage>
+        <PageHeader
+          variant="admin"
+          title="Reports"
+          subtitle={`${properties.length} properties · ${tenants.length} tenants`}
+        />
+        {reportBody}
+      </AdminPage>
+    );
+  }
+
+  return (
+    <OwnerPage>
+      <PageHeader
+        title="Reports & statements"
+        subtitle="PDF exports for tenants, properties, and finances"
+        meta={`${properties.length} propert${properties.length === 1 ? 'y' : 'ies'} · ${tenants.length} tenant${tenants.length === 1 ? '' : 's'}`}
+      />
+      {reportBody}
+    </OwnerPage>
   );
 };
 

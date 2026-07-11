@@ -35,6 +35,11 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { propertyAPI } from '../../services/api/propertyAPI';
+import PageHeader from '../../components/UI/PageHeader';
+import { OwnerPage, OwnerStatStrip } from '../../components/Owner';
+import { ownerPrimaryButtonSx, portalOutlinedButtonSx, colors } from '../../theme/designTokens';
+import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
+import useOwnerSoftRefresh from '../../hooks/useOwnerSoftRefresh';
 
 const PropertyQR = () => {
   const dispatch = useDispatch();
@@ -56,6 +61,13 @@ const PropertyQR = () => {
   useEffect(() => {
     dispatch(fetchProperties());
   }, [dispatch]);
+
+  useRegisterPageMeta({
+    title: 'QR payments',
+    subtitle: 'Rent collection QR codes',
+  });
+
+  useOwnerSoftRefresh(() => dispatch(fetchProperties()));
 
   useEffect(() => {
     if (selectedProperty) {
@@ -169,15 +181,46 @@ const PropertyQR = () => {
   const selectedPropertyData = properties.find(p => p.id === parseInt(selectedProperty));
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <QrCodeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Property QR Code Management
-      </Typography>
+    <OwnerPage>
+      <PageHeader
+        title="Property QR codes"
+        subtitle="Tenants scan to pay rent and utilities for their unit"
+        action={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => dispatch(fetchProperties())}
+            disabled={loading}
+            sx={portalOutlinedButtonSx}
+          >
+            Refresh
+          </Button>
+        }
+      />
 
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Generate a single QR code for your property that tenants can scan to pay rent and utilities for their specific units.
-      </Typography>
+      <OwnerStatStrip
+        sx={{ mb: 3 }}
+        stats={[
+          { title: 'Properties', value: properties.length, icon: <HomeIcon /> },
+          {
+            title: 'QR ready',
+            value: propertyQR ? '1' : '0',
+            icon: <QrCodeIcon />,
+            subtitle: selectedPropertyData?.name || 'Select a property',
+          },
+          {
+            title: 'MTN configured',
+            value: selectedPropertyData?.mtn_mobile_money_number ? 'Yes' : '—',
+            icon: <PaymentIcon />,
+          },
+          {
+            title: 'Airtel configured',
+            value: selectedPropertyData?.airtel_money_number ? 'Yes' : '—',
+            icon: <PaymentIcon />,
+            variantIndex: 1,
+          },
+        ]}
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -432,7 +475,7 @@ const PropertyQR = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </OwnerPage>
   );
 };
 

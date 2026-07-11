@@ -31,10 +31,14 @@ import {
   AccountBalance as BankIcon,
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
+import PageHeader from '../../components/UI/PageHeader';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import { adminConfirm } from '../../components/Admin/AdminConfirmDialog';
 import paymentMethodAPI from '../../services/api/paymentMethodAPI';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
 
 const AdminPaymentMethods = () => {
   const { user } = useSelector(state => state.auth);
@@ -130,7 +134,8 @@ const AdminPaymentMethods = () => {
   };
 
   const handleDelete = async (methodId) => {
-    if (!window.confirm('Are you sure you want to delete this payment method?')) return;
+    const ok = await adminConfirm('Delete payment method?', 'This cannot be undone.');
+    if (!ok) return;
     try {
       setLoading(true);
       await paymentMethodAPI.remove(methodId);
@@ -241,7 +246,7 @@ const AdminPaymentMethods = () => {
             size="small"
             disabled={loading}
           />
-          <OwnerStatusChip status={method.is_active ? 'active' : 'inactive'} label={method.is_active ? 'Active' : 'Inactive'} />
+          <AdminStatusChip status={method.is_active ? 'active' : 'inactive'} label={method.is_active ? 'Active' : 'Inactive'} />
         </Box>
       ),
     },
@@ -270,44 +275,38 @@ const AdminPaymentMethods = () => {
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Payment Methods Management
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
-              Add Payment Method
-            </Button>
-          </Box>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Payment methods"
+        subtitle="Guest payment options"
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Add payment method
+          </Button>
+        }
+      />
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-          <DataTable
-            columns={paymentMethodColumns}
-            rows={paymentMethods}
-            loading={loading}
-            getRowId={(row) => String(row.id)}
-            title="Payment methods"
-            subtitle="Mobile money and bank accounts shown on viewing-fee checkout"
-            emptyTitle="No payment methods"
-            emptyDescription="Add a payment method so prospects can pay viewing fees manually."
-            emptyIcon={PaymentIcon}
-            emptyActionLabel="Add Payment Method"
-            onEmptyAction={() => handleOpenDialog()}
-            searchPlaceholder="Search by name, account, or bank…"
-          />
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={paymentMethodColumns}
+        rows={paymentMethods}
+        loading={loading}
+        getRowId={(row) => String(row.id)}
+        title="Payment methods"
+        subtitle="Mobile money and bank accounts shown on viewing-fee checkout"
+        emptyTitle="No payment methods"
+        emptyDescription="Add a payment method so prospects can pay viewing fees manually."
+        emptyIcon={PaymentIcon}
+        emptyActionLabel="Add payment method"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by name, account, or bank…"
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -399,13 +398,13 @@ const AdminPaymentMethods = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={loading}>
-              {loading ? <CircularProgress size={20} /> : (editingMethod ? 'Update' : 'Add')} Payment Method
+            <Button type="submit" variant="contained" disabled={loading} sx={adminPrimaryButtonSx}>
+              {loading ? <CircularProgress size={20} /> : (editingMethod ? 'Update' : 'Add')} payment method
             </Button>
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

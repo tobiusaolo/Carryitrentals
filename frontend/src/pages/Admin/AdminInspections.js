@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -57,45 +58,20 @@ import authService from '../../services/authService';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert, showInfo } from '../../utils/sweetAlert';
 import Swal from 'sweetalert2';
 import PageHeader from '../../components/UI/PageHeader';
-import OwnerStatCard from '../../components/Owner/OwnerStatCard';
-import { adminPrimaryButtonSx } from '../../theme/designTokens';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import { adminPrimaryButtonSx, colors } from '../../theme/designTokens';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
-import { colors } from '../../theme/designTokens';
 import { useCachedQuery } from '../../hooks/useCachedQuery';
-
-function parseInspectionsPayload(responseData) {
-  let inspectionsData = [];
-  let total = 0;
-
-  if (responseData && typeof responseData === 'object') {
-    if (Array.isArray(responseData)) {
-      inspectionsData = responseData;
-      total = responseData.length;
-    } else if (responseData.items && Array.isArray(responseData.items)) {
-      inspectionsData = responseData.items;
-      total = responseData.total || responseData.items.length;
-    } else if (responseData.bookings && Array.isArray(responseData.bookings)) {
-      inspectionsData = responseData.bookings;
-      total = responseData.total || responseData.bookings.length;
-    } else {
-      const keys = Object.keys(responseData);
-      for (const key of keys) {
-        if (Array.isArray(responseData[key])) {
-          inspectionsData = responseData[key];
-          total = responseData.total || responseData[key].length;
-          break;
-        }
-      }
-    }
-  }
-
-  return { items: inspectionsData, total };
-}
+import { parseInspectionsPayload } from '../../utils/parseInspectionsPayload';
+import { buildAdminInspectionColumns } from './columns/adminInspectionColumns';
 
 const AdminInspections = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
+  const [searchParams] = useSearchParams();
+  const highlightBookingId = searchParams.get('booking_id');
 
   const portalEnabled = user?.role === 'admin';
 
@@ -125,6 +101,16 @@ const AdminInspections = () => {
 
   const inspections = inspectionsResult.items;
   const totalCount = inspectionsResult.total;
+
+  useEffect(() => {
+    if (!highlightBookingId || loading || !inspections.length) return undefined;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`inspection-row-${highlightBookingId}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [highlightBookingId, loading, inspections.length]);
+
   const [openDialog, setOpenDialog] = useState(false);
   const [editingInspection, setEditingInspection] = useState(null);
   const [formData, setFormData] = useState({
@@ -475,201 +461,19 @@ const AdminInspections = () => {
 
   const pendingCount = inspections.filter((i) => i.status?.toLowerCase() === 'pending').length;
 
-  const inspectionColumns = [
-    {
-      id: 'id',
-      label: 'Inspection ID',
-      getSearchValue: (row) => `#${row.id}`,
-      render: (inspection) => (
-        <Box>
-          <Typography variant="subtitle2" fontWeight={600}>
-            #{inspection.id}
-          </Typography>
-          {inspection.is_public_booking && (
-            <Chip label="Public" size="small" color="info" sx={{ mt: 0.5 }} />
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'property',
-      label: 'Property',
-      getSearchValue: (row) =>
-        `${row.rental_unit?.title || row.rental_unit?.name || ''} ${row.rental_unit?.location || ''} ${row.rental_unit_id || ''}`,
-      render: (inspection) => (
-        <Box>
-          <Typography variant="body2" fontWeight="bold">
-            {inspection.rental_unit?.title || inspection.rental_unit?.name || inspection.rental_unit_id || `Booking ID: ${inspection.id}`}
-          </Typography>
-          {inspection.rental_unit?.location && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              {inspection.rental_unit.location}
-            </Typography>
-          )}
-          {inspection.rental_unit?.unit_type && (
-            <Typography variant="caption" display="block" color="primary">
-              {inspection.rental_unit.unit_type}
-            </Typography>
-          )}
-          {inspection.rental_unit_id && !inspection.rental_unit && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              Unit ID: {inspection.rental_unit_id}
-            </Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'client',
-      label: 'Client',
-      getSearchValue: (row) =>
-        `${row.contact_name || row.tenant?.name || ''} ${row.contact_email || ''}`,
-      render: (inspection) => (
-        <Box>
-          <Typography variant="body2" fontWeight="bold">
-            {inspection.contact_name || inspection.tenant?.name || 'N/A'}
-          </Typography>
-          {inspection.contact_email && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              {inspection.contact_email}
-            </Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'contact_phone',
-      label: 'Contact',
-      getSearchValue: (row) => row.contact_phone,
-      render: (inspection) => (
-        <Typography variant="body2">{inspection.contact_phone || 'N/A'}</Typography>
-      ),
-    },
-    {
-      id: 'booking_date',
-      label: 'Date & Time',
-      getSearchValue: (row) =>
-        `${new Date(row.booking_date).toLocaleDateString()} ${row.preferred_time_slot || ''}`,
-      render: (inspection) => (
-        <Box>
-          <Typography variant="body2">
-            {new Date(inspection.booking_date).toLocaleDateString()}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" display="block">
-            {inspection.preferred_time_slot
-              ? inspection.preferred_time_slot.charAt(0).toUpperCase() + inspection.preferred_time_slot.slice(1)
-              : 'Not specified'}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      render: (inspection) => <OwnerStatusChip status={inspection.status} />,
-    },
-    {
-      id: 'payment',
-      label: 'Payment',
-      render: (inspection) =>
-        inspection.payment?.payment_id ? (
-          <Chip
-            size="small"
-            label={inspection.payment_status || inspection.payment?.status || 'pending'}
-            color={
-              (inspection.payment_status || inspection.payment?.status) === 'paid'
-                ? 'success'
-                : 'warning'
-            }
-            onClick={() => handlePaymentManagement(inspection)}
-            sx={{ cursor: 'pointer' }}
-          />
-        ) : (
-          <Typography variant="caption" color="text.secondary">
-            No payment
-          </Typography>
-        ),
-    },
-    {
-      id: 'actions',
-      label: 'Actions',
-      align: 'right',
-      render: (inspection) => (
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
-          {inspection.status?.toLowerCase() === 'pending' && (
-            <>
-              <Tooltip title="Approve Inspection">
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="success"
-                  startIcon={<ApproveIcon />}
-                  onClick={() => handleApproveBooking(inspection.id)}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    boxShadow: 2,
-                    px: 2,
-                    '&:hover': { boxShadow: 4, transform: 'translateY(-1px)' },
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  Approve
-                </Button>
-              </Tooltip>
-              <Tooltip title="Reject Inspection">
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="error"
-                  startIcon={<RejectIcon />}
-                  onClick={() => handleRejectBooking(inspection.id)}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    boxShadow: 2,
-                    px: 2,
-                    '&:hover': { boxShadow: 4, transform: 'translateY(-1px)' },
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  Reject
-                </Button>
-              </Tooltip>
-            </>
-          )}
-          {inspection.status?.toLowerCase() !== 'pending' && (
-            <OwnerStatusChip status={inspection.status} />
-          )}
-          <Tooltip title="More Actions">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                setActionMenuAnchor(e.currentTarget);
-                setSelectedInspectionForMenu(inspection);
-              }}
-              sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                ml: 'auto',
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                  borderColor: 'primary.main',
-                  transform: 'scale(1.05)',
-                },
-                transition: 'all 0.2s',
-              }}
-            >
-              <MoreVertIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
-    },
-  ];
+  const inspectionColumns = buildAdminInspectionColumns({
+    handlePaymentManagement,
+    handleApproveBooking,
+    handleRejectBooking,
+    setActionMenuAnchor,
+    setSelectedInspectionForMenu,
+  });
+
+  const confirmedCount = inspections.filter((i) => i.status?.toLowerCase() === 'confirmed').length;
+  const completedCount = inspections.filter((i) => i.status?.toLowerCase() === 'completed').length;
 
   return (
-    <Box>
+    <AdminPage>
       <PageHeader
         variant="admin"
         title="Inspections"
@@ -687,35 +491,15 @@ const AdminInspections = () => {
         </Alert>
       )}
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard title="Total" value={inspections.length} icon={<AssignmentIcon />} variantIndex={1} />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard
-            title="Pending"
-            value={inspections.filter((i) => i.status?.toLowerCase() === 'pending').length}
-            icon={<ScheduleIcon />}
-            variantIndex={2}
-          />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard
-            title="Confirmed"
-            value={inspections.filter((i) => i.status?.toLowerCase() === 'confirmed').length}
-            icon={<CheckCircleIcon />}
-            variantIndex={0}
-          />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <OwnerStatCard
-            title="Completed"
-            value={inspections.filter((i) => i.status?.toLowerCase() === 'completed').length}
-            icon={<CheckCircleIcon />}
-            variantIndex={0}
-          />
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        loading={loading && !inspections.length}
+        stats={[
+          { title: 'Total', value: inspections.length, icon: <AssignmentIcon /> },
+          { title: 'Pending', value: pendingCount, icon: <ScheduleIcon /> },
+          { title: 'Confirmed', value: confirmedCount, icon: <CheckCircleIcon /> },
+          { title: 'Completed', value: completedCount, icon: <CheckCircleIcon /> },
+        ]}
+      />
 
       <DataTable
         columns={inspectionColumns}
@@ -729,6 +513,16 @@ const AdminInspections = () => {
         onEmptyAction={() => handleOpenDialog()}
         searchPlaceholder="Search by property, client, or ID…"
         getRowId={(row) => row.id}
+        getRowDomId={(row) => `inspection-row-${row.id}`}
+        getRowSx={(row) =>
+          highlightBookingId && String(row.id) === String(highlightBookingId)
+            ? {
+                bgcolor: `${colors.adminAccent}14`,
+                outline: `2px solid ${colors.adminAccent}`,
+                outlineOffset: -2,
+              }
+            : {}
+        }
       />
 
       {/* Actions Menu */}
@@ -1363,7 +1157,7 @@ const AdminInspections = () => {
           )}
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

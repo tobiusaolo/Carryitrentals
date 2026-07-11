@@ -18,11 +18,15 @@ import Communications from './pages/Communications/Communications';
 import Reports from './pages/Reports/Reports';
 import ModernAdminDashboard from './pages/Admin/ModernAdminDashboard';
 import AdminPropertyOwners from './pages/Admin/AdminPropertyOwners';
-import AdminPropertiesOverview from './pages/Admin/AdminPropertiesOverview';
+import AdminProperties from './pages/Admin/AdminProperties';
 import AdminUnits from './pages/Admin/AdminUnits';
 import AdminInspections from './pages/Admin/AdminInspections';
 import AdminAgents from './pages/Admin/AdminAgents';
 import AdminAirbnb from './pages/Admin/AdminAirbnb';
+import AdminListingRequests from './pages/Admin/AdminListingRequests';
+import AdminPaymentIntents from './pages/Admin/AdminPaymentIntents';
+import AdminListingReports from './pages/Admin/AdminListingReports';
+import AdminMaintenance from './pages/Admin/AdminMaintenance';
 import AdminTenants from './pages/Admin/AdminTenants';
 import AdminSystemHealth from './pages/Admin/AdminSystemHealth';
 import AdminActivityLogs from './pages/Admin/AdminActivityLogs';
@@ -104,7 +108,7 @@ function App() {
         <Route path="units-for-rent" element={<Navigate to="/owner/property-hub?tab=units-for-rent" replace />} />
         <Route path="airbnb" element={<Navigate to="/owner/property-hub?tab=airbnb" replace />} />
         <Route path="tenants" element={<Navigate to="/owner/property-hub?tab=tenants" replace />} />
-        <Route path="payments" element={<Payments />} />
+        <Route path="payments" element={<Navigate to="/owner/property-hub?tab=payments" replace />} />
         <Route path="billing" element={<OwnerBilling />} />
         <Route path="utilities" element={<Utilities />} />
         <Route path="inspections" element={<OwnerViewings />} />
@@ -126,8 +130,13 @@ function App() {
       }>
         <Route index element={<ModernAdminDashboard />} />
         <Route path="owners" element={<AdminPropertyOwners />} />
-        <Route path="properties" element={<AdminPropertiesOverview />} />
+        <Route path="properties" element={<AdminProperties />} />
+        <Route path="internal-units" element={<Units />} />
         <Route path="units" element={<AdminUnits />} />
+        <Route path="listing-requests" element={<AdminListingRequests />} />
+        <Route path="listing-reports" element={<AdminListingReports />} />
+        <Route path="payment-intents" element={<AdminPaymentIntents />} />
+        <Route path="maintenance" element={<AdminMaintenance />} />
         <Route path="inspections" element={<AdminInspections />} />
         <Route path="additional-services" element={<AdditionalServices />} />
         <Route path="payment-methods" element={<AdminPaymentMethods />} />

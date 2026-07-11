@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -51,13 +52,23 @@ import {
 import api from '../../services/api/api';
 import axios from 'axios';
 import authService from '../../services/authService';
+import { propertyAPI } from '../../services/api/propertyAPI';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert, showWarning, showInfo } from '../../utils/sweetAlert';
 import Swal from 'sweetalert2';
 import AirbnbListingFormFields from '../../components/Forms/AirbnbListingFormFields';
 import { emptyAirbnbFormState, MIN_AIRBNB_IMAGES, getAirbnbPropertyTypeLabel } from '../../constants/airbnb';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminTabbedPage from '../../components/Admin/AdminTabbedPage';
+import { adminPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
+import {
+  buildAirbnbListingColumns,
+  buildAirbnbBookingColumns,
+  buildAirbnbPaymentColumns,
+} from './columns/adminAirbnbColumns';
 
 const AdminAirbnb = () => {
   const [activeTab, setActiveTab] = useState(0); // 0=Listings, 1=Bookings, 2=Payments
@@ -76,10 +87,42 @@ const AdminAirbnb = () => {
   const [saveLoading, setSaveLoading] = useState(false);
   
   const [formData, setFormData] = useState(emptyAirbnbFormState());
+  const [properties, setProperties] = useState([]);
 
   useEffect(() => {
     loadData();
+    loadProperties();
   }, [activeTab]);
+
+  const loadProperties = async () => {
+    try {
+      const res = await propertyAPI.getAllProperties();
+      setProperties(res.data || []);
+    } catch (err) {
+      console.error('Failed to load properties:', err);
+    }
+  };
+
+  const [searchParams] = useSearchParams();
+  const prefillApplied = useRef(false);
+  useEffect(() => {
+    const requestId = searchParams.get('request_id');
+    if (!requestId || prefillApplied.current) return;
+    prefillApplied.current = true;
+    const propertyId = searchParams.get('property_id') || '';
+    const prop = properties.find((p) => String(p.id) === String(propertyId));
+    setFormData({
+      ...emptyAirbnbFormState(),
+      property_id: propertyId,
+      title: searchParams.get('title') || '',
+      description: searchParams.get('notes') || '',
+      location: prop ? [prop.address, prop.city].filter(Boolean).join(', ') : '',
+      country: prop?.country || emptyAirbnbFormState().country,
+    });
+    setEditingAirbnb(null);
+    setSelectedImages([]);
+    setOpenDialog(true);
+  }, [searchParams, properties]);
 
   const loadData = () => {
     if (activeTab === 0) {
@@ -468,13 +511,15 @@ const AdminAirbnb = () => {
         imagesBase64 = results.join('|||IMAGE_SEPARATOR|||');
       }
 
+      const requestId = searchParams.get('request_id');
       const payload = {
         ...formData,
         price_per_night: parseFloat(formData.price_per_night),
         max_guests: parseInt(formData.max_guests),
         bedrooms: parseInt(formData.bedrooms),
         bathrooms: parseInt(formData.bathrooms),
-        ...(imagesBase64 && { images: imagesBase64 })
+        ...(imagesBase64 && { images: imagesBase64 }),
+        ...(!editingAirbnb && requestId ? { listing_request_id: requestId } : {}),
       };
 
       // Use authService for consistent authentication
@@ -553,358 +598,62 @@ const AdminAirbnb = () => {
     }
   };
 
-  const listingColumns = [
-    {
-      id: 'title',
-      label: 'Title',
-      getSearchValue: (row) => `${row.title} ${row.location} ${row.country}`,
-      render: (airbnb) => (
-        <Typography variant="body2" fontWeight={600}>
-          {airbnb.title}
-        </Typography>
-      ),
-    },
-    {
-      id: 'property_type',
-      label: 'Type',
-      render: (airbnb) => (
-        <Chip
-          label={getAirbnbPropertyTypeLabel(airbnb.property_type)}
-          size="small"
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      id: 'location',
-      label: 'Location',
-      getSearchValue: (row) => `${row.location} ${row.country || ''}`,
-      render: (airbnb) => (
-        <Box>
-          <Typography variant="body2">{airbnb.location}</Typography>
-          {airbnb.country && (
-            <Typography variant="caption" color="text.secondary">
-              {airbnb.country}
-            </Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'country',
-      label: 'Country',
-      render: (airbnb) => (
-        <Chip label={airbnb.country || 'N/A'} size="small" color="info" variant="outlined" />
-      ),
-    },
-    {
-      id: 'price_per_night',
-      label: 'Price/Night',
-      render: (airbnb) => (
-        <Chip
-          label={`${airbnb.currency} ${parseFloat(airbnb.price_per_night).toLocaleString()}`}
-          size="small"
-          color="primary"
-          variant="outlined"
-        />
-      ),
-    },
-    { id: 'max_guests', label: 'Guests' },
-    { id: 'bedrooms', label: 'Bedrooms' },
-    {
-      id: 'is_available',
-      label: 'Status',
-      render: (airbnb) => <OwnerStatusChip status={airbnb.is_available} />,
-    },
-    {
-      id: 'actions',
-      label: 'Actions',
-      align: 'right',
-      render: (airbnb) => (
-        <TableActions
-          actions={[
-            { icon: <Visibility fontSize="small" />, label: 'View Details', onClick: () => handleView(airbnb) },
-            { icon: <Edit fontSize="small" />, label: 'Edit', onClick: () => handleOpenDialog(airbnb) },
-            { icon: <Delete fontSize="small" />, label: 'Delete', onClick: () => handleDelete(airbnb.id) },
-          ]}
-        />
-      ),
-    },
-  ];
+  const listingColumns = buildAirbnbListingColumns({
+    handleView,
+    handleOpenDialog,
+    handleDelete,
+  });
 
-  const bookingColumns = [
-    {
-      id: 'id',
-      label: 'Booking ID',
-      render: (booking) => (
-        <Typography variant="body2" fontWeight={600}>
-          #{booking.id}
-        </Typography>
-      ),
-    },
-    {
-      id: 'property',
-      label: 'Property',
-      getSearchValue: (row) => `${row.airbnb_title || ''} ${row.airbnb_location || ''} ${row.airbnb_id || ''}`,
-      render: (booking) => (
-        <Box>
-          <Typography variant="body2" fontWeight={600}>
-            {booking.airbnb_title || booking.airbnb_id || 'N/A'}
-          </Typography>
-          {booking.airbnb_location && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              {booking.airbnb_location}
-            </Typography>
-          )}
-          {booking.airbnb_id && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              ID: {booking.airbnb_id}
-            </Typography>
-          )}
-        </Box>
-      ),
-    },
-    {
-      id: 'guest',
-      label: 'Guest',
-      getSearchValue: (row) => `${row.guest_name || ''} ${row.guest_phone || ''}`,
-      render: (booking) => (
-        <Box>
-          <Typography variant="body2" fontWeight={600}>
-            {booking.guest_name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {booking.guest_phone}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      id: 'check_in',
-      label: 'Check-in',
-      render: (booking) => formatDate(booking.check_in),
-    },
-    {
-      id: 'check_out',
-      label: 'Check-out',
-      render: (booking) => formatDate(booking.check_out),
-    },
-    { id: 'number_of_guests', label: 'Guests' },
-    {
-      id: 'total_amount',
-      label: 'Total Amount',
-      render: (booking) => (
-        <Box>
-          <Typography variant="body2" fontWeight={600}>
-            {formatCurrency(booking.total_amount, booking.currency)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Prepaid: {formatCurrency(booking.prepayment_amount, booking.currency)}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      render: (booking) => <OwnerStatusChip status={booking.status} />,
-    },
-    {
-      id: 'payment_status',
-      label: 'Payment',
-      render: (booking) => <OwnerStatusChip status={booking.payment_status} />,
-    },
-    {
-      id: 'actions',
-      label: 'Actions',
-      align: 'right',
-      render: (booking) => (
-        <TableActions
-          actions={[
-            {
-              icon: <Visibility fontSize="small" />,
-              label: 'View Details',
-              onClick: () => handleViewBookingDetails(booking),
-            },
-            {
-              icon: <ApproveIcon fontSize="small" />,
-              label: 'Approve Booking',
-              hidden: !(booking.status && booking.status.toLowerCase() === 'pending'),
-              onClick: () => {
-                if (booking.id) {
-                  handleApproveBooking(booking.id);
-                } else {
-                  showError('Error', 'Booking ID is missing');
-                }
-              },
-            },
-            {
-              icon: <DeclineIcon fontSize="small" />,
-              label: 'Decline Booking',
-              hidden: !(booking.status && booking.status.toLowerCase() === 'pending'),
-              onClick: () => {
-                if (booking.id) {
-                  handleDeclineBooking(booking.id);
-                } else {
-                  showError('Error', 'Booking ID is missing');
-                }
-              },
-            },
-          ]}
-        />
-      ),
-    },
-  ];
+  const bookingColumns = buildAirbnbBookingColumns({
+    formatDate,
+    formatCurrency,
+    handleViewBookingDetails,
+    handleApproveBooking,
+    handleDeclineBooking,
+  });
 
-  const paymentColumns = [
-    {
-      id: 'payment_reference',
-      label: 'Transaction ID',
-      getSearchValue: (row) => row.payment_reference,
-      render: (payment) => (
-        <Typography variant="body2" fontFamily="monospace">
-          {payment.payment_reference}
-        </Typography>
-      ),
-    },
-    {
-      id: 'booking_id',
-      label: 'Booking ID',
-      render: (payment) => `#${payment.booking_id}`,
-    },
-    {
-      id: 'guest_name',
-      label: 'Guest',
-      getSearchValue: (row) => row.guest_name,
-    },
-    {
-      id: 'airbnb_title',
-      label: 'Property',
-      getSearchValue: (row) => row.airbnb_title,
-    },
-    {
-      id: 'amount',
-      label: 'Amount',
-      render: (payment) => (
-        <Typography variant="body2" fontWeight={600}>
-          {formatCurrency(payment.amount, payment.currency)}
-        </Typography>
-      ),
-    },
-    {
-      id: 'payment_method',
-      label: 'Payment Method',
-      render: (payment) => (
-        <Chip
-          label={payment.payment_method?.replace('_', ' ').toUpperCase()}
-          size="small"
-          icon={<CreditCard />}
-          variant="outlined"
-        />
-      ),
-    },
-    {
-      id: 'payment_status',
-      label: 'Status',
-      render: (payment) => <OwnerStatusChip status={payment.payment_status} />,
-    },
-    {
-      id: 'payment_date',
-      label: 'Date',
-      render: (payment) => formatDate(payment.payment_date),
-    },
-  ];
+  const paymentColumns = buildAirbnbPaymentColumns({ formatDate, formatCurrency });
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: 'white' }}>
-                <Hotel sx={{ verticalAlign: 'middle', mr: 1 }} />
-                Airbnb Management
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                Manage listings, bookings, and payments
-              </Typography>
-            </Box>
-            {activeTab === 0 && (
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => handleOpenDialog()}
-                sx={{
-                  bgcolor: 'white',
-                  color: '#667eea',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.9)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: 4
-                  },
-                  transition: 'all 0.2s'
-                }}
-              >
-                Add Airbnb Listing
-              </Button>
-            )}
-          </Box>
-        </CardContent>
-      </Card>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Airbnb"
+        subtitle="Listings, bookings, and payments"
+        action={
+          activeTab === 0 ? (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => handleOpenDialog()}
+              sx={adminPrimaryButtonSx}
+            >
+              Add listing
+            </Button>
+          ) : (
+            <Button
+              startIcon={<Add />}
+              onClick={loadData}
+              variant="outlined"
+              size="small"
+              sx={portalOutlinedButtonSx}
+            >
+              Refresh
+            </Button>
+          )
+        }
+      />
 
-      {/* Tabs */}
-      <Card sx={{ mb: 3, borderRadius: 2, boxShadow: 2 }}>
-        <Tabs 
-          value={activeTab} 
-          onChange={(e, newValue) => setActiveTab(newValue)}
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 600,
-              minHeight: 64
-            }
-          }}
-          indicatorColor="primary"
-          textColor="primary"
-        >
-          <Tab 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Hotel />
-                <span>Listings ({airbnbs.length})</span>
-              </Box>
-            } 
-          />
-          <Tab 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CalendarIcon />
-                <span>Bookings ({bookings.length})</span>
-              </Box>
-            } 
-          />
-          <Tab 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PaymentIcon />
-                <span>Payments ({payments.length})</span>
-              </Box>
-            } 
-          />
-        </Tabs>
-      </Card>
-
-      {/* Loading */}
-      {loading && (
-        <Card sx={{ mb: 3, borderRadius: 2 }}>
-          <LinearProgress sx={{ height: 6, borderRadius: 1 }} />
-        </Card>
-      )}
+      <AdminTabbedPage
+        activeTab={activeTab}
+        onTabChange={(e, newValue) => setActiveTab(newValue)}
+        tabs={[
+          { id: 'listings', label: `Listings (${airbnbs.length})`, icon: <Hotel fontSize="small" /> },
+          { id: 'bookings', label: `Bookings (${bookings.length})`, icon: <CalendarIcon fontSize="small" /> },
+          { id: 'payments', label: `Payments (${payments.length})`, icon: <PaymentIcon fontSize="small" /> },
+        ]}
+      >
+        {loading && <LinearProgress sx={{ mb: 2, height: 4, borderRadius: 1 }} />}
 
       {/* TAB 0: LISTINGS */}
       {activeTab === 0 && (
@@ -952,6 +701,8 @@ const AdminAirbnb = () => {
           searchPlaceholder="Search by guest, property, or transaction ID…"
         />
       )}
+
+      </AdminTabbedPage>
 
       {/* Booking Details Dialog */}
       <Dialog open={openBookingDialog} onClose={() => setOpenBookingDialog(false)} maxWidth="md" fullWidth>
@@ -1170,6 +921,8 @@ const AdminAirbnb = () => {
           <AirbnbListingFormFields
             formData={formData}
             setFormData={setFormData}
+            properties={properties}
+            requireProperty
             selectedImages={selectedImages}
             onImageSelect={handleImageSelect}
             onRemoveImage={handleRemoveImage}
@@ -1332,7 +1085,7 @@ const AdminAirbnb = () => {
         </DialogActions>
       </Dialog>
 
-    </Box>
+    </AdminPage>
   );
 };
 

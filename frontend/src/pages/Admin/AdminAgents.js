@@ -5,17 +5,9 @@ import {
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Avatar,
   Button,
-  IconButton,
   Alert,
   CircularProgress,
   Dialog,
@@ -23,12 +15,7 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
+  Paper,
   LinearProgress,
   Switch,
   FormControlLabel
@@ -53,16 +40,23 @@ import {
   Notes as NotesIcon,
   Star as StarIcon,
   TrendingUp as TrendingUpIcon,
-  Home as HomeIcon
+  Home as HomeIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { agentAPI } from '../../services/api/agentAPI';
 import { showSuccess, showError, showConfirm, showLoading, closeAlert } from '../../utils/sweetAlert';
 import authService from '../../services/authService';
 import { useCachedQuery } from '../../hooks/useCachedQuery';
+import PageHeader from '../../components/UI/PageHeader';
+import DataTable from '../../components/UI/DataTable';
+import TableActions from '../../components/UI/TableActions';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import { adminPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
 
 const AdminAgents = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const {
@@ -260,234 +254,188 @@ const AdminAgents = () => {
     }
   };
 
+  const activeCount = agents.filter((agent) => agent.is_active).length;
+  const assignedUnits = agents.reduce((sum, agent) => sum + (agent.assigned_units || 0), 0);
+  const completedInspections = agents.reduce((sum, agent) => sum + (agent.completed_inspections || 0), 0);
+
+  const agentColumns = [
+    {
+      id: 'agent',
+      label: 'Agent',
+      getSearchValue: (row) => `${row.name} ${row.id}`,
+      render: (agent) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar
+            src={agent.profile_picture}
+            sx={{ mr: 2, bgcolor: 'primary.light', width: 40, height: 40 }}
+          >
+            <PersonIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2">{agent.name}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              ID: {agent.id} · Age: {agent.age}
+            </Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'contact',
+      label: 'Contact',
+      getSearchValue: (row) => `${row.email} ${row.phone}`,
+      render: (agent) => (
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+            <EmailIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="body2">{agent.email}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <PhoneIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="body2">{agent.phone}</Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'personal',
+      label: 'Personal info',
+      getSearchValue: (row) => `${row.location} ${row.nin_number}`,
+      render: (agent) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">
+            {agent.location}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            NIN: {agent.nin_number}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'performance',
+      label: 'Performance',
+      render: (agent) => (
+        <Box>
+          <Typography variant="body2">
+            <strong>{agent.assigned_units || 0}</strong> units assigned
+          </Typography>
+          <Typography variant="body2">
+            <strong>{agent.completed_inspections || 0}</strong> inspections completed
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (agent) => (
+        <AdminStatusChip status={agent.is_active ? 'active' : 'inactive'} />
+      ),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (agent) => (
+        <TableActions
+          inline
+          actions={[
+            {
+              icon: agent.is_active ? <ToggleOnIcon fontSize="small" /> : <ToggleOffIcon fontSize="small" />,
+              label: agent.is_active ? 'Deactivate' : 'Activate',
+              onClick: () => handleToggleActive(agent),
+            },
+            {
+              icon: <ViewIcon fontSize="small" />,
+              label: 'View',
+              onClick: () => handleViewAgent(agent),
+            },
+            {
+              icon: <EditIcon fontSize="small" />,
+              label: 'Edit',
+              onClick: () => handleOpenDialog(agent),
+            },
+            {
+              icon: <DeleteIcon fontSize="small" />,
+              label: 'Delete',
+              danger: true,
+              onClick: () => handleDelete(agent.id),
+            },
+          ]}
+        />
+      ),
+    },
+  ];
+
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">Admin access required</Alert>
+      </AdminPage>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Agents"
+        subtitle={`${activeCount} active · ${agents.length} total`}
+        action={
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={loadAgents}
+              variant="outlined"
+              size="small"
+              sx={portalOutlinedButtonSx}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              sx={adminPrimaryButtonSx}
+            >
+              Add agent
+            </Button>
+          </Box>
+        }
+      />
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <PersonIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{agents.length}</Typography>
-                  <Typography color="text.secondary">Total Agents</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {agents.filter(agent => agent.is_active).length}
-                  </Typography>
-                  <Typography color="text.secondary">Active Agents</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <AssignmentIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {agents.reduce((sum, agent) => sum + (agent.assigned_units || 0), 0)}
-                  </Typography>
-                  <Typography color="text.secondary">Assigned Units</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <BusinessIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {agents.reduce((sum, agent) => sum + (agent.completed_inspections || 0), 0)}
-                  </Typography>
-                  <Typography color="text.secondary">Completed Inspections</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {(loading || refreshing) && <LinearProgress sx={{ mb: 2 }} />}
 
-      {/* Agents Table */}
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              All Agents
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleOpenDialog()}
-            >
-              Add Agent
-            </Button>
-          </Box>
-          
-          {(loading || refreshing) && <LinearProgress sx={{ mb: 2 }} />}
-          
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Agent</TableCell>
-                  <TableCell>Contact</TableCell>
-                  <TableCell>Personal Info</TableCell>
-                  <TableCell>Performance</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3 }}>
-                        <CircularProgress />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ) : agents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <Box sx={{ py: 3 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          No agents found. Click "Add Agent" to create one.
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ) : agents.map((agent) => (
-                  <TableRow key={agent.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          src={agent.profile_picture} 
-                          sx={{ mr: 2, bgcolor: 'primary.light', width: 48, height: 48 }}
-                        >
-                          <PersonIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{agent.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            ID: {agent.id} | Age: {agent.age}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                          <EmailIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{agent.email}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <PhoneIcon sx={{ mr: 1, fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{agent.phone}</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {agent.location}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          NIN: {agent.nin_number}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2">
-                          <strong>{agent.assigned_units || 0}</strong> units assigned
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>{agent.completed_inspections || 0}</strong> inspections completed
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={agent.is_active ? "Active" : "Inactive"} 
-                        color={agent.is_active ? "success" : "default"}
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title={agent.is_active ? "Deactivate Agent" : "Activate Agent"}>
-                        <IconButton 
-                          size="small" 
-                          color={agent.is_active ? "success" : "default"}
-                          onClick={() => handleToggleActive(agent)}
-                        >
-                          {agent.is_active ? <ToggleOnIcon /> : <ToggleOffIcon />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="View Details">
-                        <IconButton size="small" onClick={() => handleViewAgent(agent)}>
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Agent">
-                        <IconButton size="small" onClick={() => handleOpenDialog(agent)}>
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Agent">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(agent.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { title: 'Total agents', value: agents.length, icon: <PersonIcon /> },
+          { title: 'Active agents', value: activeCount, icon: <CheckCircleIcon /> },
+          { title: 'Assigned units', value: assignedUnits, icon: <AssignmentIcon /> },
+          { title: 'Completed inspections', value: completedInspections, icon: <BusinessIcon /> },
+        ]}
+      />
+
+      <DataTable
+        columns={agentColumns}
+        rows={agents}
+        loading={loading}
+        title="All agents"
+        emptyTitle="No agents yet"
+        emptyDescription='Click "Add agent" to onboard a field agent.'
+        emptyIcon={PersonIcon}
+        emptyActionLabel="Add agent"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by name, email, or location…"
+        getRowId={(row) => row.id}
+      />
 
       {/* Add/Edit Agent Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -951,7 +899,7 @@ const AdminAgents = () => {
           </>
         )}
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

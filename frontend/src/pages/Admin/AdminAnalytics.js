@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, Suspense, lazy } from 'react';
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
   Avatar,
   List,
@@ -27,13 +25,20 @@ import {
   Subscriptions as SubscriptionsIcon,
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
+import PageHeader from '../../components/UI/PageHeader';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminPanel from '../../components/Admin/AdminPanel';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
 import { formatMoney } from '../../utils/formatMoney';
 import adminAPI from '../../services/api/adminAPI';
+import { buildOwnerPieData, buildOccupancyBarData } from '../../utils/adminChartData';
+
+const AdminAnalyticsCharts = lazy(() => import('../../components/Admin/AdminAnalyticsCharts'));
 
 const AdminAnalytics = () => {
-  const { user } = useSelector(state => state.auth);
+  const { user } = useSelector((state) => state.auth);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,36 +58,16 @@ const AdminAnalytics = () => {
 
   useEffect(() => {
     if (user?.role === 'admin') loadAnalytics();
+    const handler = () => loadAnalytics();
+    window.addEventListener('carryit:admin-refresh', handler);
+    return () => window.removeEventListener('carryit:admin-refresh', handler);
   }, [user, loadAnalytics]);
-
-  const StatCard = ({ title, value, icon, color, subtitle, trend }) => (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Avatar sx={{ bgcolor: color, mr: 2 }}>{icon}</Avatar>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h4" component="div">{value}</Typography>
-            <Typography color="text.secondary" variant="body2">{title}</Typography>
-            {subtitle && (
-              <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
-            )}
-          </Box>
-          {trend != null && trend !== 0 && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {trend > 0 ? <TrendingUpIcon color="success" /> : <TrendingDownIcon color="error" />}
-              <Typography variant="body2" color={trend > 0 ? 'success.main' : 'error.main'}>
-                {Math.abs(trend)}%
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      </CardContent>
-    </Card>
-  );
 
   const currency = analytics?.currency || 'UGX';
   const totalPortfolio = analytics?.portfolio_monthly_rent ?? 0;
   const revenueByOwner = analytics?.revenue_by_owner ?? [];
+  const ownerPieData = buildOwnerPieData(revenueByOwner);
+  const occupancyBarData = buildOccupancyBarData(analytics?.property_performance ?? []);
 
   const revenueColumns = [
     {
@@ -91,16 +76,14 @@ const AdminAnalytics = () => {
       getSearchValue: (row) => row.ownerName,
       render: (owner) => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>{owner.ownerName.charAt(0)}</Avatar>
+          <Avatar sx={{ mr: 2, bgcolor: 'primary.main', width: 32, height: 32, fontSize: '0.875rem' }}>
+            {owner.ownerName?.charAt(0)}
+          </Avatar>
           {owner.ownerName}
         </Box>
       ),
     },
-    {
-      id: 'properties',
-      label: 'Properties',
-      render: (owner) => owner.properties,
-    },
+    { id: 'properties', label: 'Properties', render: (owner) => owner.properties },
     {
       id: 'revenue',
       label: 'Portfolio rent (monthly)',
@@ -112,8 +95,8 @@ const AdminAnalytics = () => {
       render: (owner) => {
         const marketShare = totalPortfolio ? (owner.revenue / totalPortfolio) * 100 : 0;
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <LinearProgress variant="determinate" value={marketShare} sx={{ width: 100, mr: 1 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LinearProgress variant="determinate" value={marketShare} sx={{ width: 80, height: 4, borderRadius: 2 }} />
             {marketShare.toFixed(1)}%
           </Box>
         );
@@ -125,169 +108,156 @@ const AdminAnalytics = () => {
       render: (owner) => {
         const marketShare = totalPortfolio ? (owner.revenue / totalPortfolio) * 100 : 0;
         const label = marketShare > 50 ? 'High' : marketShare > 25 ? 'Medium' : 'Low';
-        return <OwnerStatusChip status={label.toLowerCase()} label={label} />;
+        return <AdminStatusChip status={label.toLowerCase()} label={label} />;
       },
     },
   ];
 
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
 
   if (loading && !analytics) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
+      <AdminPage>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      </AdminPage>
     );
   }
 
-  return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <AssessmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        System Analytics
-      </Typography>
+  const growth = analytics?.portfolio_growth_week_pct;
 
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Live portfolio metrics and platform revenue from your database.
-      </Typography>
+  return (
+    <AdminPage>
+      <PageHeader variant="admin" title="Analytics" subtitle="Trends & performance" />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {analytics && (
         <>
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Platform MRR"
-                value={formatMoney(analytics.mrr?.amount ?? 0, currency)}
-                icon={<SubscriptionsIcon />}
-                color="success.main"
-                subtitle={`${analytics.mrr?.active_subscribers ?? 0} subscribed landlords`}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Occupancy rate"
-                value={`${analytics.occupancy_rate ?? 0}%`}
-                icon={<PeopleIcon />}
-                color="info.main"
-                subtitle="Units occupied"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Properties"
-                value={analytics.total_properties ?? 0}
-                icon={<HomeIcon />}
-                color="primary.main"
-                subtitle="On platform"
-                trend={analytics.portfolio_growth_week_pct}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Platform revenue (MTD)"
-                value={formatMoney(analytics.platform_revenue_mtd ?? 0, currency)}
-                icon={<MoneyIcon />}
-                color="warning.main"
-                subtitle="Subscriptions, viewing fees, Airbnb fees"
-              />
-            </Grid>
-          </Grid>
+          <AdminStatStrip
+            loading={loading}
+            stats={[
+              {
+                id: 'mrr',
+                title: 'Platform MRR',
+                value: formatMoney(analytics.mrr?.amount ?? 0, currency),
+                subtitle: `${analytics.mrr?.active_subscribers ?? 0} subscribed landlords`,
+                icon: <SubscriptionsIcon />,
+              },
+              {
+                id: 'occupancy',
+                title: 'Occupancy rate',
+                value: `${analytics.occupancy_rate ?? 0}%`,
+                subtitle: 'Units occupied',
+                icon: <PeopleIcon />,
+                progress: analytics.occupancy_rate,
+              },
+              {
+                id: 'properties',
+                title: 'Properties',
+                value: analytics.total_properties ?? 0,
+                subtitle: 'On platform',
+                icon: <HomeIcon />,
+                trend: growth,
+                trendLabel: 'vs last week',
+              },
+              {
+                id: 'revenue',
+                title: 'Platform revenue (MTD)',
+                value: formatMoney(analytics.platform_revenue_mtd ?? 0, currency),
+                subtitle: 'Subscriptions, viewing fees, Airbnb fees',
+                icon: <MoneyIcon />,
+              },
+            ]}
+          />
 
-          <Alert severity="info" sx={{ mb: 3 }}>
-            Portfolio rent totals ({formatMoney(totalPortfolio, currency)}/mo) reflect landlord
-            inventory — not CarryIT platform revenue. See Platform revenue for subscription income.
+          <Alert severity="info" sx={{ mb: 2.5 }}>
+            Portfolio rent ({formatMoney(totalPortfolio, currency)}/mo) is landlord inventory — not platform revenue.
           </Alert>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                    Top owners by portfolio rent
-                  </Typography>
-                  <List>
-                    {(analytics.top_performers ?? []).map((owner, index) => (
-                      <React.Fragment key={owner.ownerId}>
-                        <ListItem>
-                          <ListItemAvatar>
-                            <Avatar sx={{ bgcolor: 'primary.main' }}>{index + 1}</Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={owner.ownerName}
-                            secondary={`${owner.properties} properties · ${formatMoney(owner.revenue, currency)}/mo`}
-                          />
-                        </ListItem>
-                        {index < (analytics.top_performers?.length ?? 0) - 1 && <Divider />}
-                      </React.Fragment>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    <HomeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                    Property performance
-                  </Typography>
-                  <List>
-                    {(analytics.property_performance ?? []).slice(0, 5).map((property) => (
-                      <React.Fragment key={property.id}>
-                        <ListItem>
-                          <ListItemText
-                            primary={property.name}
-                            secondary={
-                              <Box>
-                                <Typography variant="body2">
-                                  Rent potential: {formatMoney(property.revenue, currency)}/mo
-                                </Typography>
-                                <Typography variant="body2">
-                                  Units: {property.units} · Occupied: {property.occupied} ({property.occupancy}%)
-                                </Typography>
-                                <LinearProgress variant="determinate" value={property.occupancy} sx={{ mt: 1 }} />
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                        <Divider />
-                      </React.Fragment>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12}>
-              <DataTable
-                columns={revenueColumns}
-                rows={revenueByOwner}
-                getRowId={(row) => row.ownerId}
-                title="Portfolio rent by owner"
-                subtitle="Landlord rent inventory — not platform revenue"
-                emptyTitle="No owner data"
-                emptyDescription="Owner metrics appear once landlords register properties."
-                emptyIcon={PieChartIcon}
-                searchPlaceholder="Search by owner name…"
+          {(ownerPieData.length > 0 || occupancyBarData.length > 0) && (
+            <Suspense fallback={<LinearProgress sx={{ mb: 2.5 }} />}>
+              <AdminAnalyticsCharts
+                ownerPieData={ownerPieData}
+                occupancyBarData={occupancyBarData}
               />
+            </Suspense>
+          )}
+
+          <Grid container spacing={2} sx={{ mb: 2.5 }}>
+            <Grid item xs={12} md={6}>
+              <AdminPanel title="Top owners by portfolio rent" contentSx={{ py: 1 }}>
+                <List disablePadding>
+                  {(analytics.top_performers ?? []).map((owner, index) => (
+                    <React.Fragment key={owner.ownerId}>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, fontSize: '0.75rem' }}>
+                            {index + 1}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={owner.ownerName}
+                          secondary={`${owner.properties} properties · ${formatMoney(owner.revenue, currency)}/mo`}
+                        />
+                      </ListItem>
+                      {index < (analytics.top_performers?.length ?? 0) - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                </List>
+              </AdminPanel>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <AdminPanel title="Property performance" contentSx={{ py: 1 }}>
+                <List disablePadding>
+                  {(analytics.property_performance ?? []).slice(0, 5).map((property) => (
+                    <React.Fragment key={property.id}>
+                      <ListItem sx={{ px: 0, alignItems: 'flex-start' }}>
+                        <ListItemText
+                          primary={property.name}
+                          secondary={
+                            <Box component="span" sx={{ display: 'block' }}>
+                              <Typography variant="caption" display="block">
+                                Rent potential: {formatMoney(property.revenue, currency)}/mo
+                              </Typography>
+                              <Typography variant="caption" display="block">
+                                {property.units} units · {property.occupied} occupied ({property.occupancy}%)
+                              </Typography>
+                              <LinearProgress variant="determinate" value={property.occupancy} sx={{ mt: 0.5, height: 4, borderRadius: 2 }} />
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                      <Divider />
+                    </React.Fragment>
+                  ))}
+                </List>
+              </AdminPanel>
             </Grid>
           </Grid>
+
+          <DataTable
+            columns={revenueColumns}
+            rows={revenueByOwner}
+            getRowId={(row) => row.ownerId}
+            title="Portfolio rent by owner"
+            subtitle="Landlord rent inventory — not platform revenue"
+            emptyTitle="No owner data"
+            emptyDescription="Owner metrics appear once landlords register properties."
+            emptyIcon={PieChartIcon}
+            searchPlaceholder="Search by owner name…"
+          />
         </>
       )}
-    </Box>
+    </AdminPage>
   );
 };
 

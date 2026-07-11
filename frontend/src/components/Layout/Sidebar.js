@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -16,73 +16,30 @@ import {
   Stack,
   IconButton,
   Tooltip,
+  Collapse,
 } from '@mui/material';
+import {
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+} from '@mui/icons-material';
 import logoImage from '../../assets/images/er13.png';
 import { colors, ownerPalette } from '../../theme/designTokens';
 import { logout } from '../../store/slices/authSlice';
 import {
-  SpaceDashboard,
-  Apartment,
-  AccountBalanceWallet,
-  Bolt,
-  EventAvailable,
-  ReceiptLong,
-  Forum,
-  Summarize,
-  Insights,
   Logout,
   AdminPanelSettings,
   ChevronRight,
 } from '@mui/icons-material';
+import { OWNER_NAV_SECTIONS } from '../../constants/ownerNav';
 
 export const drawerWidth = 272;
-
-const navSections = [
-  {
-    label: 'Overview',
-    items: [
-      { text: 'Dashboard', icon: SpaceDashboard, path: '/owner/dashboard' },
-    ],
-  },
-  {
-    label: 'Portfolio',
-    items: [
-      {
-        text: 'Property & listings',
-        icon: Apartment,
-        path: '/owner/property-hub',
-        match: ['/owner/property-hub', '/owner/properties', '/owner/units', '/owner/tenants', '/owner/payments'],
-      },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      { text: 'Billing & subscription', icon: ReceiptLong, path: '/owner/billing' },
-      { text: 'Utilities', icon: Bolt, path: '/owner/utilities' },
-      { text: 'Viewing payments', icon: ReceiptLong, path: '/owner/viewing-payments' },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { text: 'Viewing bookings', icon: EventAvailable, path: '/owner/viewings' },
-      { text: 'Communications', icon: Forum, path: '/owner/communications' },
-    ],
-  },
-  {
-    label: 'Insights',
-    items: [
-      { text: 'Reports', icon: Summarize, path: '/owner/reports' },
-      { text: 'Analytics', icon: Insights, path: '/owner/analytics' },
-    ],
-  },
-];
 
 const sidebarBg = '#141414';
 const sidebarBorder = alpha('#FFFFFF', 0.08);
 const sidebarText = alpha('#FFFFFF', 0.72);
 const sidebarTextMuted = alpha('#FFFFFF', 0.42);
+
+const COLLAPSE_STORAGE_KEY = 'carryit-owner-nav-collapsed';
 
 const isItemActive = (location, item) => {
   if (location.pathname === item.path) return true;
@@ -95,6 +52,27 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleSection = (label) => {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      try {
+        localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const handleNavigate = (path) => {
     navigate(path);
@@ -119,7 +97,6 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
         backgroundImage: `linear-gradient(180deg, ${sidebarBg} 0%, #0d0d0d 100%)`,
       }}
     >
-      {/* Brand */}
       <Box
         sx={{
           px: 2.5,
@@ -173,7 +150,6 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
         </Stack>
       </Box>
 
-      {/* Navigation */}
       <Box
         sx={{
           flex: 1,
@@ -187,95 +163,115 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle, isMobile }) => {
           },
         }}
       >
-        {navSections.map((section) => (
-          <Box key={section.label} sx={{ mb: 2.5 }}>
-            <Typography
-              sx={{
-                px: 1.5,
-                mb: 0.75,
-                fontSize: '0.625rem',
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: sidebarTextMuted,
-              }}
-            >
-              {section.label}
-            </Typography>
-            <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
-              {section.items.map((item) => {
-                const active = isItemActive(location, item);
-                const Icon = item.icon;
-                return (
-                  <ListItem key={item.text} disablePadding>
-                    <ListItemButton
-                      onClick={() => handleNavigate(item.path)}
-                      sx={{
-                        py: 1.1,
-                        px: 1.5,
-                        borderRadius: '10px',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        color: active ? '#fff' : sidebarText,
-                        bgcolor: active ? alpha(ownerPalette.accent, 0.14) : 'transparent',
-                        border: `1px solid ${active ? alpha(ownerPalette.accent, 0.35) : 'transparent'}`,
-                        '&:hover': {
-                          bgcolor: active
-                            ? alpha(ownerPalette.accent, 0.18)
-                            : alpha('#fff', 0.06),
-                          color: '#fff',
-                        },
-                        transition: 'background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease',
-                        '&::before': active
-                          ? {
-                              content: '""',
-                              position: 'absolute',
-                              left: 0,
-                              top: '20%',
-                              bottom: '20%',
-                              width: 3,
-                              borderRadius: '0 4px 4px 0',
-                              bgcolor: ownerPalette.accent,
-                            }
-                          : {},
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: 36,
-                          color: active ? ownerPalette.accent : sidebarTextMuted,
-                        }}
-                      >
-                        <Icon sx={{ fontSize: 20 }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={item.text}
-                        primaryTypographyProps={{
-                          fontWeight: active ? 700 : 500,
-                          fontSize: '0.875rem',
-                          letterSpacing: '-0.01em',
-                          noWrap: true,
-                        }}
-                      />
-                      {active && (
-                        <ChevronRight
+        {OWNER_NAV_SECTIONS.map((section) => {
+          const collapsed = collapsedSections[section.label];
+          const sectionActive = section.items.some((item) => isItemActive(location, item));
+
+          return (
+            <Box key={section.label} sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  px: 1.5,
+                  mb: 0.75,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                onClick={() => toggleSection(section.label)}
+              >
+                <Typography
+                  sx={{
+                    fontSize: '0.625rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: sectionActive ? alpha(ownerPalette.accent, 0.9) : sidebarTextMuted,
+                  }}
+                >
+                  {section.label}
+                </Typography>
+                <IconButton size="small" sx={{ color: sidebarTextMuted, p: 0.25 }}>
+                  {collapsed ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ExpandLessIcon sx={{ fontSize: 16 }} />}
+                </IconButton>
+              </Box>
+              <Collapse in={!collapsed}>
+                <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
+                  {section.items.map((item) => {
+                    const active = isItemActive(location, item);
+                    const Icon = item.icon;
+                    return (
+                      <ListItem key={item.text} disablePadding>
+                        <ListItemButton
+                          onClick={() => handleNavigate(item.path)}
                           sx={{
-                            fontSize: 16,
-                            color: alpha(ownerPalette.accent, 0.9),
-                            opacity: 0.9,
+                            py: 1.1,
+                            px: 1.5,
+                            borderRadius: '10px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            color: active ? '#fff' : sidebarText,
+                            bgcolor: active ? alpha(ownerPalette.accent, 0.14) : 'transparent',
+                            border: `1px solid ${active ? alpha(ownerPalette.accent, 0.35) : 'transparent'}`,
+                            '&:hover': {
+                              bgcolor: active
+                                ? alpha(ownerPalette.accent, 0.18)
+                                : alpha('#fff', 0.06),
+                              color: '#fff',
+                            },
+                            transition: 'background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease',
+                            '&::before': active
+                              ? {
+                                  content: '""',
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: '20%',
+                                  bottom: '20%',
+                                  width: 3,
+                                  borderRadius: '0 4px 4px 0',
+                                  bgcolor: ownerPalette.accent,
+                                }
+                              : {},
                           }}
-                        />
-                      )}
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
-            </List>
-          </Box>
-        ))}
+                        >
+                          <ListItemIcon
+                            sx={{
+                              minWidth: 36,
+                              color: active ? ownerPalette.accent : sidebarTextMuted,
+                            }}
+                          >
+                            <Icon sx={{ fontSize: 20 }} />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={item.text}
+                            primaryTypographyProps={{
+                              fontWeight: active ? 700 : 500,
+                              fontSize: '0.875rem',
+                              letterSpacing: '-0.01em',
+                              noWrap: true,
+                            }}
+                          />
+                          {active && (
+                            <ChevronRight
+                              sx={{
+                                fontSize: 16,
+                                color: alpha(ownerPalette.accent, 0.9),
+                                opacity: 0.9,
+                              }}
+                            />
+                          )}
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </Collapse>
+            </Box>
+          );
+        })}
       </Box>
 
-      {/* Footer */}
       <Box sx={{ p: 1.5, borderTop: `1px solid ${sidebarBorder}` }}>
         {user?.role === 'admin' && (
           <Button

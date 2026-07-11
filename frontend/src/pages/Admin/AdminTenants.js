@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
   Chip,
   Avatar,
@@ -27,22 +25,24 @@ import {
   Person as PersonIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
-  Home as HomeIcon,
   AttachMoney as MoneyIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Schedule as ScheduleIcon,
-  Business as BusinessIcon
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import adminAPI from '../../services/api/adminAPI';
 import { tenantAPI } from '../../services/api/tenantAPI';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import { formatMoney } from '../../utils/formatMoney';
+import adminConfirm from '../../components/Admin/AdminConfirmDialog';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
 
 const AdminTenants = () => {
-  const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
@@ -240,15 +240,21 @@ const AdminTenants = () => {
   };
 
   const handleDelete = async (tenantId) => {
-    if (window.confirm('Are you sure you want to delete this tenant?')) {
-      try {
+    const confirmed = await adminConfirm(
+      'Delete tenant?',
+      'This tenant record will be permanently removed.',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
+
+    try {
         console.log('Deleting tenant:', tenantId);
         // TODO: Implement delete API call
         loadTenants();
       } catch (err) {
         setError('Failed to delete tenant');
       }
-    }
   };
 
   const tenantColumns = [
@@ -312,12 +318,12 @@ const AdminTenants = () => {
     {
       id: 'payment_status',
       label: 'Payment Status',
-      render: (tenant) => <OwnerStatusChip status={tenant.payment_status} />,
+      render: (tenant) => <AdminStatusChip status={tenant.payment_status} />,
     },
     {
       id: 'status',
       label: 'Status',
-      render: (tenant) => <OwnerStatusChip status={tenant.status} />,
+      render: (tenant) => <AdminStatusChip status={tenant.status} />,
     },
     {
       id: 'actions',
@@ -337,17 +343,29 @@ const AdminTenants = () => {
 
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
 
+  const activeCount = tenants.filter((t) => t.status === 'active').length;
+  const overdueCount = tenants.filter((t) => t.payment_status === 'overdue').length;
+  const totalRent = tenants.reduce((sum, t) => sum + Number(t.rent_amount || 0), 0);
+
   return (
-    <Box sx={{ p: 3 }}>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Tenants"
+        subtitle="All leases"
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Add tenant
+          </Button>
+        }
+      />
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -399,75 +417,14 @@ const AdminTenants = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <PersonIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{tenants.length}</Typography>
-                  <Typography color="text.secondary">Total Tenants</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {tenants.filter(tenant => tenant.status === 'active').length}
-                  </Typography>
-                  <Typography color="text.secondary">Active Tenants</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
-                  <WarningIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {tenants.filter(tenant => tenant.payment_status === 'overdue').length}
-                  </Typography>
-                  <Typography color="text.secondary">Overdue Payments</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <MoneyIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    ${tenants.reduce((sum, tenant) => sum + tenant.rent_amount, 0).toLocaleString()}
-                  </Typography>
-                  <Typography color="text.secondary">Total Monthly Rent</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        stats={[
+          { id: 'total', title: 'Total tenants', value: tenants.length, icon: <PersonIcon /> },
+          { id: 'active', title: 'Active', value: activeCount, icon: <CheckCircleIcon /> },
+          { id: 'overdue', title: 'Overdue payments', value: overdueCount, icon: <WarningIcon /> },
+          { id: 'rent', title: 'Monthly rent', value: formatMoney(totalRent, 'UGX'), icon: <MoneyIcon /> },
+        ]}
+      />
 
       <DataTable
         columns={tenantColumns}
@@ -481,11 +438,6 @@ const AdminTenants = () => {
         emptyActionLabel="Add Tenant"
         onEmptyAction={() => handleOpenDialog()}
         searchPlaceholder="Search by name, email, or phone…"
-        toolbar={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
-            Add Tenant
-          </Button>
-        }
       />
 
       {/* Add/Edit Tenant Dialog */}
@@ -706,7 +658,7 @@ const AdminTenants = () => {
           <Button onClick={handleCloseViewDialog}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { colors, typography } from '../../theme/designTokens';
+import AdminBreadcrumbs from '../Admin/AdminBreadcrumbs';
 
-const PortalNavTitle = ({ title, subtitle, meta }) => (
+const PortalNavTitle = ({ title, subtitle, meta, pathname }) => (
   <Box sx={{ minWidth: 0, maxWidth: { xs: 'min(72vw, 280px)', sm: 'min(48vw, 420px)' } }}>
-    {meta && (
+    {pathname && <AdminBreadcrumbs pathname={pathname} pageTitle={title} />}
+    {meta && !pathname && (
       <Typography
         variant="caption"
         sx={{

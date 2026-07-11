@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -40,22 +41,30 @@ import {
 import FormSection from '../../components/Forms/FormSection';
 import {
   PROPERTY_TYPE_OPTIONS,
+  LISTING_INTENT_OPTIONS,
   COUNTRY_OPTIONS,
   emptyPropertyFormState,
+  propertyFormFromRow,
+  buildPropertyPayload,
+  isLandProperty,
+  getPropertyTypeLabel,
 } from '../../constants/property';
 import PageHeader from '../../components/UI/PageHeader';
 import { ownerPrimaryButtonSx } from '../../theme/designTokens';
-import OwnerPageContainer from '../../components/Owner/OwnerPageContainer';
-import OwnerStatCard from '../../components/Owner/OwnerStatCard';
+import { OwnerPage } from '../../components/Owner';
+import OwnerStatStrip from '../../components/Owner/OwnerStatStrip';
 import OwnerDataGrid from '../../components/Owner/OwnerDataGrid';
 import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import PropertyDetailPanel from '../../components/Owner/PropertyDetailPanel';
 
 const Properties = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { properties, isLoading, error } = useSelector((state) => state.properties);
   const { user } = useSelector((state) => state.auth);
 
   const [openDialog, setOpenDialog] = useState(false);
+  const [viewProperty, setViewProperty] = useState(null);
   const [editingProperty, setEditingProperty] = useState(null);
   const [formData, setFormData] = useState(emptyPropertyFormState());
 
@@ -75,22 +84,16 @@ const Properties = () => {
   const handleOpenDialog = (property = null) => {
     if (property) {
       setEditingProperty(property);
-      setFormData({
-        name: property.name || '',
-        address: property.address || '',
-        city: property.city || '',
-        state: property.state || '',
-        zip_code: property.zip_code || '',
-        country: property.country || emptyPropertyFormState().country,
-        property_type: property.property_type || 'house',
-        description: property.description || '',
-        total_units: property.total_units || 1,
-      });
+      setFormData(propertyFormFromRow(property));
     } else {
       setEditingProperty(null);
       setFormData(emptyPropertyFormState());
     }
     setOpenDialog(true);
+  };
+
+  const handleViewProperty = (property) => {
+    setViewProperty(property);
   };
 
   const handleCloseDialog = () => {
@@ -109,10 +112,11 @@ const Properties = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    const payload = buildPropertyPayload(formData);
     if (editingProperty) {
-      await dispatch(updateProperty({ propertyId: editingProperty.id, propertyData: formData }));
+      await dispatch(updateProperty({ propertyId: editingProperty.id, propertyData: payload }));
     } else {
-      await dispatch(createProperty(formData));
+      await dispatch(createProperty(payload));
     }
     
     handleCloseDialog();
@@ -134,12 +138,42 @@ const Properties = () => {
     {
       field: 'property_type',
       headerName: 'Type',
-      width: 120,
+      width: 130,
       renderCell: (params) => (
-        <OwnerStatusChip status={params.value} label={params.value} />
+        <OwnerStatusChip status={params.value} label={getPropertyTypeLabel(params.value)} />
       ),
     },
-    { field: 'total_units', headerName: 'Units', width: 80 },
+    {
+      field: 'occupied_units',
+      headerName: 'Occupied',
+      width: 90,
+      valueGetter: (params) => params.row.occupied_units ?? params.row.stats?.occupied_units ?? 0,
+    },
+    {
+      field: 'available_units',
+      headerName: 'Available',
+      width: 95,
+      valueGetter: (params) => params.row.available_units ?? params.row.stats?.available_units ?? 0,
+    },
+    {
+      field: 'total_units',
+      headerName: 'Declared',
+      width: 90,
+      renderCell: (params) => {
+        const registered = params.row.unit_count ?? params.row.stats?.unit_count ?? 0;
+        const declared = params.row.total_units ?? 0;
+        return declared > 0 ? `${registered}/${declared}` : registered;
+      },
+    },
+    {
+      field: 'occupancy_rate',
+      headerName: 'Occ. %',
+      width: 80,
+      valueGetter: (params) => {
+        const rate = params.row.occupancy_rate ?? params.row.stats?.occupancy_rate ?? 0;
+        return `${Number(rate).toFixed(0)}%`;
+      },
+    },
     {
       field: 'created_at',
       headerName: 'Created',
@@ -155,7 +189,7 @@ const Properties = () => {
         <GridActionsCellItem
           icon={<Visibility fontSize="small" />}
           label="View"
-          onClick={() => handleOpenDialog(params.row)}
+          onClick={() => handleViewProperty(params.row)}
           showInMenu
         />,
         <GridActionsCellItem
@@ -182,8 +216,13 @@ const Properties = () => {
     );
   }
 
+  const totalRegistered = properties.reduce((s, p) => s + (p.unit_count ?? p.stats?.unit_count ?? 0), 0);
+  const totalOccupied = properties.reduce((s, p) => s + (p.occupied_units ?? p.stats?.occupied_units ?? 0), 0);
+  const totalAvailable = properties.reduce((s, p) => s + (p.available_units ?? p.stats?.available_units ?? 0), 0);
+  const totalDeclared = properties.reduce((s, p) => s + (p.total_units ?? 0), 0);
+
   return (
-    <OwnerPageContainer>
+    <OwnerPage>
       <PageHeader
         title="Properties"
         action={
@@ -204,51 +243,15 @@ const Properties = () => {
         </Alert>
       )}
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            title="Total properties"
-            value={properties.length}
-            icon={<Home />}
-            variantIndex={0}
-            subtitle="In portfolio"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            title="Total units"
-            value={properties.reduce((sum, prop) => sum + (prop.total_units || 0), 0)}
-            icon={<Apartment />}
-            variantIndex={1}
-            subtitle="All sites"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            title="Property types"
-            value={new Set(properties.map((p) => p.property_type)).size}
-            icon={<Home />}
-            variantIndex={2}
-            subtitle="Categories"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <OwnerStatCard
-            title="Avg units / property"
-            value={
-              properties.length > 0
-                ? Math.round(
-                    properties.reduce((sum, prop) => sum + (prop.total_units || 0), 0) /
-                      properties.length
-                  )
-                : 0
-            }
-            icon={<Apartment />}
-            variantIndex={0}
-            subtitle="Per site"
-          />
-        </Grid>
-      </Grid>
+      <OwnerStatStrip
+        sx={{ mb: 2 }}
+        stats={[
+          { title: 'Properties', value: properties.length, icon: <Home />, subtitle: 'In portfolio' },
+          { title: 'Units registered', value: totalRegistered, icon: <Apartment />, subtitle: totalDeclared > 0 ? `${totalDeclared} declared` : 'Track capacity' },
+          { title: 'Occupied', value: totalOccupied, icon: <Home />, variantIndex: 1 },
+          { title: 'Available', value: totalAvailable, icon: <Apartment />, variantIndex: 2 },
+        ]}
+      />
 
       <OwnerDataGrid
         rows={properties}
@@ -261,6 +264,29 @@ const Properties = () => {
         onEmptyAction={() => handleOpenDialog()}
       />
 
+      <Dialog open={Boolean(viewProperty)} onClose={() => setViewProperty(null)} maxWidth="md" fullWidth>
+        <DialogTitle>{viewProperty?.name || 'Property details'}</DialogTitle>
+        <DialogContent dividers>
+          <PropertyDetailPanel
+            property={viewProperty}
+            onEdit={() => {
+              const p = viewProperty;
+              setViewProperty(null);
+              handleOpenDialog(p);
+            }}
+            onAddUnit={() => {
+              setViewProperty(null);
+              navigate(`/owner/property-hub?tab=units&property_id=${viewProperty.id}`);
+            }}
+            onManageUnits={() => {
+              setViewProperty(null);
+              navigate(`/owner/property-hub?tab=units&property_id=${viewProperty.id}`);
+            }}
+            onClose={() => setViewProperty(null)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Add/Edit Property Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -269,8 +295,8 @@ const Properties = () => {
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <Alert severity="info" sx={{ mb: 2 }}>
-              A <strong>property</strong> is the building or site you manage. You add individual{' '}
-              <strong>rental units</strong> or rooms under it later.
+              A <strong>property</strong> is a building, estate, or land parcel. For rentals, set how many
+              units it holds (e.g. 120) — CarryIT tracks occupied vs available as you add units.
             </Alert>
             <Grid container spacing={2}>
               <Grid item xs={12}>
@@ -309,18 +335,73 @@ const Properties = () => {
                       </FormControl>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Total units"
-                        name="total_units"
-                        type="number"
-                        value={formData.total_units}
-                        onChange={handleInputChange}
-                        required
-                        inputProps={{ min: 1 }}
-                        helperText="Rooms or flats in this property"
-                      />
+                      <FormControl fullWidth required>
+                        <InputLabel>Listing intent</InputLabel>
+                        <Select
+                          name="listing_intent"
+                          value={formData.listing_intent}
+                          onChange={handleInputChange}
+                          label="Listing intent"
+                        >
+                          {LISTING_INTENT_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Grid>
+                    {!isLandProperty(formData) ? (
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Declared total units"
+                          name="total_units"
+                          type="number"
+                          value={formData.total_units}
+                          onChange={handleInputChange}
+                          required
+                          inputProps={{ min: 1 }}
+                          helperText="Capacity you manage (e.g. 120 apartments)"
+                        />
+                      </Grid>
+                    ) : (
+                      <>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Plot size"
+                            name="lot_size"
+                            value={formData.lot_size}
+                            onChange={handleInputChange}
+                            placeholder="e.g. 2 acres, 50x100ft"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Sale price (UGX)"
+                            name="sale_price"
+                            type="number"
+                            value={formData.sale_price}
+                            onChange={handleInputChange}
+                            inputProps={{ min: 0 }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Subdivided plots (optional)"
+                            name="total_units"
+                            type="number"
+                            value={formData.total_units}
+                            onChange={handleInputChange}
+                            inputProps={{ min: 0 }}
+                            helperText="How many plots if subdivided"
+                          />
+                        </Grid>
+                      </>
+                    )}
                   </Grid>
                 </FormSection>
               </Grid>
@@ -408,7 +489,7 @@ const Properties = () => {
           </DialogActions>
         </form>
       </Dialog>
-    </OwnerPageContainer>
+    </OwnerPage>
   );
 };
 

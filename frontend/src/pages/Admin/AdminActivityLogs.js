@@ -31,9 +31,14 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
+import PageHeader from '../../components/UI/PageHeader';
 import DataTable from '../../components/UI/DataTable';
 import TableActions from '../../components/UI/TableActions';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminPanel from '../../components/Admin/AdminPanel';
 import adminAPI from '../../services/api/adminAPI';
+import { portalOutlinedButtonSx } from '../../theme/designTokens';
 
 const AdminActivityLogs = () => {
   const { user } = useSelector(state => state.auth);
@@ -44,11 +49,15 @@ const AdminActivityLogs = () => {
   const [levelFilter, setLevelFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [detailLog, setDetailLog] = useState(null);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       loadActivityLogs();
     }
+    const handler = () => loadActivityLogs();
+    window.addEventListener('carryit:admin-refresh', handler);
+    return () => window.removeEventListener('carryit:admin-refresh', handler);
   }, [user]);
 
   const filteredLogs = useMemo(() => {
@@ -216,10 +225,10 @@ const AdminActivityLogs = () => {
       id: 'actions',
       label: 'Actions',
       align: 'right',
-      render: () => (
+      render: (log) => (
         <TableActions
           actions={[
-            { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => {} },
+            { icon: <ViewIcon fontSize="small" />, label: 'View details', onClick: () => setDetailLog(log) },
           ]}
         />
       ),
@@ -228,25 +237,28 @@ const AdminActivityLogs = () => {
 
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
 
+  const errorCount = logs.filter((log) => log.level === 'ERROR').length;
+  const warningCount = logs.filter((log) => log.level === 'WARNING').length;
+  const infoCount = logs.filter((log) => log.level === 'INFO').length;
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <ScheduleIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Activity Logs
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Events derived from tenants, properties, payments, and viewing bookings in your database.
-      </Typography>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Activity logs"
+        subtitle="Audit log"
+        action={
+          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={exportLogs} size="small" sx={portalOutlinedButtonSx}>
+            Export CSV
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -254,75 +266,15 @@ const AdminActivityLogs = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <ScheduleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{logs.length}</Typography>
-                  <Typography color="text.secondary">Total Logs</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
-                  <ErrorIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {logs.filter(log => log.level === 'ERROR').length}
-                  </Typography>
-                  <Typography color="text.secondary">Errors</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <WarningIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {logs.filter(log => log.level === 'WARNING').length}
-                  </Typography>
-                  <Typography color="text.secondary">Warnings</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {logs.filter(log => log.level === 'INFO').length}
-                  </Typography>
-                  <Typography color="text.secondary">Info Logs</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { id: 'total', title: 'Total logs', value: logs.length, icon: <ScheduleIcon /> },
+          { id: 'errors', title: 'Errors', value: errorCount, icon: <ErrorIcon /> },
+          { id: 'warnings', title: 'Warnings', value: warningCount, icon: <WarningIcon /> },
+          { id: 'info', title: 'Info', value: infoCount, icon: <CheckCircleIcon /> },
+        ]}
+      />
 
       <DataTable
         columns={logColumns}
@@ -371,16 +323,26 @@ const AdminActivityLogs = () => {
                 <MenuItem value="month">Last Month</MenuItem>
               </Select>
             </FormControl>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refreshLogs} size="small">
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={refreshLogs} size="small" sx={portalOutlinedButtonSx}>
               Refresh
-            </Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={exportLogs} size="small">
-              Export
             </Button>
           </Box>
         }
       />
-    </Box>
+
+      {detailLog && (
+        <AdminPanel title="Log details" sx={{ mt: 2 }} contentSx={{ py: 2 }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Time:</strong> {new Date(detailLog.timestamp).toLocaleString()}</Typography>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Level:</strong> {detailLog.level}</Typography>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Category:</strong> {detailLog.category}</Typography>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>User:</strong> {detailLog.user}</Typography>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Action:</strong> {detailLog.action}</Typography>
+          <Typography variant="body2" sx={{ mb: 0.5 }}><strong>Description:</strong> {detailLog.description}</Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}><strong>IP:</strong> {detailLog.ip_address || '-'}</Typography>
+          <Button size="small" onClick={() => setDetailLog(null)}>Close</Button>
+        </AdminPanel>
+      )}
+    </AdminPage>
   );
 };
 

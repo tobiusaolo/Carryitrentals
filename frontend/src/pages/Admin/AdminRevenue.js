@@ -1,12 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, Suspense, lazy } from 'react';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
-  Divider,
   Grid,
   LinearProgress,
   Table,
@@ -19,40 +16,21 @@ import {
 import {
   AccountBalance,
   AttachMoney,
-  Hotel,
   Payment,
   Refresh,
   Subscriptions,
-  Visibility,
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminPanel from '../../components/Admin/AdminPanel';
 import { formatMoney } from '../../utils/formatMoney';
 import { adminRevenueAPI } from '../../services/api/adminRevenueAPI';
 import { portalOutlinedButtonSx } from '../../theme/designTokens';
+import { buildTransactionSparkline, buildSourceBarData } from '../../utils/adminChartData';
 
-function StatCard({ title, value, subtitle, icon, color = 'primary.main' }) {
-  return (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            {title}
-          </Typography>
-          <Box sx={{ color, opacity: 0.85 }}>{icon}</Box>
-        </Box>
-        <Typography variant="h4" fontWeight={800} color={color}>
-          {value}
-        </Typography>
-        {subtitle ? (
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            {subtitle}
-          </Typography>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
+const AdminRevenueCharts = lazy(() => import('../../components/Admin/AdminRevenueCharts'));
 
 function SourceRow({ label, mtd, allTime, currency }) {
   return (
@@ -85,6 +63,9 @@ const AdminRevenue = () => {
 
   useEffect(() => {
     if (user?.role === 'admin') load();
+    const handler = () => load();
+    window.addEventListener('carryit:admin-refresh', handler);
+    return () => window.removeEventListener('carryit:admin-refresh', handler);
   }, [user, load]);
 
   if (user?.role !== 'admin') {
@@ -96,12 +77,16 @@ const AdminRevenue = () => {
   const platform = data?.platform_revenue;
   const rent = data?.landlord_rent_volume;
   const pending = data?.pending_approvals;
+  const revenueSparkline = buildTransactionSparkline(data?.recent_platform_transactions ?? []);
+  const sourceBarData = buildSourceBarData(platform?.by_source_mtd ?? {});
+  const sourcePieData = sourceBarData.map((row) => ({ name: row.name, value: row.value }));
 
   return (
-    <Box>
+    <AdminPage>
       <PageHeader
+        variant="admin"
         title="Platform revenue"
-        subtitle="Subscriptions, viewing fees, and Airbnb commissions — rent is kept separate for landlords"
+        subtitle="MRR, subscriptions & fees"
         action={
           <Button
             variant="outlined"
@@ -126,56 +111,57 @@ const AdminRevenue = () => {
 
       {data ? (
         <>
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Monthly recurring revenue (MRR)"
-                value={formatMoney(mrr?.amount ?? 0, currency)}
-                subtitle={`${mrr?.active_subscribers ?? 0} active · ${mrr?.trialing_subscribers ?? 0} trialing`}
-                icon={<Subscriptions />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Platform revenue (MTD)"
-                value={formatMoney(platform?.mtd_total ?? 0, currency)}
-                subtitle="This calendar month"
-                icon={<AttachMoney />}
-                color="success.main"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="Pesapal (MTD)"
-                value={formatMoney(platform?.by_method_mtd?.pesapal ?? 0, currency)}
-                subtitle={`Manual: ${formatMoney(platform?.by_method_mtd?.manual ?? 0, currency)}`}
-                icon={<Payment />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title="All-time platform revenue"
-                value={formatMoney(platform?.all_time_total ?? 0, currency)}
-                subtitle="Excludes tenant rent"
-                icon={<AccountBalance />}
-              />
-            </Grid>
-          </Grid>
+          <AdminStatStrip
+            stats={[
+              {
+                id: 'mrr',
+                title: 'Monthly recurring revenue',
+                value: formatMoney(mrr?.amount ?? 0, currency),
+                subtitle: `${mrr?.active_subscribers ?? 0} active · ${mrr?.trialing_subscribers ?? 0} trialing`,
+                icon: <Subscriptions />,
+              },
+              {
+                id: 'mtd',
+                title: 'Platform revenue (MTD)',
+                value: formatMoney(platform?.mtd_total ?? 0, currency),
+                subtitle: 'This calendar month',
+                icon: <AttachMoney />,
+                sparklineData: revenueSparkline,
+              },
+              {
+                id: 'pesapal',
+                title: 'Pesapal (MTD)',
+                value: formatMoney(platform?.by_method_mtd?.pesapal ?? 0, currency),
+                subtitle: `Manual: ${formatMoney(platform?.by_method_mtd?.manual ?? 0, currency)}`,
+                icon: <Payment />,
+              },
+              {
+                id: 'alltime',
+                title: 'All-time platform revenue',
+                value: formatMoney(platform?.all_time_total ?? 0, currency),
+                subtitle: 'Excludes tenant rent',
+                icon: <AccountBalance />,
+              },
+            ]}
+          />
 
           <Alert severity="info" sx={{ mb: 3 }}>
             {rent?.note}
           </Alert>
 
+          {sourceBarData.length > 0 && (
+            <Suspense fallback={<LinearProgress sx={{ mb: 3 }} />}>
+              <AdminRevenueCharts
+                sourceBarData={sourceBarData}
+                sourcePieData={sourcePieData}
+                currency={currency}
+              />
+            </Suspense>
+          )}
+
           <Grid container spacing={3}>
             <Grid item xs={12} md={7}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Revenue by source
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Only CarryIT income — landlord subscriptions, viewing fees, and Airbnb platform cut.
-                  </Typography>
+              <AdminPanel title="Revenue by source" subtitle="CarryIT income only — subscriptions, viewing fees, Airbnb cut.">
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -205,14 +191,9 @@ const AdminRevenue = () => {
                       />
                     </TableBody>
                   </Table>
-                </CardContent>
-              </Card>
+              </AdminPanel>
 
-              <Card sx={{ mt: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Recent platform transactions
-                  </Typography>
+              <AdminPanel title="Recent platform transactions" sx={{ mt: 3 }} contentSx={{ pt: 0 }}>
                   {(data.recent_platform_transactions ?? []).length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       No completed platform payments yet.
@@ -243,21 +224,14 @@ const AdminRevenue = () => {
                       </TableBody>
                     </Table>
                   )}
-                </CardContent>
-              </Card>
+              </AdminPanel>
             </Grid>
 
             <Grid item xs={12} md={5}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Hotel fontSize="small" />
-                    Landlord rent volume (not platform revenue)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Rent paid by tenants through CarryIT is recorded for landlords only. It does not
-                    enter the platform wallet or subscription revenue.
-                  </Typography>
+              <AdminPanel
+                title="Landlord rent volume"
+                subtitle="Not platform revenue — rent processed for landlords only."
+              >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">MTD rent processed</Typography>
                     <Typography variant="body1" fontWeight={700}>
@@ -270,15 +244,9 @@ const AdminRevenue = () => {
                       {formatMoney(rent?.all_time_amount ?? 0, currency)}
                     </Typography>
                   </Box>
-                </CardContent>
-              </Card>
+              </AdminPanel>
 
-              <Card sx={{ mt: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Visibility fontSize="small" />
-                    Pending approvals
-                  </Typography>
+              <AdminPanel title="Pending approvals" sx={{ mt: 3 }} contentSx={{ pt: 0 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Platform payments (viewing, etc.)</Typography>
                     <Typography variant="body1" fontWeight={700}>
@@ -291,15 +259,9 @@ const AdminRevenue = () => {
                       {pending?.rent_for_landlords_count ?? 0}
                     </Typography>
                   </Box>
-                </CardContent>
-              </Card>
+              </AdminPanel>
 
-              <Card sx={{ mt: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Payment methods (all time)
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
+              <AdminPanel title="Payment methods (all time)" sx={{ mt: 3 }} contentSx={{ pt: 0 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Pesapal</Typography>
                     <Typography fontWeight={700}>
@@ -312,13 +274,12 @@ const AdminRevenue = () => {
                       {formatMoney(platform?.by_method_all_time?.manual ?? 0, currency)}
                     </Typography>
                   </Box>
-                </CardContent>
-              </Card>
+              </AdminPanel>
             </Grid>
           </Grid>
         </>
       ) : null}
-    </Box>
+    </AdminPage>
   );
 };
 

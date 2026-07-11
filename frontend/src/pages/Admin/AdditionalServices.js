@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -43,10 +44,16 @@ import {
 import additionalServicesAPI from '../../services/api/additionalServicesAPI';
 import authService from '../../services/authService';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import adminConfirm from '../../components/Admin/AdminConfirmDialog';
+import { adminPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
 
 const AdditionalServices = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -78,7 +85,6 @@ const AdditionalServices = () => {
       // Try the admin stats endpoint first
       try {
         const response = await api.get('/additional-services/admin/stats');
-        console.log('Admin stats response:', response.data);
         
         if (response.data) {
           // Handle different response formats
@@ -99,21 +105,12 @@ const AdditionalServices = () => {
           }
         }
       } catch (statsError) {
-        console.warn('Stats endpoint failed:', statsError);
-        console.warn('Error details:', {
-          status: statsError.response?.status,
-          data: statsError.response?.data,
-          message: statsError.message
-        });
+        // Fall through to regular endpoint
       }
       
-      // Fallback to regular endpoint
-      console.log('Trying fallback endpoint...');
       const fallbackResponse = await api.get('/additional-services/');
       const servicesData = Array.isArray(fallbackResponse.data) ? fallbackResponse.data : [];
-      console.log('Loaded services from fallback:', servicesData.length);
       
-      // Add empty stats for services that don't have them
       const servicesWithStats = servicesData.map(service => ({
         ...service,
         booking_count: service.booking_count || 0,
@@ -248,9 +245,13 @@ const AdditionalServices = () => {
   };
 
   const handleDelete = async (serviceId) => {
-    if (!window.confirm('Are you sure you want to delete this service? This action cannot be undone.')) {
-      return;
-    }
+    const confirmed = await adminConfirm(
+      'Delete service?',
+      'This action cannot be undone.',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -352,7 +353,7 @@ const AdditionalServices = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (booking) => <OwnerStatusChip status={booking.status || 'unknown'} />,
+      render: (booking) => <AdminStatusChip status={booking.status || 'unknown'} />,
     },
     {
       id: 'created_at',
@@ -434,7 +435,7 @@ const AdditionalServices = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (booking) => <OwnerStatusChip status={booking.status || 'unknown'} />,
+      render: (booking) => <AdminStatusChip status={booking.status || 'unknown'} />,
     },
     {
       id: 'created_at',
@@ -456,7 +457,7 @@ const AdditionalServices = () => {
               icon: <ViewIcon fontSize="small" />,
               label: 'View Inspection Details',
               onClick: () => {
-                window.location.href = `/admin/inspections?booking_id=${booking.id || booking.booking_id}`;
+                navigate(`/admin/inspections?booking_id=${booking.id || booking.booking_id}`);
               },
             },
           ]}
@@ -465,26 +466,36 @@ const AdditionalServices = () => {
     },
   ];
 
+  const totalBookings = services.reduce((sum, s) => sum + (s.booking_count || 0), 0);
+  const activeServices = services.filter((s) => s.is_active).length;
+
   if (loading && services.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <CircularProgress />
-      </Box>
+      <AdminPage>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+          <CircularProgress />
+        </Box>
+      </AdminPage>
     );
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ textTransform: 'none' }}
-        >
-          Add Service
-        </Button>
-      </Box>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Additional services"
+        subtitle={`${activeServices} active · ${totalBookings} bookings`}
+        action={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={adminPrimaryButtonSx}
+          >
+            Add service
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -497,6 +508,15 @@ const AdditionalServices = () => {
           {success}
         </Alert>
       )}
+
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { title: 'Services', value: services.length, icon: <MovingIcon /> },
+          { title: 'Active', value: activeServices, icon: <CheckCircleIcon /> },
+          { title: 'Total bookings', value: totalBookings, icon: <CalendarIcon /> },
+        ]}
+      />
 
       {/* Services List */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -814,7 +834,7 @@ const AdditionalServices = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

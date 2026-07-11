@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -20,12 +20,14 @@ import {
   Logout,
   Settings,
   Person,
+  Refresh,
 } from '@mui/icons-material';
 import Sidebar, { drawerWidth } from './Sidebar';
 import PortalNavTitle from './PortalNavTitle';
 import { logout } from '../../store/slices/authSlice';
 import { PageMetaProvider, usePageMeta } from '../../contexts/PageMetaContext';
 import { OWNER_ROUTE_META, OWNER_PROPERTY_HUB_TAB_META, colors, layout } from '../../theme/designTokens';
+import { triggerOwnerRefresh } from '../../utils/ownerRefresh';
 
 const toolbarHeight = layout.headerHeight;
 
@@ -38,6 +40,7 @@ const OwnerLayoutChrome = () => {
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -54,6 +57,12 @@ const OwnerLayoutChrome = () => {
   const handleLogout = () => {
     dispatch(logout());
     handleProfileMenuClose();
+  };
+
+  const handleSoftRefresh = async () => {
+    setRefreshing(true);
+    triggerOwnerRefresh();
+    setTimeout(() => setRefreshing(false), 400);
   };
 
   return (
@@ -95,7 +104,23 @@ const OwnerLayoutChrome = () => {
             />
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            <IconButton
+              size="small"
+              onClick={handleSoftRefresh}
+              disabled={refreshing}
+              aria-label="Refresh data"
+              sx={{ display: { xs: 'inline-flex', md: 'inline-flex' } }}
+            >
+              <Refresh
+                fontSize="small"
+                sx={
+                  refreshing
+                    ? { animation: 'spin 0.8s linear infinite', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } }
+                    : {}
+                }
+              />
+            </IconButton>
             {!isMobile && (
               <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                 {user?.first_name} {user?.last_name}

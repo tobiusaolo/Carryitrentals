@@ -5,7 +5,7 @@ import unitSlice from './slices/unitSlice';
 import tenantSlice from './slices/tenantSlice';
 import analyticsSlice from './slices/analyticsSlice';
 import utilitySlice from './slices/utilitySlice';
-import { leaseReducer, paymentReducer, maintenanceReducer } from './slices/otherSlices';
+import { paymentReducer } from './slices/otherSlices';
 
 export const store = configureStore({
   reducer: {
@@ -15,9 +15,7 @@ export const store = configureStore({
     tenants: tenantSlice,
     analytics: analyticsSlice,
     utilities: utilitySlice,
-    leases: leaseReducer,
     payments: paymentReducer,
-    maintenance: maintenanceReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

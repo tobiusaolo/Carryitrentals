@@ -44,14 +44,21 @@ import {
   DeleteSweep as DeleteSweepIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import notificationAPI from '../../services/api/notificationAPI';
 import authService from '../../services/authService';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
 import TableActions from '../../components/UI/TableActions';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
+import adminConfirm from '../../components/Admin/AdminConfirmDialog';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
 
 const AdminNotifications = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user } = useSelector(state => state.auth);
 
   const [loading, setLoading] = useState(false);
@@ -74,6 +81,9 @@ const AdminNotifications = () => {
     if (user?.role === 'admin') {
       loadNotifications();
     }
+    const handler = () => loadNotifications();
+    window.addEventListener('carryit:admin-refresh', handler);
+    return () => window.removeEventListener('carryit:admin-refresh', handler);
   }, [user]);
 
   const filteredNotifications = useMemo(() => {
@@ -102,6 +112,16 @@ const AdminNotifications = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resolveNotificationPath = (notification) => {
+    const type = String(notification?.notification_type || '').toLowerCase();
+    if (type.includes('listing_request')) return '/admin/listing-requests';
+    if (type.includes('payment_proof') || type.includes('payment_intent')) return '/admin/payment-intents';
+    if (type.includes('inspection') || type.includes('viewing')) return '/admin/inspections';
+    if (type.includes('maintenance')) return '/admin/maintenance';
+    if (type.includes('listing_report')) return '/admin/listing-reports';
+    return null;
   };
 
   const handleView = async (notification) => {
@@ -200,8 +220,15 @@ const AdminNotifications = () => {
   };
 
   const handleDelete = async (notificationId) => {
-    if (window.confirm('Are you sure you want to delete this notification?')) {
-      setLoading(true);
+    const confirmed = await adminConfirm(
+      'Delete notification?',
+      'This notification will be permanently removed.',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
       setError(null);
       try {
         const api = authService.createAxiosInstance();
@@ -213,7 +240,6 @@ const AdminNotifications = () => {
       } finally {
         setLoading(false);
       }
-    }
   };
 
   const markAsRead = async (notificationId) => {
@@ -285,7 +311,7 @@ const AdminNotifications = () => {
       id: 'is_read',
       label: 'Read Status',
       render: (notification) => (
-        <OwnerStatusChip
+        <AdminStatusChip
           status={notification.is_read ? 'completed' : 'pending'}
           label={notification.is_read ? 'Read' : 'Unread'}
         />
@@ -332,25 +358,28 @@ const AdminNotifications = () => {
 
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
 
+  const readCount = notifications.filter((n) => n.is_read === true).length;
+  const unreadCount = notifications.filter((n) => n.is_read === false).length;
+  const alertCount = notifications.filter((n) => n.notification_type === 'error' || n.notification_type === 'warning').length;
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        <NotificationsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Notifications Management
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Manage system notifications, alerts, and communications to users across the platform.
-      </Typography>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Notifications"
+        subtitle="Alerts"
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Create notification
+          </Button>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -358,75 +387,15 @@ const AdminNotifications = () => {
         </Alert>
       )}
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <NotificationsIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">{notifications.length}</Typography>
-                  <Typography color="text.secondary">Total Notifications</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {notifications.filter(n => n.is_read === true).length}
-                  </Typography>
-                  <Typography color="text.secondary">Read</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <ScheduleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {notifications.filter(n => n.is_read === false).length}
-                  </Typography>
-                  <Typography color="text.secondary">Unread</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: 'error.main', mr: 2 }}>
-                  <ErrorIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4">
-                    {notifications.filter(n => n.notification_type === 'error' || n.notification_type === 'warning').length}
-                  </Typography>
-                  <Typography color="text.secondary">Alerts</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <AdminStatStrip
+        loading={loading}
+        stats={[
+          { id: 'total', title: 'Total', value: notifications.length, icon: <NotificationsIcon /> },
+          { id: 'read', title: 'Read', value: readCount, icon: <CheckCircleIcon /> },
+          { id: 'unread', title: 'Unread', value: unreadCount, icon: <ScheduleIcon /> },
+          { id: 'alerts', title: 'Alerts', value: alertCount, icon: <ErrorIcon /> },
+        ]}
+      />
 
       <DataTable
         columns={notificationColumns}
@@ -463,8 +432,8 @@ const AdminNotifications = () => {
                 <MenuItem value="unread">Unread</MenuItem>
               </Select>
             </FormControl>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
-              Create Notification
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>
+              Create notification
             </Button>
           </Box>
         }
@@ -614,6 +583,18 @@ const AdminNotifications = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
+          {viewingNotification && resolveNotificationPath(viewingNotification) ? (
+            <Button
+              variant="contained"
+              onClick={() => {
+                setOpenViewDialog(false);
+                navigate(resolveNotificationPath(viewingNotification));
+              }}
+              sx={adminPrimaryButtonSx}
+            >
+              Open related page
+            </Button>
+          ) : null}
           {viewingNotification && (
             <Button 
               variant="outlined" 
@@ -628,7 +609,7 @@ const AdminNotifications = () => {
           )}
         </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

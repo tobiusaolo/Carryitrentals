@@ -10,7 +10,8 @@ import { OpenInNew, Refresh, Payment } from '@mui/icons-material';
 import { useCachedQuery } from '../../hooks/useCachedQuery';
 import PageHeader from '../../components/UI/PageHeader';
 import DataTable from '../../components/UI/DataTable';
-import OwnerStatusChip from '../../components/Owner/OwnerStatusChip';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatusChip from '../../components/Admin/AdminStatusChip';
 import { formatMoney } from '../../utils/formatMoney';
 import { useSelector } from 'react-redux';
 import { portalOutlinedButtonSx } from '../../theme/designTokens';
@@ -32,8 +33,18 @@ const AdminViewingPayments = () => {
   const rows = Array.isArray(data) ? data : [];
 
   if (user?.role !== 'admin') {
-    return <Alert severity="error">Admin access required</Alert>;
+    return (
+      <AdminPage>
+        <Alert severity="error">Admin access required</Alert>
+      </AdminPage>
+    );
   }
+
+  const paidCount = rows.filter((p) => String(p.status).toLowerCase() === 'paid').length;
+  const pendingCount = rows.filter((p) => {
+    const s = String(p.status).toLowerCase();
+    return s === 'pending' || s === 'partial';
+  }).length;
 
   const columns = [
     {
@@ -47,7 +58,9 @@ const AdminViewingPayments = () => {
       id: 'booking',
       label: 'Booking',
       render: (p) => (
-        <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem' }}>{p.inspection_booking_id}</span>
+        <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem' }}>
+          {p.inspection_booking_id}
+        </span>
       ),
     },
     {
@@ -58,7 +71,7 @@ const AdminViewingPayments = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (p) => <OwnerStatusChip status={p.status} />,
+      render: (p) => <AdminStatusChip status={p.status} />,
     },
     {
       id: 'transaction',
@@ -83,12 +96,19 @@ const AdminViewingPayments = () => {
   ];
 
   return (
-    <>
+    <AdminPage>
       <PageHeader
         variant="admin"
         title="Viewing payments"
+        subtitle="Inspection fees"
         action={
-          <Button startIcon={<Refresh />} onClick={load} variant="outlined" size="small" sx={portalOutlinedButtonSx}>
+          <Button
+            startIcon={<Refresh />}
+            onClick={load}
+            variant="outlined"
+            size="small"
+            sx={portalOutlinedButtonSx}
+          >
             Refresh
           </Button>
         }
@@ -102,11 +122,12 @@ const AdminViewingPayments = () => {
         rows={rows}
         loading={loading && !rows.length}
         title="All payments"
+        subtitle={`${paidCount} paid · ${pendingCount} pending`}
         emptyTitle="No payments"
         emptyDescription="Created when a guest books a viewing."
         emptyIcon={Payment}
       />
-    </>
+    </AdminPage>
   );
 };
 

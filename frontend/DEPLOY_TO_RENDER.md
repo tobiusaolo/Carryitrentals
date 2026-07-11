@@ -59,7 +59,7 @@ git push -u origin main
    - Add environment variable:
      ```
      Key: REACT_APP_API_URL
-     Value: https://carryit-backend.onrender.com/api/v1
+     Value: https://carryit-backend-su8h.onrender.com/api/v1
      ```
    - Note: This is optional since the URL is already hardcoded in the code
 
@@ -209,7 +209,7 @@ npm run build
 - Ensure `homepage` is NOT set in `package.json`
 
 ### API Calls Failing
-- Verify backend URL: `https://carryit-backend.onrender.com`
+- Verify backend URL: `https://carryit-backend-su8h.onrender.com`
 - Check browser network tab
 - Ensure CORS is enabled on backend
 
@@ -240,7 +240,7 @@ After deployment, verify:
 
 ## 📞 Support
 
-**Backend API**: https://carryit-backend.onrender.com
+**Backend API**: https://carryit-backend-su8h.onrender.com
 **Email**: stuartkevinz852@gmail.com, carryit@gmail.com
 **Phone**: +256754577922
 

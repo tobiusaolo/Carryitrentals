@@ -88,7 +88,7 @@ const OwnerPropertyHub = () => {
         {activeTab?.key === 'properties' && <Properties />}
         {activeTab?.key === 'units' && <Units />}
         {activeTab?.key === 'units-for-rent' && <UnitsForRent />}
-        {activeTab?.key === 'airbnb' && <OwnerAirbnb embedded />}
+        {activeTab?.key === 'airbnb' && <OwnerAirbnb />}
         {activeTab?.key === 'tenants' && <Tenants />}
         {activeTab?.key === 'payments' && <Payments />}
       </Box>

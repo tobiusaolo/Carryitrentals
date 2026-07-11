@@ -7,7 +7,7 @@
 ## ✅ Code Configuration
 
 ### Backend URLs Updated
-- [x] All API calls point to: `https://carryit-backend.onrender.com/api/v1`
+- [x] All API calls point to: `https://carryit-backend-su8h.onrender.com/api/v1`
 - [x] Updated files:
   - `src/services/authService.js`
   - `src/services/api/unitAPI.js`
@@ -116,7 +116,7 @@ services:
 
 ## 🌐 Live URLs (After Deployment)
 
-- **Backend API**: https://carryit-backend.onrender.com ✅ LIVE
+- **Backend API**: https://carryit-backend-su8h.onrender.com ✅ LIVE
 - **Frontend**: https://carryit-frontend.onrender.com ⏳ PENDING
 - **Custom Domain**: https://www.carryit.com (optional)
 
@@ -255,7 +255,7 @@ Everything is configured and ready. Just:
 
 **Phone**: +256754577922
 
-**Backend**: https://carryit-backend.onrender.com
+**Backend**: https://carryit-backend-su8h.onrender.com
 
 ---
 

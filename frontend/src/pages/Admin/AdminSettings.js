@@ -25,8 +25,11 @@ import {
   Notifications,
   CheckCircle
 } from '@mui/icons-material';
-import axios from 'axios';
-import { API_BASE_URL } from '../../config/api';
+import authService from '../../services/authService';
+import PageHeader from '../../components/UI/PageHeader';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminPanel from '../../components/Admin/AdminPanel';
+import { adminPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
 
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
@@ -49,10 +52,7 @@ const AdminSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/admin/settings`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await authService.get('/admin/settings');
 
       if (response.data && response.data.length > 0) {
         // Convert array of settings to object
@@ -79,12 +79,7 @@ const AdminSettings = () => {
   const initializeDefaults = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/settings/initialize-defaults`,
-        {},
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await authService.post('/admin/settings/initialize-defaults', {});
 
       showAlert('success', 'Default settings initialized successfully!');
       await loadSettings();
@@ -99,12 +94,7 @@ const AdminSettings = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/settings/bulk-update`,
-        settings,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await authService.post('/admin/settings/bulk-update', settings);
 
       showAlert('success', 'Settings saved successfully!');
       await loadSettings();
@@ -127,93 +117,64 @@ const AdminSettings = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
-        <CircularProgress />
-      </Box>
+      <AdminPage>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 10 }}>
+          <CircularProgress />
+        </Box>
+      </AdminPage>
     );
   }
 
   if (!initialized) {
     return (
-      <Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Box>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-              System Settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Configure payment numbers and system preferences
-            </Typography>
+      <AdminPage>
+        <PageHeader variant="admin" title="Settings" subtitle="Platform config" />
+        <AdminPanel title="Settings not initialized" subtitle="Initialize default payment numbers and preferences.">
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <SettingsIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+            <Button
+              variant="contained"
+              onClick={initializeDefaults}
+              disabled={saving}
+              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+              sx={adminPrimaryButtonSx}
+            >
+              {saving ? 'Initializing…' : 'Initialize default settings'}
+            </Button>
           </Box>
-        </Box>
-
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-          <SettingsIcon sx={{ fontSize: 80, color: '#667eea', mb: 2 }} />
-          <Typography variant="h5" fontWeight={600} gutterBottom>
-            Settings Not Initialized
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Click the button below to initialize default system settings including mobile money payment numbers.
-          </Typography>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={initializeDefaults}
-            disabled={saving}
-            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 4,
-              py: 1.5
-            }}
-          >
-            {saving ? 'Initializing...' : 'Initialize Default Settings'}
-          </Button>
-        </Paper>
-      </Box>
+        </AdminPanel>
+      </AdminPage>
     );
   }
 
   return (
-    <Box>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            System Settings
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Configure mobile money payment numbers and system preferences
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Tooltip title="Refresh Settings">
-            <IconButton onClick={loadSettings} disabled={loading}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-            onClick={handleSave}
-            disabled={saving}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3
-            }}
-          >
-            {saving ? 'Saving...' : 'Save Settings'}
-          </Button>
-        </Box>
-      </Box>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Settings"
+        subtitle="Platform config"
+        action={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Refresh">
+              <IconButton onClick={loadSettings} disabled={loading} size="small">
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              onClick={handleSave}
+              disabled={saving}
+              sx={adminPrimaryButtonSx}
+            >
+              Save changes
+            </Button>
+          </Box>
+        }
+      />
 
-      {/* Alert */}
       {alert.show && (
-        <Alert severity={alert.type} sx={{ mb: 3 }} onClose={() => setAlert({ ...alert, show: false })}>
+        <Alert severity={alert.type} sx={{ mb: 2 }} onClose={() => setAlert({ ...alert, show: false })}>
           {alert.message}
         </Alert>
       )}
@@ -419,7 +380,7 @@ const AdminSettings = () => {
           </Typography>
         </Box>
       </Paper>
-    </Box>
+    </AdminPage>
   );
 };
 

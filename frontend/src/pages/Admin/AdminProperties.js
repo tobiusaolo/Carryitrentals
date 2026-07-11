@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
   Button,
   Dialog,
@@ -15,19 +13,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
-  IconButton,
   Alert,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Avatar,
-  Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -36,12 +23,20 @@ import {
   Visibility as ViewIcon,
   Home as HomeIcon,
   Business as BusinessIcon,
-  AttachMoney as MoneyIcon,
   People as PeopleIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProperties } from '../../store/slices/propertySlice';
 import { propertyAPI } from '../../services/api/propertyAPI';
+import adminAPI from '../../services/api/adminAPI';
+import PageHeader from '../../components/UI/PageHeader';
+import DataTable from '../../components/UI/DataTable';
+import TableActions from '../../components/UI/TableActions';
+import AdminPage from '../../components/Admin/AdminPage';
+import AdminStatStrip from '../../components/Admin/AdminStatStrip';
+import PropertyDetailPanel from '../../components/Owner/PropertyDetailPanel';
+import { adminConfirm } from '../../components/Admin/AdminConfirmDialog';
+import { adminPrimaryButtonSx } from '../../theme/designTokens';
 
 const AdminProperties = () => {
   const dispatch = useDispatch();
@@ -67,12 +62,23 @@ const AdminProperties = () => {
     total_units: '',
     owner_id: ''
   });
+  const [owners, setOwners] = useState([]);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       loadProperties();
+      loadOwners();
     }
   }, [user]);
+
+  const loadOwners = async () => {
+    try {
+      const users = await adminAPI.getAllUsers();
+      setOwners((Array.isArray(users) ? users : []).filter((u) => u.role === 'owner'));
+    } catch (err) {
+      console.error('Failed to load owners:', err);
+    }
+  };
 
   const loadProperties = async () => {
     setLoading(true);
@@ -158,6 +164,11 @@ const AdminProperties = () => {
     setSuccess(null);
 
     try {
+      if (!formData.owner_id && !editingProperty) {
+        setError('Select a property owner');
+        setLoading(false);
+        return;
+      }
       if (editingProperty) {
         await propertyAPI.updateProperty(editingProperty.id, formData);
         setSuccess('Property updated successfully!');
@@ -176,130 +187,131 @@ const AdminProperties = () => {
   };
 
   const handleDeleteProperty = async (propertyId) => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
-      setLoading(true);
-      try {
-        await propertyAPI.deleteProperty(propertyId);
-        setSuccess('Property deleted successfully!');
-        await loadProperties();
-      } catch (err) {
-        setError('Failed to delete property');
-      } finally {
-        setLoading(false);
-      }
+    const ok = await adminConfirm('Delete property?', 'This will remove the property and related data.');
+    if (!ok) return;
+    setLoading(true);
+    try {
+      await propertyAPI.deleteProperty(propertyId);
+      setSuccess('Property deleted successfully!');
+      await loadProperties();
+    } catch (err) {
+      setError('Failed to delete property');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const ownerLabel = (ownerId) => {
+    const o = owners.find((x) => String(x.id) === String(ownerId));
+    return o ? `${o.first_name || ''} ${o.last_name || ''}`.trim() || o.email : ownerId || '-';
+  };
+
+  const propertyColumns = [
+    {
+      id: 'name',
+      label: 'Property',
+      render: (p) => (
+        <>
+          <Typography variant="body2" fontWeight={600}>{p.name}</Typography>
+          <Typography variant="caption" color="text.secondary">{p.property_type}</Typography>
+        </>
+      ),
+    },
+    {
+      id: 'location',
+      label: 'Location',
+      render: (p) => `${p.address || ''}, ${p.city || ''}`.replace(/^, |, $/g, '') || '-',
+    },
+    {
+      id: 'owner',
+      label: 'Owner',
+      render: (p) => ownerLabel(p.owner_id),
+    },
+    {
+      id: 'units',
+      label: 'Occupancy',
+      render: (p) => {
+        const occupied = p.occupied_units ?? p.stats?.occupied_units ?? 0;
+        const available = p.available_units ?? p.stats?.available_units ?? 0;
+        const registered = p.unit_count ?? p.stats?.unit_count ?? 0;
+        const declared = p.total_units ?? 0;
+        return (
+          <>
+            <Typography variant="body2">{occupied} occ · {available} avail</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {declared > 0 ? `${registered}/${declared} registered` : `${registered} registered`}
+            </Typography>
+          </>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (p) => (
+        <TableActions
+          actions={[
+            { icon: <ViewIcon fontSize="small" />, label: 'View', onClick: () => handleViewProperty(p) },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit', onClick: () => handleOpenDialog(p) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete', onClick: () => handleDeleteProperty(p.id), danger: true },
+          ]}
+        />
+      ),
+    },
+  ];
+
   if (user?.role !== 'admin') {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error">
-          <Typography variant="h6">Access Denied</Typography>
-          <Typography>You need admin privileges to access this page.</Typography>
-        </Alert>
-      </Box>
+      <AdminPage>
+        <Alert severity="error">You need admin privileges to access this page.</Alert>
+      </AdminPage>
     );
   }
 
+  const totalUnits = properties.reduce((sum, p) => sum + Number(p.unit_count ?? p.stats?.unit_count ?? 0), 0);
+  const totalOccupied = properties.reduce((sum, p) => sum + Number(p.occupied_units ?? p.stats?.occupied_units ?? 0), 0);
+  const totalAvailable = properties.reduce((sum, p) => sum + Number(p.available_units ?? p.stats?.available_units ?? 0), 0);
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          <HomeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Property Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Property
-        </Button>
-      </Box>
+    <AdminPage>
+      <PageHeader
+        variant="admin"
+        title="Properties"
+        subtitle="Add & manage portfolios"
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={adminPrimaryButtonSx}>
+            Add property
+          </Button>
+        }
+      />
 
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Manage all properties in the system, including admin-uploaded properties and owner properties.
-      </Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      <AdminStatStrip
+        stats={[
+          { id: 'count', title: 'Properties', value: properties.length, icon: <HomeIcon /> },
+          { id: 'owners', title: 'Owners', value: owners.length, icon: <BusinessIcon /> },
+          { id: 'units', title: 'Units registered', value: totalUnits, icon: <PeopleIcon /> },
+          { id: 'occupied', title: 'Occupied', value: totalOccupied, icon: <HomeIcon /> },
+          { id: 'available', title: 'Available', value: totalAvailable, icon: <BusinessIcon /> },
+        ]}
+      />
 
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {success}
-        </Alert>
-      )}
-
-      {/* Properties Grid */}
-      <Grid container spacing={3}>
-        {properties.map((property) => (
-          <Grid item xs={12} md={6} lg={4} key={property.id}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                  <Typography variant="h6">{property.name}</Typography>
-                  <Chip 
-                    label={property.property_type} 
-                    color="primary" 
-                    size="small" 
-                  />
-                </Box>
-                
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {property.address}, {property.city}, {property.state}
-                </Typography>
-                
-                <Typography variant="body2" paragraph>
-                  {property.description}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <HomeIcon sx={{ mr: 1, fontSize: 16 }} />
-                    <Typography variant="body2">
-                      {property.total_units} units
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <BusinessIcon sx={{ mr: 1, fontSize: 16 }} />
-                    <Typography variant="body2">
-                      Owner ID: {property.owner_id}
-                    </Typography>
-                  </Box>
-                </Box>
-                
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button 
-                    size="small" 
-                    startIcon={<ViewIcon />}
-                    onClick={() => handleViewProperty(property)}
-                  >
-                    View
-                  </Button>
-                  <Button 
-                    size="small" 
-                    startIcon={<EditIcon />}
-                    onClick={() => handleOpenDialog(property)}
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    size="small" 
-                    color="error" 
-                    startIcon={<DeleteIcon />}
-                    onClick={() => handleDeleteProperty(property.id)}
-                  >
-                    Delete
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      <DataTable
+        columns={propertyColumns}
+        rows={properties}
+        loading={loading}
+        title="All properties"
+        subtitle="Admin and owner portfolios"
+        emptyTitle="No properties"
+        emptyDescription="Add a property and assign it to an owner."
+        emptyIcon={HomeIcon}
+        emptyActionLabel="Add property"
+        onEmptyAction={() => handleOpenDialog()}
+        searchPlaceholder="Search by name, city, or owner…"
+      />
 
       {/* Add/Edit Property Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
@@ -377,6 +389,22 @@ const AdminProperties = () => {
               />
             </Grid>
             <Grid item xs={12} md={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Property owner</InputLabel>
+                <Select
+                  value={formData.owner_id}
+                  label="Property owner"
+                  onChange={handleInputChange('owner_id')}
+                >
+                  {owners.map((o) => (
+                    <MenuItem key={o.id} value={o.id}>
+                      {`${o.first_name || ''} ${o.last_name || ''}`.trim() || o.email} ({o.email})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Total Units"
@@ -402,11 +430,7 @@ const AdminProperties = () => {
           <Button onClick={handleCloseDialog}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained"
-            disabled={loading}
-          >
+          <Button onClick={handleSubmit} variant="contained" disabled={loading} sx={adminPrimaryButtonSx}>
             {loading ? <CircularProgress size={20} /> : (editingProperty ? 'Update' : 'Create')}
           </Button>
         </DialogActions>
@@ -416,59 +440,23 @@ const AdminProperties = () => {
       <Dialog open={viewDialogOpen} onClose={handleCloseViewDialog} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <HomeIcon />
-          Property Details - {selectedProperty?.name}
+          {selectedProperty?.name || 'Property details'}
         </DialogTitle>
-        <DialogContent>
-          {selectedProperty && (
-            <Box>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Property Name</Typography>
-                  <Typography variant="body1">{selectedProperty.name}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Property Type</Typography>
-                  <Typography variant="body1">{selectedProperty.property_type}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary">Address</Typography>
-                  <Typography variant="body1">{selectedProperty.address}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography variant="subtitle2" color="text.secondary">City</Typography>
-                  <Typography variant="body1">{selectedProperty.city}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography variant="subtitle2" color="text.secondary">State</Typography>
-                  <Typography variant="body1">{selectedProperty.state}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography variant="subtitle2" color="text.secondary">Zip Code</Typography>
-                  <Typography variant="body1">{selectedProperty.zip_code}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Country</Typography>
-                  <Typography variant="body1">{selectedProperty.country}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Total Units</Typography>
-                  <Typography variant="body1">{selectedProperty.total_units}</Typography>
-                </Grid>
-                {selectedProperty.description && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">Description</Typography>
-                    <Typography variant="body1">{selectedProperty.description}</Typography>
-                  </Grid>
-                )}
-              </Grid>
-            </Box>
-          )}
+        <DialogContent dividers>
+          {selectedProperty ? (
+            <PropertyDetailPanel
+              property={selectedProperty}
+              onEdit={() => {
+                const p = selectedProperty;
+                handleCloseViewDialog();
+                handleOpenDialog(p);
+              }}
+              onClose={handleCloseViewDialog}
+            />
+          ) : null}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseViewDialog}>Close</Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </AdminPage>
   );
 };
 

@@ -74,20 +74,7 @@ export const deletePayment = createAsyncThunk(
   }
 );
 
-// Placeholder slices for other features
-const leaseSlice = createSlice({
-  name: 'leases',
-  initialState: {
-    leases: [],
-    isLoading: false,
-    error: null,
-  },
-  reducers: {
-    clearError: (state) => {
-      state.error = null;
-    },
-  },
-});
+// Placeholder lease & maintenance slices removed — pages were never wired up.
 
 const paymentSlice = createSlice({
   name: 'payments',
@@ -203,25 +190,7 @@ const paymentSlice = createSlice({
   },
 });
 
-const maintenanceSlice = createSlice({
-  name: 'maintenance',
-  initialState: {
-    maintenanceRequests: [],
-    isLoading: false,
-    error: null,
-  },
-  reducers: {
-    clearError: (state) => {
-      state.error = null;
-    },
-  },
-});
-
-export const { clearError: clearLeaseError } = leaseSlice.actions;
 export const { clearError: clearPaymentError, clearCurrentPayment } = paymentSlice.actions;
-export const { clearError: clearMaintenanceError } = maintenanceSlice.actions;
 
-export const leaseReducer = leaseSlice.reducer;
 export const paymentReducer = paymentSlice.reducer;
-export const maintenanceReducer = maintenanceSlice.reducer;
 
