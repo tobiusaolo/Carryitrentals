@@ -28,6 +28,7 @@ import { isListingSaved, toggleSavedListing } from '../../utils/favorites';
 import { getRentalStatusMeta } from '../../utils/rentalStatus';
 import { getAirbnbPropertyTypeLabel, getListingStatusMeta } from '../../constants/airbnb';
 import DisplayPrice from '../Public/DisplayPrice';
+import WatermarkedImage from '../Public/WatermarkedImage';
 import { colors, layout, typography } from '../../theme/designTokens';
 
 const verifiedLabel = (property) =>
@@ -132,17 +133,18 @@ const PropertyCard = ({ property, onClick, variant = 'rental' }) => {
     >
       {/* Image */}
       <Box sx={{ position: 'relative', width: '100%', pt: '68%', bgcolor: '#ececec' }}>
-        <Box
-          component="img"
+        <WatermarkedImage
           src={images[currentImage] || 'https://via.placeholder.com/800x544?text=No+photo'}
           alt={title}
-          sx={{
+          variant="card"
+          wrapperSx={{
             position: 'absolute',
             top: 0,
             left: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+          }}
+          sx={{
             filter: statusMeta.isAvailable ? 'none' : 'grayscale(40%) brightness(0.92)',
             transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
             transform: isHovered && statusMeta.isAvailable ? 'scale(1.04)' : 'scale(1)',

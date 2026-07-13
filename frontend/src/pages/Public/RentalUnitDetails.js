@@ -44,6 +44,7 @@ import { API_BASE_URL } from '../../config/api';
 import { DEFAULT_INSPECTION_FEE_UGX, BOOKING_TIME_SLOTS } from '../../constants/rentalUnit';
 import { isListingSaved, toggleSavedListing } from '../../utils/favorites';
 import DisplayPrice from '../../components/Public/DisplayPrice';
+import WatermarkedImage from '../../components/Public/WatermarkedImage';
 import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
 import { convertAmount, normalizeCurrency } from '../../config/currencyLocale';
 import { getRentalStatusMeta, normalizeRentalStatus } from '../../utils/rentalStatus';
@@ -304,14 +305,20 @@ const RentalUnitDetails = () => {
 
         <Grid container spacing={1} sx={{ height: { xs: 300, md: 500 }, mb: 4, borderRadius: '16px', overflow: 'hidden' }}>
           <Grid item xs={12} md={6} sx={{ height: '100%' }}>
-            <Box component="img" src={unit.images?.[0] || 'https://via.placeholder.com/800x600'} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <WatermarkedImage
+              src={unit.images?.[0] || 'https://via.placeholder.com/800x600'}
+              alt={unit.title || unit.name || 'Property'}
+            />
           </Grid>
           {!isMobile && (
             <Grid item md={6} sx={{ height: '100%' }}>
               <Grid container spacing={1} sx={{ height: '100%' }}>
                 {[1, 2, 3, 4].map((i) => (
                   <Grid item xs={6} sx={{ height: '50%' }} key={i}>
-                    <Box component="img" src={unit.images?.[i] || unit.images?.[0]} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <WatermarkedImage
+                      src={unit.images?.[i] || unit.images?.[0]}
+                      alt={`${unit.title || 'Property'} photo ${i + 1}`}
+                    />
                   </Grid>
                 ))}
               </Grid>

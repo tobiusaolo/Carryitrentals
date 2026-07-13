@@ -38,6 +38,7 @@ import axios from 'axios';
 import PublicHeader from '../../components/Navigation/PublicHeader';
 import Footer from '../../components/Footer';
 import DisplayPrice from '../../components/Public/DisplayPrice';
+import WatermarkedImage from '../../components/Public/WatermarkedImage';
 import { COUNTRY_OPTIONS, calculateStayTotal, getAirbnbPropertyTypeLabel } from '../../constants/airbnb';
 import {
   validateAirbnbBooking,
@@ -174,14 +175,13 @@ const AirbnbDetails = () => {
                 height: { md: 400 },
               }}
             >
-              <Box
-                component="img"
+              <WatermarkedImage
                 src={images[0]}
                 alt={airbnb.title}
-                sx={{ gridRow: { md: 'span 2' }, width: '100%', height: '100%', objectFit: 'cover' }}
+                wrapperSx={{ gridRow: { md: 'span 2' }, width: '100%', height: '100%' }}
               />
               {images.slice(1, 3).map((img, i) => (
-                <Box key={i} component="img" src={img} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <WatermarkedImage key={i} src={img} alt="" wrapperSx={{ width: '100%', height: '100%' }} />
               ))}
             </Box>
           </Grid>
