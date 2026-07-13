@@ -9,14 +9,10 @@ import {
   FormHelperText,
   Button,
   Alert,
-  ImageList,
-  ImageListItem,
-  ImageListItemBar,
-  IconButton,
   Typography,
 } from '@mui/material';
-import { CloudUpload as UploadIcon, Delete as DeleteImageIcon } from '@mui/icons-material';
 import FormSection from './FormSection';
+import ImagePickerField from './ImagePickerField';
 import {
   COUNTRY_OPTIONS,
   CURRENCY_OPTIONS,
@@ -289,45 +285,19 @@ const AirbnbListingFormFields = ({
     {onImageSelect && (
       <Grid item xs={12}>
         <FormSection title="Photos" subtitle={`${MIN_AIRBNB_IMAGES}–${MAX_AIRBNB_IMAGES} images required`}>
-          <input
-            accept="image/*"
-            style={{ display: 'none' }}
-            id="airbnb-listing-image-upload"
-            multiple
-            type="file"
-            onChange={onImageSelect}
+          <ImagePickerField
+            inputId="airbnb-listing-image-upload"
+            selectedImages={selectedImages}
+            onSelect={(files) => {
+              const syntheticEvent = { target: { files } };
+              onImageSelect(syntheticEvent);
+            }}
+            onRemove={onRemoveImage}
+            minImages={MIN_AIRBNB_IMAGES}
+            maxImages={MAX_AIRBNB_IMAGES}
+            label="Upload photos"
+            helperText="Add photos of the space — bedrooms, kitchen, bathroom, and exterior."
           />
-          <label htmlFor="airbnb-listing-image-upload">
-            <Button variant="outlined" component="span" startIcon={<UploadIcon />} fullWidth sx={{ mb: 2 }}>
-              {selectedImages.length > 0 ? 'Add more photos' : 'Upload photos'}
-            </Button>
-          </label>
-          <Alert severity={selectedImages.length >= MIN_AIRBNB_IMAGES ? 'success' : 'warning'} sx={{ mb: 2 }}>
-            {selectedImages.length} / {MAX_AIRBNB_IMAGES} photos
-            {selectedImages.length >= MIN_AIRBNB_IMAGES ? ' — ready to save' : ` — need at least ${MIN_AIRBNB_IMAGES}`}
-          </Alert>
-          {selectedImages.length > 0 && (
-            <ImageList cols={3} gap={8}>
-              {selectedImages.map((image, index) => (
-                <ImageListItem key={index}>
-                  <img
-                    src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                    alt={`Listing ${index + 1}`}
-                    style={{ height: 120, objectFit: 'cover' }}
-                  />
-                  {onRemoveImage && (
-                    <ImageListItemBar
-                      actionIcon={
-                        <IconButton sx={{ color: 'white' }} onClick={() => onRemoveImage(index)}>
-                          <DeleteImageIcon />
-                        </IconButton>
-                      }
-                    />
-                  )}
-                </ImageListItem>
-              ))}
-            </ImageList>
-          )}
         </FormSection>
       </Grid>
     )}

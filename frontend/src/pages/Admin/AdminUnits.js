@@ -46,9 +46,7 @@ import {
   Verified as VerifiedIcon,
   Warning as WarningIcon,
   Schedule as ScheduleIcon,
-  CloudUpload as UploadIcon,
   PhotoCamera as CameraIcon,
-  Delete as DeleteImageIcon,
   Close as CloseIcon,
   Image as ImageIcon,
   Info as InfoIcon,
@@ -87,6 +85,7 @@ import {
   splitListingImages,
 } from '../../utils/rentalUnitForm';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
+import ImagePickerField from '../../components/Forms/ImagePickerField';
 import { buildAdminUnitColumns } from './columns/adminUnitColumns';
 import adminConfirm from '../../components/Admin/AdminConfirmDialog';
 
@@ -226,17 +225,12 @@ const AdminUnits = () => {
     setOpenDialog(true);
   };
 
-  const handleImageSelect = (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length < 5) {
-      setError('Please select at least 5 images');
-      return;
-    }
-    if (files.length > 10) {
+  const handleImageSelect = (files) => {
+    if (selectedImages.length + files.length > 10) {
       setError('Maximum 10 images allowed');
       return;
     }
-    setSelectedImages(files);
+    setSelectedImages((prev) => [...prev, ...files]);
     setError(null);
   };
 
@@ -871,57 +865,23 @@ const AdminUnits = () => {
               <StepLabel>Upload Images (5-10 images required)</StepLabel>
               <StepContent>
                 <Box sx={{ mb: 2 }}>
-                  <input
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    id="image-upload"
-                    multiple
-                    type="file"
-                    onChange={handleImageSelect}
+                  <ImagePickerField
+                    inputId="admin-unit-image-upload"
+                    selectedImages={selectedImages}
+                    onSelect={handleImageSelect}
+                    onRemove={handleRemoveImage}
+                    minImages={MIN_RENTAL_LISTING_IMAGES}
+                    maxImages={10}
+                    label="Select images"
+                    helperText="Add 5–10 photos of the unit — different angles and rooms. You can add them one batch at a time."
+                    disabled={submitting}
                   />
-                  <label htmlFor="image-upload">
-                    <Button
-                      variant="contained"
-                      component="span"
-                      startIcon={<UploadIcon />}
-                      sx={{ mb: 2 }}
-                    >
-                      Select Images
-                    </Button>
-                  </label>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Please select 5-10 images of the unit. Images should show different angles and rooms.
-                  </Typography>
                   <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2">
-                      <strong>Image Format Tip:</strong> Accepted formats are JPEG, JPG, PNG, or GIF. Maximum file size is 10MB per image.
+                      <strong>Image format:</strong> JPEG, JPG, PNG, or GIF. Maximum 10 MB per image.
                     </Typography>
                   </Alert>
-                  
-                  {selectedImages.length > 0 && (
-                    <ImageList sx={{ width: '100%', height: 300 }} cols={3} rowHeight={150}>
-                      {selectedImages.map((image, index) => (
-                        <ImageListItem key={index}>
-                          <img
-                            src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                            alt={`Unit ${index + 1}`}
-                            loading="lazy"
-                          />
-                          <ImageListItemBar
-                            actionIcon={
-                              <IconButton
-                                sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
-                                onClick={() => handleRemoveImage(index)}
-                              >
-                                <DeleteImageIcon />
-                              </IconButton>
-                            }
-                          />
-                        </ImageListItem>
-                      ))}
-                    </ImageList>
-                  )}
-                  
+
                   <RentalVideoField
                     existingUrl={removeVideo ? '' : existingVideoUrl}
                     selectedFile={selectedVideo}

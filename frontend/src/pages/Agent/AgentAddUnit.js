@@ -14,10 +14,6 @@ import {
   Step,
   StepLabel,
   StepContent,
-  ImageList,
-  ImageListItem,
-  ImageListItemBar,
-  IconButton,
   LinearProgress,
   Paper,
   Dialog,
@@ -31,8 +27,6 @@ import {
   Grow
 } from '@mui/material';
 import {
-  CloudUpload as UploadIcon,
-  Delete as DeleteImageIcon,
   Home as HomeIcon,
   CheckCircle as SuccessIcon,
   Close as CloseIcon
@@ -42,6 +36,7 @@ import api from '../../services/api/api';
 import { emptyRentalFormState, UNIT_TYPE_OPTIONS, CURRENCY_OPTIONS, COUNTRY_OPTIONS, MIN_RENTAL_LISTING_IMAGES } from '../../constants/rentalUnit';
 import { buildRentalUnitPayload, imagesPayloadFromSelection } from '../../utils/rentalUnitForm';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
+import ImagePickerField from '../../components/Forms/ImagePickerField';
 import { unitAPI } from '../../services/api/unitAPI';
 import { RENTAL_STATUS_OPTIONS } from '../../utils/rentalStatus';
 
@@ -70,25 +65,16 @@ const AgentAddUnit = () => {
     setActiveStep((prev) => prev - 1);
   };
 
-  const handleImageSelect = (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length < 5) {
-      setNotification({
-        open: true,
-        message: 'Please select at least 5 images',
-        severity: 'error'
-      });
-      return;
-    }
+  const handleImageSelect = (files) => {
     if (selectedImages.length + files.length > 10) {
       setNotification({
         open: true,
         message: 'Maximum 10 images allowed',
-        severity: 'error'
+        severity: 'error',
       });
       return;
     }
-    setSelectedImages([...selectedImages, ...files]);
+    setSelectedImages((prev) => [...prev, ...files]);
   };
 
   const handleRemoveImage = (index) => {
@@ -395,52 +381,18 @@ const AgentAddUnit = () => {
             <StepLabel>Upload Images (5-10 images required)</StepLabel>
             <StepContent>
               <Box sx={{ mb: 2 }}>
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="image-upload"
-                  multiple
-                  type="file"
-                  onChange={handleImageSelect}
+                <ImagePickerField
+                  inputId="agent-unit-image-upload"
+                  selectedImages={selectedImages}
+                  onSelect={handleImageSelect}
+                  onRemove={handleRemoveImage}
+                  minImages={MIN_RENTAL_LISTING_IMAGES}
+                  maxImages={10}
+                  label="Select images"
+                  helperText="Add 5–10 photos of the unit. You can pick them in multiple batches and preview each one below."
+                  disabled={loading}
                 />
-                <label htmlFor="image-upload">
-                  <Button
-                    variant="contained"
-                    component="span"
-                    startIcon={<UploadIcon />}
-                    sx={{ mb: 2 }}
-                  >
-                    Select Images
-                  </Button>
-                </label>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Please select 5-10 images of the unit. Images should show different angles and rooms.
-                </Typography>
-                
-                {selectedImages.length > 0 && (
-                  <ImageList sx={{ width: '100%', height: 300 }} cols={3} rowHeight={150}>
-                    {selectedImages.map((image, index) => (
-                      <ImageListItem key={index}>
-                        <img
-                          src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                          alt={`Unit image ${index + 1}`}
-                          loading="lazy"
-                        />
-                        <ImageListItemBar
-                          actionIcon={
-                            <IconButton
-                              sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
-                              onClick={() => handleRemoveImage(index)}
-                            >
-                              <DeleteImageIcon />
-                            </IconButton>
-                          }
-                        />
-                      </ImageListItem>
-                    ))}
-                  </ImageList>
-                )}
-                
+
                 <RentalVideoField
                   selectedFile={selectedVideo}
                   onSelectFile={setSelectedVideo}

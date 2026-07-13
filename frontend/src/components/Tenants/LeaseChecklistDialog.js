@@ -20,6 +20,7 @@ import {
   CardMedia,
 } from '@mui/material';
 import { leaseInspectionAPI } from '../../services/api/leaseInspectionAPI';
+import ImagePickerField from '../Forms/ImagePickerField';
 
 const TYPE_LABELS = {
   move_in: 'Move-in',
@@ -213,18 +214,18 @@ export default function LeaseChecklistDialog({ open, onClose, tenant, isOwner = 
 
             {!readOnly && (
               <Box sx={{ mb: 2 }}>
-                <Button variant="outlined" component="label" sx={{ mr: 1 }}>
-                  Add photos
-                  <input
-                    type="file"
-                    hidden
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
-                  />
-                </Button>
+                <ImagePickerField
+                  inputId="lease-checklist-photo-upload"
+                  selectedImages={photoFiles}
+                  onSelect={(files) => setPhotoFiles((prev) => [...prev, ...files])}
+                  onRemove={(index) => setPhotoFiles((prev) => prev.filter((_, i) => i !== index))}
+                  maxImages={20}
+                  label="Add photos"
+                  helperText="Attach photos of damage, meter readings, or room condition before uploading."
+                  disabled={saving}
+                />
                 {photoFiles.length > 0 && (
-                  <Button onClick={uploadPhotos} disabled={saving}>
+                  <Button onClick={uploadPhotos} disabled={saving} sx={{ mt: 1 }}>
                     Upload {photoFiles.length} photo(s)
                   </Button>
                 )}
