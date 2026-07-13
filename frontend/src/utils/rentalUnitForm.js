@@ -10,9 +10,13 @@ export { MIN_RENTAL_LISTING_IMAGES };
 
 export function splitListingImages(images) {
   if (!images) return [];
-  if (Array.isArray(images)) return images.filter(Boolean);
+  if (Array.isArray(images)) {
+    return images.filter((img) => img && !isLegacyLocalUploadUrl(img));
+  }
   if (typeof images === 'string') {
-    return images.split(IMAGE_SEPARATOR).filter((img) => img.trim());
+    return images
+      .split(IMAGE_SEPARATOR)
+      .filter((img) => img.trim() && !isLegacyLocalUploadUrl(img));
   }
   return [];
 }

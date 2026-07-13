@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL, resolveMediaUrl } from '../../config/api';
 import { resolveListingVideoUrl } from '../../utils/listingVideo';
+import { isLegacyLocalUploadUrl } from '../../utils/rentalUnitForm';
 
 export const reportListing = (payload) =>
   axios.post(`${API_BASE_URL}/marketplace/listing-reports`, payload);
@@ -19,10 +20,12 @@ export const normalizePublicRentalUnit = (unit) => {
   if (copy.images && typeof copy.images === 'string') {
     copy.images = copy.images
       .split('|||IMAGE_SEPARATOR|||')
-      .filter((img) => img.trim())
+      .filter((img) => img.trim() && !isLegacyLocalUploadUrl(img))
       .map((img) => resolveMediaUrl(img.trim()));
   } else if (Array.isArray(copy.images)) {
-    copy.images = copy.images.filter(Boolean).map((img) => resolveMediaUrl(img));
+    copy.images = copy.images
+      .filter((img) => img && !isLegacyLocalUploadUrl(img))
+      .map((img) => resolveMediaUrl(img));
   } else {
     copy.images = [];
   }
