@@ -159,8 +159,8 @@ export function buildAdminUnitColumns({
         <TableActions
           actions={[
             { icon: <ViewIcon fontSize="small" />, label: 'View Details', onClick: () => handleView(unit) },
-            { icon: <EditIcon fontSize="small" />, label: 'Edit Unit', onClick: () => handleOpenDialog({ ...unit, isRentalUnit: true }) },
-            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Unit', onClick: () => handleDelete(unit.id, true), danger: true },
+            { icon: <EditIcon fontSize="small" />, label: 'Edit Unit', onClick: () => handleOpenDialog(unit) },
+            { icon: <DeleteIcon fontSize="small" />, label: 'Delete Unit', onClick: () => handleDelete(unit.id), danger: true },
           ]}
         />
       ),

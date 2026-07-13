@@ -323,12 +323,7 @@ const AdminUnits = () => {
       
       let createdUnit;
       if (editingUnit) {
-        // Update existing unit
-        if (editingUnit.isRentalUnit) {
-          createdUnit = await unitAPI.updateRentalUnit(editingUnit.id, unitData);
-        } else {
-          createdUnit = await unitAPI.updateUnit(editingUnit.id, unitData);
-        }
+        createdUnit = await unitAPI.updateRentalUnit(editingUnit.id, unitData);
       } else {
         // Create new rental unit WITH base64 images
         const response = await unitAPI.createRentalUnit(unitData);
@@ -407,7 +402,7 @@ const AdminUnits = () => {
     }
   };
 
-  const handleDelete = async (unitId, isRentalUnit = false) => {
+  const handleDelete = async (unitId) => {
     const confirmed = await adminConfirm(
       'Delete unit?',
       'This listing will be permanently removed from the marketplace.',
@@ -417,11 +412,7 @@ const AdminUnits = () => {
     if (!confirmed) return;
 
     try {
-        if (isRentalUnit) {
-          await unitAPI.deleteRentalUnit(unitId);
-        } else {
-          await unitAPI.deleteUnit(unitId);
-        }
+        await unitAPI.deleteRentalUnit(unitId);
         // Success - refresh data immediately
         await loadUnits();
         setError(null); // Clear any previous errors
