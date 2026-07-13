@@ -45,6 +45,8 @@ import { DEFAULT_INSPECTION_FEE_UGX, BOOKING_TIME_SLOTS } from '../../constants/
 import { isListingSaved, toggleSavedListing } from '../../utils/favorites';
 import DisplayPrice from '../../components/Public/DisplayPrice';
 import WatermarkedImage from '../../components/Public/WatermarkedImage';
+import ListingVideoBadge from '../../components/Public/ListingVideoBadge';
+import ListingVideoPlayer from '../../components/Public/ListingVideoPlayer';
 import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
 import { convertAmount, normalizeCurrency } from '../../config/currencyLocale';
 import { getRentalStatusMeta, normalizeRentalStatus } from '../../utils/rentalStatus';
@@ -279,6 +281,7 @@ const RentalUnitDetails = () => {
             <Chip label="NIN-verified agent" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
           )}
           <Chip label={unit.country || 'Uganda'} size="small" variant="outlined" />
+          <ListingVideoBadge unit={unit} />
         </Box>
 
         <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, color: '#222' }}>
@@ -326,25 +329,13 @@ const RentalUnitDetails = () => {
           )}
         </Grid>
 
-        {unit.video_url && (
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Property walkthrough
-            </Typography>
-            <Box
-              component="video"
-              src={unit.video_url}
-              controls
-              playsInline
-              sx={{
-                width: '100%',
-                maxHeight: 480,
-                borderRadius: '16px',
-                bgcolor: '#000',
-              }}
-            />
-          </Box>
-        )}
+        <Box sx={{ mb: 4 }}>
+          <ListingVideoPlayer
+            unit={unit}
+            poster={unit.images?.[0]}
+            sx={{ mt: 1 }}
+          />
+        </Box>
 
         <Grid container spacing={6}>
           <Grid item xs={12} md={8}>

@@ -23,12 +23,15 @@ import {
   People,
   Nightlight,
   HomeWork,
+  Videocam,
 } from '@mui/icons-material';
 import { isListingSaved, toggleSavedListing } from '../../utils/favorites';
 import { getRentalStatusMeta } from '../../utils/rentalStatus';
 import { getAirbnbPropertyTypeLabel, getListingStatusMeta } from '../../constants/airbnb';
 import DisplayPrice from '../Public/DisplayPrice';
 import WatermarkedImage from '../Public/WatermarkedImage';
+import ListingVideoBadge from '../Public/ListingVideoBadge';
+import { hasListingVideo } from '../../utils/listingVideo';
 import { colors, layout, typography } from '../../theme/designTokens';
 
 const verifiedLabel = (property) =>
@@ -94,6 +97,8 @@ const PropertyCard = ({ property, onClick, variant = 'rental' }) => {
     property.rent ||
     0;
   const pricePeriod = isAirbnb || property.price_per_night ? '/ night' : '/ month';
+  const showVideoBadge = !isAirbnb;
+  const listingHasVideo = showVideoBadge && hasListingVideo(property);
 
   const handlePrevImage = (e) => {
     e.stopPropagation();
@@ -208,6 +213,23 @@ const PropertyCard = ({ property, onClick, variant = 'rental' }) => {
             }}
             onClick={(e) => e.stopPropagation()}
           />
+          {showVideoBadge && listingHasVideo && (
+            <Chip
+              icon={<Videocam sx={{ fontSize: '14px !important' }} />}
+              label="Video"
+              size="small"
+              sx={{
+                height: 26,
+                fontWeight: 700,
+                fontSize: '0.68rem',
+                color: '#5b21b6',
+                bgcolor: alpha('#fff', 0.92),
+                backdropFilter: 'blur(8px)',
+                '& .MuiChip-icon': { color: '#7c3aed' },
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </Stack>
 
         {/* Save */}
@@ -414,6 +436,10 @@ const PropertyCard = ({ property, onClick, variant = 'rental' }) => {
           >
             Ref {property.listing_code}
           </Typography>
+        )}
+
+        {showVideoBadge && (
+          <ListingVideoBadge unit={property} variant="outlined" sx={{ alignSelf: 'flex-start' }} />
         )}
 
         <Box

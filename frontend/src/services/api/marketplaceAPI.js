@@ -13,6 +13,9 @@ export const fetchPublicRentals = (params = {}) =>
 export const fetchPublicRentalById = (id) =>
   axios.get(`${API_BASE_URL}/rental-units/public/${id}`);
 
+import { resolveMediaUrl } from '../../config/api';
+import { resolveListingVideoUrl } from '../../utils/listingVideo';
+
 export const normalizePublicRentalUnit = (unit) => {
   const copy = { ...unit };
   if (copy.images && typeof copy.images === 'string') {
@@ -24,6 +27,9 @@ export const normalizePublicRentalUnit = (unit) => {
     copy.images = copy.images.filter(Boolean).map((img) => resolveMediaUrl(img));
   } else {
     copy.images = [];
+  }
+  if (copy.video_url) {
+    copy.video_url = resolveListingVideoUrl(copy.video_url);
   }
   return copy;
 };

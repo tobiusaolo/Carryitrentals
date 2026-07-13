@@ -86,6 +86,8 @@ import {
 } from '../../utils/rentalUnitForm';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
 import ImagePickerField from '../../components/Forms/ImagePickerField';
+import ListingVideoPlayer from '../../components/Public/ListingVideoPlayer';
+import ListingVideoBadge from '../../components/Public/ListingVideoBadge';
 import { buildAdminUnitColumns } from './columns/adminUnitColumns';
 import adminConfirm from '../../components/Admin/AdminConfirmDialog';
 
@@ -1277,6 +1279,13 @@ const AdminUnits = () => {
                   </Box>
                 </Box>
               )}
+
+              <Box sx={{ px: 5, pt: 3, pb: 1, bgcolor: '#fafbfc' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <ListingVideoBadge unit={viewingUnit} />
+                </Box>
+                <ListingVideoPlayer unit={viewingUnit} />
+              </Box>
 
               {/* Content Section */}
               <Box sx={{ p: 5, background: '#fafbfc' }}>

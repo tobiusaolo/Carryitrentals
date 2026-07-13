@@ -50,6 +50,8 @@ import { fetchMyListingRequests } from '../../services/api/listingRequestAPI';
 import useOwnerSoftRefresh from '../../hooks/useOwnerSoftRefresh';
 import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
+import ListingVideoPlayer from '../../components/Public/ListingVideoPlayer';
+import ListingVideoBadge from '../../components/Public/ListingVideoBadge';
 import { showSuccess, showError } from '../../utils/sweetAlert';
 
 function listingImageUrls(images) {
@@ -351,16 +353,20 @@ const UnitsForRent = () => {
             {
               id: 'marketplace',
               label: 'Marketplace',
-              render: (unit) =>
-                isListingDraft(unit) ? (
-                  <Chip
-                    size="small"
-                    color="warning"
-                    label={`Draft · ${countListingImages(unit)}/${MIN_RENTAL_LISTING_IMAGES} photos`}
-                  />
-                ) : (
-                  <Chip size="small" color="success" variant="outlined" label="Live" />
-                ),
+              render: (unit) => (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, alignItems: 'flex-start' }}>
+                  {isListingDraft(unit) ? (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={`Draft · ${countListingImages(unit)}/${MIN_RENTAL_LISTING_IMAGES} photos`}
+                    />
+                  ) : (
+                    <Chip size="small" color="success" variant="outlined" label="Live" />
+                  )}
+                  <ListingVideoBadge unit={unit} variant="outlined" />
+                </Box>
+              ),
             },
             {
               id: 'status',
@@ -434,6 +440,12 @@ const UnitsForRent = () => {
                   </ImageList>
                 </Grid>
               )}
+              <Grid item xs={12}>
+                <ListingVideoPlayer
+                  unit={viewingUnit}
+                  poster={listingImageUrls(viewingUnit.images)[0]}
+                />
+              </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="caption" color="text.secondary">
                   Unit type

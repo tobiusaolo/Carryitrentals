@@ -60,12 +60,12 @@ const WatermarkedImage = ({
             sx={{
               transform: 'rotate(-28deg)',
               fontSize: isCard
-                ? { xs: '0.7rem', sm: '0.8rem' }
-                : { xs: '0.9rem', sm: '1.1rem', md: '1.35rem' },
-              fontWeight: 800,
-              color: 'rgba(255,255,255,0.42)',
-              textShadow: '0 2px 10px rgba(0,0,0,0.55)',
-              letterSpacing: '0.1em',
+                ? { xs: '0.55rem', sm: '0.62rem' }
+                : { xs: '0.72rem', sm: '0.85rem', md: '1rem' },
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.22)',
+              textShadow: '0 1px 4px rgba(0,0,0,0.25)',
+              letterSpacing: '0.14em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
               userSelect: 'none',

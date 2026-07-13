@@ -20,6 +20,7 @@ import TableActions from '../../../components/UI/TableActions';
 import { isCommercialUnit } from '../../../constants/rentalUnit';
 import { RENTAL_STATUS_OPTIONS } from '../../../utils/rentalStatus';
 import { formatMoney } from '../../../utils/formatMoney';
+import ListingVideoBadge from '../../../components/Public/ListingVideoBadge';
 
 export function buildAdminUnitColumns({
   handleStatusChange,
@@ -91,6 +92,11 @@ export function buildAdminUnitColumns({
           )}
         </Box>
       ),
+    },
+    {
+      id: 'video',
+      label: 'Video',
+      render: (unit) => <ListingVideoBadge unit={unit} variant="outlined" />,
     },
     {
       id: 'status',
