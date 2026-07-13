@@ -11,5 +11,12 @@ export function resolveListingVideoUrl(videoUrl) {
   if (!videoUrl) return '';
   const trimmed = String(videoUrl).trim();
   if (!trimmed) return '';
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:')
+  ) {
+    return trimmed;
+  }
   return resolveMediaUrl(trimmed);
 }

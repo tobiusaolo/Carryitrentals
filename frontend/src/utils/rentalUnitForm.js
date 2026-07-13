@@ -17,6 +17,19 @@ export function splitListingImages(images) {
   return [];
 }
 
+/** Local server upload paths break after cloud deploy — must be re-uploaded to R2. */
+export function isLegacyLocalUploadUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed.includes('/uploads/unit_images/')) return false;
+  if (trimmed.includes('r2.dev') || trimmed.includes('r2.cloudflarestorage.com')) return false;
+  return true;
+}
+
+export function filterPersistedListingImages(images) {
+  return splitListingImages(images).filter((img) => !isLegacyLocalUploadUrl(img));
+}
+
 export function countListingImages(unitOrImages) {
   if (unitOrImages && typeof unitOrImages === 'object' && !Array.isArray(unitOrImages)) {
     return splitListingImages(unitOrImages.images).length;
@@ -50,6 +63,7 @@ export async function imagesPayloadFromSelection(selectedImages) {
   const base64Images = [];
   for (const item of selectedImages) {
     if (typeof item === 'string' && item.trim()) {
+      if (isLegacyLocalUploadUrl(item)) continue;
       base64Images.push(item.trim());
     } else if (item instanceof File || item instanceof Blob) {
       base64Images.push(await fileToBase64(item));

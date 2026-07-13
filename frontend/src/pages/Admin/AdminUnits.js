@@ -83,6 +83,7 @@ import {
   rentalFormFromUnit,
   imagesPayloadFromSelection,
   splitListingImages,
+  filterPersistedListingImages,
 } from '../../utils/rentalUnitForm';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
 import ImagePickerField from '../../components/Forms/ImagePickerField';
@@ -213,7 +214,15 @@ const AdminUnits = () => {
     if (unit) {
       setEditingUnit(unit);
       setFormData(rentalFormFromUnit(unit));
-      setSelectedImages(splitListingImages(unit.images));
+      const allImages = splitListingImages(unit.images);
+      const persistedImages = filterPersistedListingImages(unit.images);
+      if (allImages.length > persistedImages.length) {
+        showWarning(
+          'Photos need re-upload',
+          'Some photos were stored on the old server disk and are no longer available. Please add at least 5 photos again before saving.'
+        );
+      }
+      setSelectedImages(persistedImages);
       setExistingVideoUrl(unit.video_url || '');
       setSelectedVideo(null);
       setRemoveVideo(false);

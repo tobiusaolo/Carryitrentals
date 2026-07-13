@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, alpha, CircularProgress } from '@mui/material';
 import { PlayCircleOutline, VideocamOff } from '@mui/icons-material';
 import { hasListingVideo, resolveListingVideoUrl } from '../../utils/listingVideo';
@@ -20,6 +20,17 @@ export default function ListingVideoPlayer({
   );
   const [loading, setLoading] = useState(Boolean(videoSrc));
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setLoading(Boolean(videoSrc));
+    setError(false);
+  }, [videoSrc]);
+
+  useEffect(() => {
+    if (!videoSrc || error) return undefined;
+    const timer = window.setTimeout(() => setLoading(false), 6000);
+    return () => window.clearTimeout(timer);
+  }, [videoSrc, error]);
 
   if (!hasListingVideo(unit)) {
     return (
@@ -83,6 +94,7 @@ export default function ListingVideoPlayer({
               justifyContent: 'center',
               bgcolor: alpha('#000', 0.35),
               zIndex: 1,
+              pointerEvents: 'none',
             }}
           >
             <CircularProgress size={36} sx={{ color: '#fff' }} />
@@ -90,7 +102,7 @@ export default function ListingVideoPlayer({
         )}
 
         {error ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Box sx={{ p: 3, textAlign: 'center', minHeight: 200, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Typography variant="body2" sx={{ color: '#fff', mb: 1 }}>
               Could not load video in browser.
             </Typography>
@@ -106,24 +118,24 @@ export default function ListingVideoPlayer({
             </Typography>
           </Box>
         ) : (
-          <Box
-            component="video"
+          <video
+            key={videoSrc}
             src={videoSrc}
             poster={poster}
             controls
             playsInline
-            preload="metadata"
-            onLoadedData={() => setLoading(false)}
+            preload="auto"
+            onLoadedMetadata={() => setLoading(false)}
             onCanPlay={() => setLoading(false)}
             onError={() => {
               setLoading(false);
               setError(true);
             }}
-            sx={{
+            style={{
               width: '100%',
               maxHeight: 480,
               display: 'block',
-              bgcolor: '#000',
+              backgroundColor: '#000',
             }}
           />
         )}
