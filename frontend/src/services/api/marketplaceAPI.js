@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, resolveMediaUrl } from '../../config/api';
+import { resolveListingVideoUrl } from '../../utils/listingVideo';
 
 export const reportListing = (payload) =>
   axios.post(`${API_BASE_URL}/marketplace/listing-reports`, payload);
@@ -12,9 +13,6 @@ export const fetchPublicRentals = (params = {}) =>
 
 export const fetchPublicRentalById = (id) =>
   axios.get(`${API_BASE_URL}/rental-units/public/${id}`);
-
-import { resolveMediaUrl } from '../../config/api';
-import { resolveListingVideoUrl } from '../../utils/listingVideo';
 
 export const normalizePublicRentalUnit = (unit) => {
   const copy = { ...unit };
