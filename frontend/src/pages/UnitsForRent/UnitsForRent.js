@@ -52,6 +52,8 @@ import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
 import RentalVideoField from '../../components/Forms/RentalVideoField';
 import ListingVideoPlayer from '../../components/Public/ListingVideoPlayer';
 import ListingVideoBadge from '../../components/Public/ListingVideoBadge';
+import ListingAvailabilityMeta from '../../components/Public/ListingAvailabilityMeta';
+import ListingInspectionBookingsBadge from '../../components/Public/ListingInspectionBookingsBadge';
 import { showSuccess, showError } from '../../utils/sweetAlert';
 
 function listingImageUrls(images) {
@@ -365,6 +367,8 @@ const UnitsForRent = () => {
                     <Chip size="small" color="success" variant="outlined" label="Live" />
                   )}
                   <ListingVideoBadge unit={unit} variant="outlined" />
+                  <ListingInspectionBookingsBadge unit={unit} variant="outlined" />
+                  <ListingAvailabilityMeta unit={unit} variant="caption" />
                 </Box>
               ),
             },

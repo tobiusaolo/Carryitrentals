@@ -21,6 +21,8 @@ import { isCommercialUnit } from '../../../constants/rentalUnit';
 import { RENTAL_STATUS_OPTIONS } from '../../../utils/rentalStatus';
 import { formatMoney } from '../../../utils/formatMoney';
 import ListingVideoBadge from '../../../components/Public/ListingVideoBadge';
+import ListingAvailabilityMeta from '../../../components/Public/ListingAvailabilityMeta';
+import ListingInspectionBookingsBadge from '../../../components/Public/ListingInspectionBookingsBadge';
 
 export function buildAdminUnitColumns({
   handleStatusChange,
@@ -97,6 +99,16 @@ export function buildAdminUnitColumns({
       id: 'video',
       label: 'Video',
       render: (unit) => <ListingVideoBadge unit={unit} variant="outlined" />,
+    },
+    {
+      id: 'listed',
+      label: 'Listed',
+      render: (unit) => <ListingAvailabilityMeta unit={unit} variant="caption" />,
+    },
+    {
+      id: 'viewings',
+      label: 'Viewings',
+      render: (unit) => <ListingInspectionBookingsBadge unit={unit} variant="outlined" />,
     },
     {
       id: 'status',

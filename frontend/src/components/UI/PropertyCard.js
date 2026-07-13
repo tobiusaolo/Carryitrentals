@@ -31,6 +31,8 @@ import { getAirbnbPropertyTypeLabel, getListingStatusMeta } from '../../constant
 import DisplayPrice from '../Public/DisplayPrice';
 import WatermarkedImage from '../Public/WatermarkedImage';
 import ListingVideoBadge from '../Public/ListingVideoBadge';
+import ListingAvailabilityMeta from '../Public/ListingAvailabilityMeta';
+import ListingInspectionBookingsBadge from '../Public/ListingInspectionBookingsBadge';
 import { hasListingVideo } from '../../utils/listingVideo';
 import { colors, layout, typography } from '../../theme/designTokens';
 
@@ -441,6 +443,12 @@ const PropertyCard = ({ property, onClick, variant = 'rental' }) => {
         {showVideoBadge && (
           <ListingVideoBadge unit={property} variant="outlined" sx={{ alignSelf: 'flex-start' }} />
         )}
+
+        {showVideoBadge && (
+          <ListingInspectionBookingsBadge unit={property} variant="outlined" sx={{ alignSelf: 'flex-start' }} />
+        )}
+
+        <ListingAvailabilityMeta unit={property} variant="caption" />
 
         <Box
           sx={{

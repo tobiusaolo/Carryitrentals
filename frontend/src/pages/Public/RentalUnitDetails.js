@@ -47,6 +47,9 @@ import DisplayPrice from '../../components/Public/DisplayPrice';
 import WatermarkedImage from '../../components/Public/WatermarkedImage';
 import ListingVideoBadge from '../../components/Public/ListingVideoBadge';
 import ListingVideoPlayer from '../../components/Public/ListingVideoPlayer';
+import ListingAvailabilityMeta from '../../components/Public/ListingAvailabilityMeta';
+import ListingInspectionBookingsBadge from '../../components/Public/ListingInspectionBookingsBadge';
+import { formatInspectionBookingsLabel } from '../../utils/listingInspections';
 import { useViewerCurrency } from '../../contexts/ViewerCurrencyContext';
 import { convertAmount, normalizeCurrency } from '../../config/currencyLocale';
 import { getRentalStatusMeta, normalizeRentalStatus } from '../../utils/rentalStatus';
@@ -282,18 +285,21 @@ const RentalUnitDetails = () => {
           )}
           <Chip label={unit.country || 'Uganda'} size="small" variant="outlined" />
           <ListingVideoBadge unit={unit} />
+          <ListingInspectionBookingsBadge unit={unit} />
         </Box>
 
         <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, color: '#222' }}>
           {unit.title || unit.name}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
           <LocationOn sx={{ fontSize: 18 }} />
           <Typography variant="body2" sx={{ fontWeight: 600, textDecoration: 'underline' }}>
             {unit.location}
           </Typography>
         </Box>
+
+        <ListingAvailabilityMeta unit={unit} sx={{ mb: 3 }} />
 
         <TrustBanner />
         <Button size="small" color="error" onClick={() => setReportOpen(true)} sx={{ mb: 2, fontWeight: 700 }}>
@@ -344,8 +350,7 @@ const RentalUnitDetails = () => {
               {unit.agent_name ? ` · Agent: ${unit.agent_name}` : ''}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              {unit.bedrooms || 0} bedrooms · {unit.bathrooms || 0} bathrooms
-              {unit.inspection_bookings_count > 0 && ` · ${unit.inspection_bookings_count} viewing requests`}
+              {unit.bedrooms || 0} bedrooms · {unit.bathrooms || 0} bathrooms · {formatInspectionBookingsLabel(unit)}
             </Typography>
 
             <Divider sx={{ my: 4 }} />
