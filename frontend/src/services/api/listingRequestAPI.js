@@ -38,6 +38,14 @@ export const listingRequestAPI = {
   getAll: (params = {}) => authService.get('/listing-requests/', { params, cache: false }),
   getById: (id) => authService.get(`/listing-requests/${id}`, { cache: false }),
   update: (id, data) => authService.patch(`/listing-requests/${id}`, data),
+  uploadVideo: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return authService.post(`/listing-requests/${id}/upload-video`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000,
+    });
+  },
 };
 
 /** Safe load for owner pages — never throws on 404/403 (e.g. stale backend or admin session). */

@@ -16,6 +16,7 @@ import {
 import { listingRequestAPI } from '../../services/api/listingRequestAPI';
 import { showSuccess } from '../../utils/sweetAlert';
 import { ownerPrimaryButtonSx, portalOutlinedButtonSx } from '../../theme/designTokens';
+import RentalVideoField from '../Forms/RentalVideoField';
 export default function ListingRequestDialog({
   open,
   onClose,
@@ -31,6 +32,7 @@ export default function ListingRequestDialog({
   const [unitId, setUnitId] = useState(defaultUnitId);
   const [title, setTitle] = useState(defaultTitle);
   const [message, setMessage] = useState('');
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -43,6 +45,7 @@ export default function ListingRequestDialog({
       setUnitId(defaultUnitId || '');
       setTitle(defaultTitle || '');
       setMessage('');
+      setSelectedVideo(null);
       setError(null);
     }
   }, [open, defaultPropertyId, defaultUnitId, defaultTitle]);
@@ -55,13 +58,17 @@ export default function ListingRequestDialog({
     setLoading(true);
     setError(null);
     try {
-      await listingRequestAPI.submit({
+      const res = await listingRequestAPI.submit({
         request_type: requestType,
         property_id: propertyId,
         unit_id: unitId || undefined,
         title: title.trim() || undefined,
         message: message.trim() || undefined,
       });
+      const requestId = res?.data?.id;
+      if (selectedVideo && requestId) {
+        await listingRequestAPI.uploadVideo(requestId, selectedVideo);
+      }
       try {
         await onSubmitted?.();
       } catch (refreshErr) {
@@ -147,6 +154,15 @@ export default function ListingRequestDialog({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
+
+        {requestType === 'rental_unit' && (
+          <RentalVideoField
+            selectedFile={selectedVideo}
+            onSelectFile={setSelectedVideo}
+            onClear={() => setSelectedVideo(null)}
+            disabled={loading}
+          />
+        )}
 
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           You will receive a notification when your listing is published or if more info is needed.

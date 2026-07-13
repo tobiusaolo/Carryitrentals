@@ -86,6 +86,7 @@ import {
   imagesPayloadFromSelection,
   splitListingImages,
 } from '../../utils/rentalUnitForm';
+import RentalVideoField from '../../components/Forms/RentalVideoField';
 import { buildAdminUnitColumns } from './columns/adminUnitColumns';
 import adminConfirm from '../../components/Admin/AdminConfirmDialog';
 
@@ -106,6 +107,9 @@ const AdminUnits = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [existingVideoUrl, setExistingVideoUrl] = useState('');
+  const [removeVideo, setRemoveVideo] = useState(false);
   const [formData, setFormData] = useState(emptyRentalFormState());
 
   useEffect(() => {
@@ -207,10 +211,16 @@ const AdminUnits = () => {
       setEditingUnit(unit);
       setFormData(rentalFormFromUnit(unit));
       setSelectedImages(splitListingImages(unit.images));
+      setExistingVideoUrl(unit.video_url || '');
+      setSelectedVideo(null);
+      setRemoveVideo(false);
     } else {
       setEditingUnit(null);
       setFormData(emptyRentalFormState());
       setSelectedImages([]);
+      setExistingVideoUrl('');
+      setSelectedVideo(null);
+      setRemoveVideo(false);
     }
     setActiveStep(0);
     setOpenDialog(true);
@@ -247,6 +257,9 @@ const AdminUnits = () => {
     setEditingUnit(null);
     setActiveStep(0);
     setSelectedImages([]);
+    setSelectedVideo(null);
+    setExistingVideoUrl('');
+    setRemoveVideo(false);
     // Reset form data
     setFormData(emptyRentalFormState());
   };
@@ -315,13 +328,19 @@ const AdminUnits = () => {
         createdUnit = response.data || response;
         
         // Log the actual response structure
-        console.log('📦 Full API response object:', response);
         console.log('📦 Response.data:', response.data);
         if (response && response.data) {
           console.log('📦 Response.data.agent_id:', response.data.agent_id, '(type:', typeof response.data.agent_id, ')');
           console.log('📦 Response.data.agent_name:', response.data.agent_name);
           console.log('📦 Response.data keys:', Object.keys(response.data));
         }
+      }
+      
+      const unitId = editingUnit?.id || createdUnit?.data?.id || createdUnit?.id;
+      if (unitId && selectedVideo) {
+        await unitAPI.uploadRentalUnitVideo(unitId, selectedVideo);
+      } else if (unitId && removeVideo && existingVideoUrl) {
+        await unitAPI.removeRentalUnitVideo(unitId);
       }
       
       console.log('✅ Unit created/updated successfully:', {
@@ -902,6 +921,20 @@ const AdminUnits = () => {
                       ))}
                     </ImageList>
                   )}
+                  
+                  <RentalVideoField
+                    existingUrl={removeVideo ? '' : existingVideoUrl}
+                    selectedFile={selectedVideo}
+                    onSelectFile={(file) => {
+                      setSelectedVideo(file);
+                      setRemoveVideo(false);
+                    }}
+                    onClear={() => {
+                      setSelectedVideo(null);
+                      setRemoveVideo(true);
+                    }}
+                    disabled={submitting}
+                  />
                   
                   {uploadingImages && (
                     <Box sx={{ mt: 2 }}>

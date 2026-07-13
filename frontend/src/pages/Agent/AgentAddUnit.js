@@ -41,6 +41,8 @@ import NotificationSystem from '../../components/UI/NotificationSystem';
 import api from '../../services/api/api';
 import { emptyRentalFormState, UNIT_TYPE_OPTIONS, CURRENCY_OPTIONS, COUNTRY_OPTIONS, MIN_RENTAL_LISTING_IMAGES } from '../../constants/rentalUnit';
 import { buildRentalUnitPayload, imagesPayloadFromSelection } from '../../utils/rentalUnitForm';
+import RentalVideoField from '../../components/Forms/RentalVideoField';
+import { unitAPI } from '../../services/api/unitAPI';
 import { RENTAL_STATUS_OPTIONS } from '../../utils/rentalStatus';
 
 const Transition = React.forwardRef(function Transition(props, ref) {
@@ -53,6 +55,7 @@ const AgentAddUnit = () => {
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
   const [successDialog, setSuccessDialog] = useState(false);
   const [createdUnit, setCreatedUnit] = useState(null);
@@ -131,8 +134,12 @@ const AgentAddUnit = () => {
       const unitData = buildRentalUnitPayload(formData, { images, includeAgentId: false });
 
       const response = await api.post('/rental-units/', unitData);
+      const created = response.data;
+      if (selectedVideo && created?.id) {
+        await unitAPI.uploadRentalUnitVideo(created.id, selectedVideo);
+      }
       
-      setCreatedUnit(response.data);
+      setCreatedUnit(created);
       setSuccessDialog(true);
     } catch (err) {
       console.error('Failed to save unit:', err);
@@ -433,6 +440,13 @@ const AgentAddUnit = () => {
                     ))}
                   </ImageList>
                 )}
+                
+                <RentalVideoField
+                  selectedFile={selectedVideo}
+                  onSelectFile={setSelectedVideo}
+                  onClear={() => setSelectedVideo(null)}
+                  disabled={loading}
+                />
                 
                 {uploadingImages && (
                   <Box sx={{ mt: 2 }}>

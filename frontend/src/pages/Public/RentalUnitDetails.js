@@ -326,6 +326,26 @@ const RentalUnitDetails = () => {
           )}
         </Grid>
 
+        {unit.video_url && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Property walkthrough
+            </Typography>
+            <Box
+              component="video"
+              src={unit.video_url}
+              controls
+              playsInline
+              sx={{
+                width: '100%',
+                maxHeight: 480,
+                borderRadius: '16px',
+                bgcolor: '#000',
+              }}
+            />
+          </Box>
+        )}
+
         <Grid container spacing={6}>
           <Grid item xs={12} md={8}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>

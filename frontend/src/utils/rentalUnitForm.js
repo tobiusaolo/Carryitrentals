@@ -127,6 +127,7 @@ export function rentalFormFromUnit(unit) {
     is_furnished: Boolean(unit.is_furnished),
     images: unit.images || '',
     agent_id: unit.agent_id != null ? String(unit.agent_id) : '',
+    video_url: unit.video_url || '',
   };
 }
 

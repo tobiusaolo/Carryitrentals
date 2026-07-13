@@ -93,6 +93,17 @@ export const unitAPI = {
     });
   },
 
+  uploadRentalUnitVideo: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return authService.post(`/rental-units/${id}/upload-video`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000,
+    });
+  },
+
+  removeRentalUnitVideo: (id) => authService.delete(`/rental-units/${id}/video`),
+
   // Search units
   searchUnits: (query, params = {}) => {
     const queryParams = new URLSearchParams();

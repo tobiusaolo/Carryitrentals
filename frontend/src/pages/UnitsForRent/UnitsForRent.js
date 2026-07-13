@@ -49,6 +49,8 @@ import { resolveMediaUrl } from '../../config/api';
 import { fetchMyListingRequests } from '../../services/api/listingRequestAPI';
 import useOwnerSoftRefresh from '../../hooks/useOwnerSoftRefresh';
 import { useRegisterPageMeta } from '../../contexts/PageMetaContext';
+import RentalVideoField from '../../components/Forms/RentalVideoField';
+import { showSuccess, showError } from '../../utils/sweetAlert';
 
 function listingImageUrls(images) {
   if (!images) return [];
@@ -72,6 +74,9 @@ const UnitsForRent = () => {
   const [properties, setProperties] = useState([]);
   const [internalUnitsAll, setInternalUnitsAll] = useState([]);
   const [viewingUnit, setViewingUnit] = useState(null);
+  const [viewingVideo, setViewingVideo] = useState(null);
+  const [removeListingVideo, setRemoveListingVideo] = useState(false);
+  const [videoSaving, setVideoSaving] = useState(false);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [listingRequests, setListingRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -152,6 +157,32 @@ const UnitsForRent = () => {
 
   const draftListings = useMemo(() => rentalUnits.filter((u) => isListingDraft(u)), [rentalUnits]);
   const publishedListings = useMemo(() => rentalUnits.filter((u) => isListingPublished(u)), [rentalUnits]);
+
+  const openViewUnit = (unit) => {
+    setViewingUnit(unit);
+    setViewingVideo(null);
+    setRemoveListingVideo(false);
+  };
+
+  const handleSaveListingVideo = async () => {
+    if (!viewingUnit) return;
+    if (!viewingVideo && !(removeListingVideo && viewingUnit.video_url)) return;
+    setVideoSaving(true);
+    try {
+      if (viewingVideo) {
+        await unitAPI.uploadRentalUnitVideo(viewingUnit.id, viewingVideo);
+      } else if (removeListingVideo) {
+        await unitAPI.removeRentalUnitVideo(viewingUnit.id);
+      }
+      await loadRentalUnits();
+      showSuccess('Video updated', 'Your listing video was saved.');
+      setViewingUnit(null);
+    } catch (err) {
+      showError('Video failed', formatRentalApiError(err, 'Could not save video'));
+    } finally {
+      setVideoSaving(false);
+    }
+  };
 
   const openRequestDialog = (prefill = {}) => {
     setRequestPrefill({
@@ -350,7 +381,7 @@ const UnitsForRent = () => {
               render: (unit) => (
                 <TableActions
                   actions={[
-                    { icon: <ViewIcon fontSize="small" />, label: 'View details', onClick: () => setViewingUnit(unit) },
+                    { icon: <ViewIcon fontSize="small" />, label: 'View details', onClick: () => openViewUnit(unit) },
                   ]}
                 />
               ),
@@ -431,10 +462,35 @@ const UnitsForRent = () => {
                   <Typography variant="body2">{viewingUnit.description}</Typography>
                 </Grid>
               )}
+              <Grid item xs={12}>
+                <RentalVideoField
+                  existingUrl={removeListingVideo ? '' : viewingUnit.video_url}
+                  selectedFile={viewingVideo}
+                  onSelectFile={(file) => {
+                    setViewingVideo(file);
+                    setRemoveListingVideo(false);
+                  }}
+                  onClear={() => {
+                    setViewingVideo(null);
+                    setRemoveListingVideo(true);
+                  }}
+                  disabled={videoSaving}
+                />
+              </Grid>
             </Grid>
           )}
         </DialogContent>
         <DialogActions>
+          {(viewingVideo || (removeListingVideo && viewingUnit?.video_url)) && (
+            <Button
+              variant="contained"
+              onClick={() => void handleSaveListingVideo()}
+              disabled={videoSaving}
+              sx={ownerPrimaryButtonSx}
+            >
+              {videoSaving ? 'Saving…' : 'Save video'}
+            </Button>
+          )}
           <Button onClick={() => setViewingUnit(null)}>Close</Button>
         </DialogActions>
       </Dialog>
