@@ -26,7 +26,7 @@ import {
   People as PeopleIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchProperties } from '../../store/slices/propertySlice';
+import { fetchProperties, deleteProperty } from '../../store/slices/propertySlice';
 import { propertyAPI } from '../../services/api/propertyAPI';
 import adminAPI from '../../services/api/adminAPI';
 import PageHeader from '../../components/UI/PageHeader';
@@ -190,12 +190,13 @@ const AdminProperties = () => {
     const ok = await adminConfirm('Delete property?', 'This will remove the property and related data.');
     if (!ok) return;
     setLoading(true);
+    setError(null);
     try {
-      await propertyAPI.deleteProperty(propertyId);
+      await dispatch(deleteProperty(propertyId)).unwrap();
       setSuccess('Property deleted successfully!');
-      await loadProperties();
+      await dispatch(fetchProperties({ __refresh: true }));
     } catch (err) {
-      setError('Failed to delete property');
+      setError(typeof err === 'string' ? err : 'Failed to delete property');
     } finally {
       setLoading(false);
     }
